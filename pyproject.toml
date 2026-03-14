@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "octorules-cloudflare"
+version = "0.1.0"
+description = "Cloudflare provider for octorules"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+readme = "README.md"
+authors = [
+    { name = "Martin Simon" },
+    { name = "Doctena S.A." },
+]
+keywords = ["cloudflare", "rules", "iac", "octorules"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Networking :: Firewalls",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "octorules>=0.16.0",
+    "cloudflare~=4.3",
+]
+
+[project.optional-dependencies]
+wirefilter = [
+    "octorules-wirefilter>=0.3.2,<1.0",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4.0",
+    "yamllint>=1.35.0",
+    "build",
+]
+
+[project.urls]
+Homepage = "https://github.com/doctena-org/octorules-cloudflare"
+Repository = "https://github.com/doctena-org/octorules-cloudflare"
+Issues = "https://github.com/doctena-org/octorules-cloudflare/issues"
+
+[project.entry-points."octorules.providers"]
+cloudflare = "octorules_cloudflare:CloudflareProvider"
+
+[tool.setuptools.packages.find]
+
+[tool.setuptools.package-data]
+"octorules_cloudflare.linter.schemas" = ["overlay.toml", "schemas.json"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
