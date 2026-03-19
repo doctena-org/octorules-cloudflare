@@ -87,4 +87,9 @@ register_phases(_CF_PHASES)
 # Auto-register CF-specific lint rules and the lint plugin.
 register_cloudflare_linter()
 
+# Register Page Shield extension hooks.
+from octorules_cloudflare.page_shield import register_page_shield  # noqa: E402
+
+register_page_shield()
+
 __all__ = ["CloudflareProvider"]

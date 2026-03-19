@@ -34,6 +34,7 @@ def lint_lists(rules_data: dict[str, Any], ctx: LintContext) -> None:
     for i, entry in enumerate(lists_section):
         if not isinstance(entry, dict):
             continue
+        ctx.set_location(entry)
 
         name = entry.get("name")
         name_label = name if isinstance(name, str) and name else f"index {i}"

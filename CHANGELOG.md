@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Lint result locations.** YAML source locations (e.g. `doctena.com.yaml:106`)
+  now appear in lint output for all CF rules.
+- **Page Shield support** (`octorules_cloudflare.page_shield`). All Page Shield
+  planning, applying, formatting, validation, and dumping code extracted from
+  octorules core. Registered via the new extension hook system at import time.
+  - `PageShieldPolicyPlan` dataclass
+  - `diff_page_shield_policies()` — full diff using description as identity key
+  - `validate_page_shield_policy()` — offline validation
+  - `format_csp_value()` — readable multi-line YAML formatting for CSP values
+  - `normalize_csp_value()` — **CSP source sorting** so reordering sources
+    in YAML does not trigger an upstream change (source order is not
+    significant in CSP)
+  - `_apply_page_shield()` — create/update/delete via CF API
+  - `_plan_page_shield()` — plan zone hook
+  - `_dump_page_shield()` — dump hook with API field stripping
+  - `PageShieldFormatter` — text/JSON/markdown/HTML/report formatting
+
+### Changed
+- Error wrapping uses `make_error_wrapper` and `format_api_error` from
+  `octorules.provider.utils` instead of hand-rolled implementations.
+- Requires `octorules>=0.17.0`.
+
 ## [0.1.0] - 2026-03-17
 
 ### Added

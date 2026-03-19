@@ -64,6 +64,7 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
         for rule in rules:
             if not isinstance(rule, dict):
                 continue
+            ctx.set_location(rule)
 
             # Action validation
             lint_actions(rule, phase, ctx)
@@ -73,6 +74,8 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
             # Phase restriction checks
             lint_phase_restrictions(rule, phase, ctx)
+
+        ctx.clear_location()
 
     # Stage 2b: Custom ruleset rules (use waf_custom_rules phase for validation)
     lint_custom_rulesets(rules_data, ctx)
@@ -86,9 +89,11 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
                 for rule in entry.get("rules", []):
                     if not isinstance(rule, dict):
                         continue
+                    ctx.set_location(rule)
                     lint_actions(rule, waf_phase, ctx)
                     lint_expressions(rule, waf_phase, ctx)
                     lint_phase_restrictions(rule, waf_phase, ctx)
+                ctx.clear_location()
 
     # Stage 2c: Page Shield policy checks
     lint_page_shield_policies(rules_data, ctx)

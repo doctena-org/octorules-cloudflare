@@ -6,7 +6,6 @@ Public API:
 
 from __future__ import annotations
 
-import functools
 import json as _json
 import logging
 import threading
@@ -29,6 +28,7 @@ from octorules.provider.exceptions import (
     ProviderAuthError,
     ProviderError,
 )
+from octorules.provider.utils import make_error_wrapper
 
 from octorules_cloudflare.exceptions import (
     APIConnectionError,
@@ -39,20 +39,10 @@ from octorules_cloudflare.exceptions import (
     PermissionDeniedError,
 )
 
-
-def _wrap_provider_errors(fn):
-    """Wrap Cloudflare SDK exceptions as provider-agnostic base exceptions."""
-
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except (AuthenticationError, PermissionDeniedError) as e:
-            raise ProviderAuthError(str(e)) from e
-        except (APIError, APIConnectionError) as e:
-            raise ProviderError(str(e)) from e
-
-    return wrapper
+_wrap_provider_errors = make_error_wrapper(
+    auth_errors=(AuthenticationError, PermissionDeniedError),
+    generic_errors=(APIError, APIConnectionError),
+)
 
 
 def _zone_phase_set() -> set[str]:

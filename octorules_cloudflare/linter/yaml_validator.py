@@ -143,6 +143,7 @@ def _check_phase_rules(phase_name: str, rules: Any, ctx: LintContext) -> None:
             )
             continue
 
+        ctx.set_location(rule)
         ref = rule.get("ref")
         _check_rule_fields(phase_name, rule, i, ctx)
 

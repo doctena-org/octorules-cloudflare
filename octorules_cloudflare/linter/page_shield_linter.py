@@ -50,6 +50,7 @@ def lint_page_shield_policies(rules_data: dict[str, Any], ctx: LintContext) -> N
                 )
             )
             continue
+        ctx.set_location(policy)
 
         desc = policy.get("description", "")
         desc_label = desc if isinstance(desc, str) and desc else f"index {i}"

@@ -250,6 +250,8 @@ Each policy entry requires:
 - During sync, policies are applied **after** lists and **before** custom rulesets and phases.
 - Use `octorules dump` to export existing Page Shield policies to YAML.
 
+**CSP source normalization:** The order of sources within a CSP directive is not significant — `script-src 'self' example.com` and `script-src example.com 'self'` are semantically identical. octorules normalizes source order (sorted alphabetically within each directive) before comparing `value` fields, so reordering sources in your YAML will not trigger an upstream change on Cloudflare. You can freely reorganize sources for readability without causing a sync.
+
 ## Linting
 
 127 Cloudflare-specific lint rules (CF prefix) across 6 ranges:

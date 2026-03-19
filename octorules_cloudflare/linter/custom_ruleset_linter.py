@@ -30,6 +30,7 @@ def lint_custom_rulesets(rules_data: dict[str, Any], ctx: LintContext) -> None:
     for i, entry in enumerate(rulesets):
         if not isinstance(entry, dict):
             continue
+        ctx.set_location(entry)
 
         rs_id = entry.get("id")
         rs_label = rs_id if isinstance(rs_id, str) and rs_id else f"index {i}"
