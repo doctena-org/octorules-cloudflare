@@ -99,7 +99,7 @@ Phases with a default action (e.g., `redirect_rules` -> `redirect`) don't need `
 
 Phases marked as both Zone and Account work at either scope. Account-only phases are skipped for zone scopes and vice versa, eliminating wasted API calls.
 
-For the full phase reference — execution order diagram, valid actions per phase, field/function availability, and key behaviors — see [docs/lint-rules/README.md](docs/lint-rules/README.md).
+For the full phase reference — execution order diagram, valid actions per phase, field/function availability, and key behaviors — see [docs/lint/README.md](docs/lint/README.md).
 
 > **Note:** `waf_managed_exceptions` was renamed to `waf_managed_rules`. The old name still works as an alias but is deprecated — update your YAML files to use the new name.
 
@@ -265,7 +265,7 @@ Each policy entry requires:
 | CF400–CF475 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 34 |
 | CF500–CF545 | Plan limits, style & value constraints | 35 |
 
-See [docs/lint-rules/README.md](docs/lint-rules/README.md) for the full rule reference.
+See [docs/lint/README.md](docs/lint/README.md) for the full rule reference.
 
 ## Development
 
