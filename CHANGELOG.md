@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-19
+
 ### Added
 - **Lint result locations.** YAML source locations (e.g. `doctena.com.yaml:106`)
   now appear in lint output for all CF rules.
