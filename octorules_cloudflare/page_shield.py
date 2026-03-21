@@ -334,7 +334,11 @@ def _prefetch_page_shield(
         return None
 
     executor = ThreadPoolExecutor(max_workers=1)
-    future = executor.submit(provider.get_all_page_shield_policies, scope)
+    try:
+        future = executor.submit(provider.get_all_page_shield_policies, scope)
+    except Exception:
+        executor.shutdown(wait=False)
+        raise
     return (future, executor, ps_desired)
 
 
