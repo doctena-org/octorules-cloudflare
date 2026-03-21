@@ -184,10 +184,12 @@ class CloudflareProvider:
 
     @property
     def account_id(self) -> str | None:
+        """Cloudflare account ID, populated after the first resolve_zone_id call."""
         return self._account_id
 
     @property
     def account_name(self) -> str | None:
+        """Cloudflare account name, populated after the first resolve_zone_id call."""
         return self._account_name
 
     @property
