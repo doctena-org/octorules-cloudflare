@@ -386,13 +386,10 @@ def _find_in_set_duplicates(expr: str) -> list[str]:
     return duplicates
 
 
-def _lint_value_constraints(
+def _check_deprecated_fields(
     info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
 ) -> None:
-    """Check value constraints (CF520-CF541)."""
-    expr = info.raw
-
-    # CF529: Deprecated field — suggest replacement
+    """CF529: Deprecated field — suggest replacement."""
     for field_name in info.fields_used:
         replacement = _DEPRECATED_FIELDS.get(field_name)
         if replacement:
@@ -408,6 +405,9 @@ def _lint_value_constraints(
                 )
             )
 
+
+def _check_ip_values(info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext) -> None:
+    """CF530: Reserved/bogon IP address.  CF531: Overlapping IP ranges."""
     # CF530: Reserved/bogon IP address
     for ip_str in info.ip_literals:
         reserved_desc = _check_ip_reserved(ip_str)
@@ -444,6 +444,13 @@ def _lint_value_constraints(
                     suggestion=f"Remove {narrower!r} (already covered by {broader!r})",
                 )
             )
+
+
+def _check_string_literal_values(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF520-CF523, CF526-CF528: String literal and field-specific value checks."""
+    expr = info.raw
 
     # CF520: HTTP method should be uppercase
     if "http.request.method" in expr:
@@ -517,51 +524,6 @@ def _lint_value_constraints(
                             suggestion=f"Use {lit.upper()!r}",
                         )
                     )
-
-    # CF524: Score values out of typical range (per-field)
-    _SCORE_RANGES: dict[str, tuple[int, int]] = {
-        "cf.threat_score": (0, 100),
-        "cf.bot_management.score": (1, 99),
-        "cf.waf.score": (1, 99),
-        "cf.waf.score.sqli": (1, 99),
-        "cf.waf.score.xss": (1, 99),
-        "cf.waf.score.rce": (1, 99),
-        "cf.edge.server_port": (1, 65535),
-        "cf.llm.prompt.injection_score": (1, 99),
-    }
-    for score_field, (lo, hi) in _SCORE_RANGES.items():
-        if score_field not in info.fields_used:
-            continue
-        for val in _extract_field_int_values(expr, score_field):
-            if val < lo or val > hi:
-                ctx.add(
-                    LintResult(
-                        rule_id="CF524",
-                        severity=Severity.WARNING,
-                        message=(
-                            f"Score value {val} for {score_field!r}"
-                            f" is outside typical range ({lo}-{hi})"
-                        ),
-                        phase=phase_name,
-                        ref=ref,
-                        field="expression",
-                    )
-                )
-
-    # CF525: Response code out of valid range
-    if "http.response.code" in info.fields_used:
-        for val in _extract_field_int_values(expr, "http.response.code"):
-            if val < 100 or val > 599:
-                ctx.add(
-                    LintResult(
-                        rule_id="CF525",
-                        severity=Severity.WARNING,
-                        message=f"Response code {val} is outside valid range (100-599)",
-                        phase=phase_name,
-                        ref=ref,
-                        field="expression",
-                    )
-                )
 
     # CF526: Header name should be lowercase
     # Check if expression references header maps (http.request.headers, http.response.headers)
@@ -641,66 +603,74 @@ def _lint_value_constraints(
                     )
                 )
 
-    # CF532: Value domain validation — field-specific value constraints
-    _STRING_VALUE_DOMAINS: dict[str, tuple[str, object]] = {
-        "http.host": ("not_contains", "/", "hostname cannot contain '/'"),
-        "http.request.full_uri": ("starts_with", ("http://", "https://")),
-        "raw.http.request.full_uri": ("starts_with", ("http://", "https://")),
-        "http.request.method": (
-            "in",
-            frozenset(
-                {
-                    "GET",
-                    "HEAD",
-                    "POST",
-                    "PUT",
-                    "DELETE",
-                    "CONNECT",
-                    "OPTIONS",
-                    "TRACE",
-                    "PATCH",
-                    "PURGE",
-                }
-            ),
+
+# CF532: Field-specific value domain tables (module-level for reuse)
+_STRING_VALUE_DOMAINS: dict[str, tuple[str, object]] = {
+    "http.host": ("not_contains", "/", "hostname cannot contain '/'"),
+    "http.request.full_uri": ("starts_with", ("http://", "https://")),
+    "raw.http.request.full_uri": ("starts_with", ("http://", "https://")),
+    "http.request.method": (
+        "in",
+        frozenset(
+            {
+                "GET",
+                "HEAD",
+                "POST",
+                "PUT",
+                "DELETE",
+                "CONNECT",
+                "OPTIONS",
+                "TRACE",
+                "PATCH",
+                "PURGE",
+            }
         ),
-        "http.request.version": (
-            "in",
-            frozenset({"HTTP/1.0", "HTTP/1.1", "HTTP/2", "HTTP/3"}),
+    ),
+    "http.request.version": (
+        "in",
+        frozenset({"HTTP/1.0", "HTTP/1.1", "HTTP/2", "HTTP/3"}),
+    ),
+    "http.request.body.mime": ("mime",),
+    "http.response.content_type.media_type": ("mime",),
+    "ip.src.continent": ("in", frozenset({"AF", "AN", "AS", "EU", "NA", "OC", "SA", "T1"})),
+    "cf.waf.score.class": (
+        "in",
+        frozenset({"attack", "likely_attack", "likely_clean", "clean"}),
+    ),
+    "cf.tls_version": (
+        "in",
+        frozenset({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3", "none"}),
+    ),
+    "cf.response.error_type": (
+        "in",
+        frozenset(
+            {
+                "1xxx",
+                "5xx",
+                "always_online",
+                "country_challenge",
+                "ip_ban",
+                "iuam",
+                "legacy_challenge",
+                "managed_challenge",
+                "ratelimit",
+                "waf",
+            }
         ),
-        "http.request.body.mime": ("mime",),
-        "http.response.content_type.media_type": ("mime",),
-        "ip.src.continent": ("in", frozenset({"AF", "AN", "AS", "EU", "NA", "OC", "SA", "T1"})),
-        "cf.waf.score.class": (
-            "in",
-            frozenset({"attack", "likely_attack", "likely_clean", "clean"}),
-        ),
-        "cf.tls_version": (
-            "in",
-            frozenset({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3", "none"}),
-        ),
-        "cf.response.error_type": (
-            "in",
-            frozenset(
-                {
-                    "1xxx",
-                    "5xx",
-                    "always_online",
-                    "country_challenge",
-                    "ip_ban",
-                    "iuam",
-                    "legacy_challenge",
-                    "managed_challenge",
-                    "ratelimit",
-                    "waf",
-                }
-            ),
-        ),
-        "raw.http.request.uri.path": ("starts_with", ("/",)),
-        "raw.http.request.uri.path.extension": ("extension",),
-    }
-    _INT_VALUE_DOMAINS: dict[str, tuple[int, int]] = {
-        "http.request.timestamp.msec": (0, 999),
-    }
+    ),
+    "raw.http.request.uri.path": ("starts_with", ("/",)),
+    "raw.http.request.uri.path.extension": ("extension",),
+}
+_INT_VALUE_DOMAINS: dict[str, tuple[int, int]] = {
+    "http.request.timestamp.msec": (0, 999),
+}
+
+
+def _check_field_value_domains(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF532: Value domain validation — field-specific value constraints."""
+    expr = info.raw
 
     for field_name in info.fields_used:
         if field_name in _STRING_VALUE_DOMAINS:
@@ -763,6 +733,61 @@ def _lint_value_constraints(
                         )
                     )
 
+
+# CF524: Score field ranges (module-level for reuse)
+_SCORE_RANGES: dict[str, tuple[int, int]] = {
+    "cf.threat_score": (0, 100),
+    "cf.bot_management.score": (1, 99),
+    "cf.waf.score": (1, 99),
+    "cf.waf.score.sqli": (1, 99),
+    "cf.waf.score.xss": (1, 99),
+    "cf.waf.score.rce": (1, 99),
+    "cf.edge.server_port": (1, 65535),
+    "cf.llm.prompt.injection_score": (1, 99),
+}
+
+
+def _check_numeric_constraints(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF524-CF525, CF533-CF534, CF538: Numeric value range and overlap checks."""
+    expr = info.raw
+
+    # CF524: Score values out of typical range (per-field)
+    for score_field, (lo, hi) in _SCORE_RANGES.items():
+        if score_field not in info.fields_used:
+            continue
+        for val in _extract_field_int_values(expr, score_field):
+            if val < lo or val > hi:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF524",
+                        severity=Severity.WARNING,
+                        message=(
+                            f"Score value {val} for {score_field!r}"
+                            f" is outside typical range ({lo}-{hi})"
+                        ),
+                        phase=phase_name,
+                        ref=ref,
+                        field="expression",
+                    )
+                )
+
+    # CF525: Response code out of valid range
+    if "http.response.code" in info.fields_used:
+        for val in _extract_field_int_values(expr, "http.response.code"):
+            if val < 100 or val > 599:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF525",
+                        severity=Severity.WARNING,
+                        message=f"Response code {val} is outside valid range (100-599)",
+                        phase=phase_name,
+                        ref=ref,
+                        field="expression",
+                    )
+                )
+
     # CF533: Timestamp bounds
     if "http.request.timestamp.sec" in info.fields_used:
         _TIMESTAMP_MIN = 1262300400  # Jan 1, 2010
@@ -821,12 +846,48 @@ def _lint_value_constraints(
                     )
                 )
 
-    # CF535: lower()/upper() value mismatch
-    _LOWER_VALUE_RE = re.compile(r'lower\s*\([^)]+\)\s+(?:eq|ne|==|!=)\s+"((?:[^"\\]|\\.)*)"')
-    _LOWER_IN_RE = re.compile(r"lower\s*\([^)]+\)\s+in\s*\{([^}]+)\}")
-    _UPPER_VALUE_RE = re.compile(r'upper\s*\([^)]+\)\s+(?:eq|ne|==|!=)\s+"((?:[^"\\]|\\.)*)"')
-    _UPPER_IN_RE = re.compile(r"upper\s*\([^)]+\)\s+in\s*\{([^}]+)\}")
+    # CF538: Integer range start > end
+    if "in" in info.operators_used:
+        for m_set in _IN_SET_PATTERN.finditer(expr):
+            content = m_set.group(1)
+            for m_range in re.finditer(r"(\d+)\.\.(\d+)", content):
+                start, end = int(m_range.group(1)), int(m_range.group(2))
+                if start > end:
+                    ctx.add(
+                        LintResult(
+                            rule_id="CF538",
+                            severity=Severity.ERROR,
+                            message=(f"Integer range {start}..{end} has start greater than end"),
+                            phase=phase_name,
+                            ref=ref,
+                            field="expression",
+                            suggestion=f"Use {end}..{start}",
+                        )
+                    )
 
+
+# CF535: Regex patterns for lower()/upper() value mismatch (module-level, compiled once)
+_LOWER_VALUE_RE = re.compile(r'lower\s*\([^)]+\)\s+(?:eq|ne|==|!=)\s+"((?:[^"\\]|\\.)*)"')
+_LOWER_IN_RE = re.compile(r"lower\s*\([^)]+\)\s+in\s*\{([^}]+)\}")
+_UPPER_VALUE_RE = re.compile(r'upper\s*\([^)]+\)\s+(?:eq|ne|==|!=)\s+"((?:[^"\\]|\\.)*)"')
+_UPPER_IN_RE = re.compile(r"upper\s*\([^)]+\)\s+in\s*\{([^}]+)\}")
+
+# CF541: Valid first-argument fields for remove_query_args()
+_VALID_QUERY_FIELDS = frozenset(
+    {
+        "http.request.uri.query",
+        "raw.http.request.uri.query",
+    }
+)
+
+
+def _check_function_arg_constraints(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF535-CF537, CF539-CF541, CF543-CF544: Function/operator argument checks."""
+    expr = info.raw
+
+    # CF535: lower()/upper() value mismatch
     if "lower" in info.functions_used:
         for m_val in _LOWER_VALUE_RE.finditer(expr):
             val = m_val.group(1)
@@ -952,25 +1013,6 @@ def _lint_value_constraints(
                 )
             )
 
-    # CF538: Integer range start > end
-    if "in" in info.operators_used:
-        for m_set in _IN_SET_PATTERN.finditer(expr):
-            content = m_set.group(1)
-            for m_range in re.finditer(r"(\d+)\.\.(\d+)", content):
-                start, end = int(m_range.group(1)), int(m_range.group(2))
-                if start > end:
-                    ctx.add(
-                        LintResult(
-                            rule_id="CF538",
-                            severity=Severity.ERROR,
-                            message=(f"Integer range {start}..{end} has start greater than end"),
-                            phase=phase_name,
-                            ref=ref,
-                            field="expression",
-                            suggestion=f"Use {end}..{start}",
-                        )
-                    )
-
     # CF539: split() limit outside 1-128
     for call_args in _extract_function_call_args(expr, "split"):
         if len(call_args) >= 3:
@@ -1029,12 +1071,6 @@ def _lint_value_constraints(
                 pass
 
     # CF541: remove_query_args() first arg must be a query field
-    _VALID_QUERY_FIELDS = frozenset(
-        {
-            "http.request.uri.query",
-            "raw.http.request.uri.query",
-        }
-    )
     for call_args in _extract_function_call_args(expr, "remove_query_args"):
         if call_args:
             first_arg = call_args[0].strip()
@@ -1053,22 +1089,6 @@ def _lint_value_constraints(
                         field="expression",
                     )
                 )
-
-    # CF542: Invalid regex pattern in 'matches' operator
-    for regex_lit in info.regex_literals:
-        try:
-            re.compile(regex_lit)
-        except re.error as e:
-            ctx.add(
-                LintResult(
-                    rule_id="CF542",
-                    severity=Severity.WARNING,
-                    message=(f"Invalid regex pattern {regex_lit!r}: {e}"),
-                    phase=phase_name,
-                    ref=ref,
-                    field="expression",
-                )
-            )
 
     # CF543: substring() bounds validation
     # Note: CF substring supports negative indices (count from end),
@@ -1111,6 +1131,39 @@ def _lint_value_constraints(
                             suggestion=f"Use '/{path_arg}'",
                         )
                     )
+
+
+def _check_regex_patterns(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF542: Invalid regex pattern in 'matches' operator."""
+    for regex_lit in info.regex_literals:
+        try:
+            re.compile(regex_lit)
+        except re.error as e:
+            ctx.add(
+                LintResult(
+                    rule_id="CF542",
+                    severity=Severity.WARNING,
+                    message=(f"Invalid regex pattern {regex_lit!r}: {e}"),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                )
+            )
+
+
+def _lint_value_constraints(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """Check literal values against field-specific constraints (CF520-CF544)."""
+    _check_deprecated_fields(info, phase_name, ref, ctx)
+    _check_ip_values(info, phase_name, ref, ctx)
+    _check_string_literal_values(info, phase_name, ref, ctx)
+    _check_field_value_domains(info, phase_name, ref, ctx)
+    _check_numeric_constraints(info, phase_name, ref, ctx)
+    _check_function_arg_constraints(info, phase_name, ref, ctx)
+    _check_regex_patterns(info, phase_name, ref, ctx)
 
 
 def _find_int_range_overlaps(content: str) -> list[tuple[str, str]]:
