@@ -497,7 +497,7 @@ class CloudflareProvider:
                 except (AuthenticationError, PermissionDeniedError):
                     raise
                 except _json.JSONDecodeError as e:
-                    raise ValueError(
+                    raise ProviderError(
                         f"Invalid JSON in list items response for {list_id}: {e}"
                     ) from e
                 except (APIError, APIConnectionError) as e:

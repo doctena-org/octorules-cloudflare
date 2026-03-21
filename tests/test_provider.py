@@ -1333,7 +1333,7 @@ class TestGetListItemsRetry:
         raw.http_response.text = "not json {"
         mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ValueError, match="Invalid JSON"):
+        with pytest.raises(ProviderError, match="Invalid JSON"):
             provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 1
 

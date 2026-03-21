@@ -320,7 +320,7 @@ class TestListMethods:
         mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        with pytest.raises(ValueError, match="Invalid JSON"):
+        with pytest.raises(ProviderError, match="Invalid JSON"):
             provider.get_list_items(scope, "lst-1")
 
     def test_get_list_items_no_result_info(self, mock_cf_client):
