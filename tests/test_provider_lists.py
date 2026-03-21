@@ -14,6 +14,10 @@ from octorules_cloudflare import CloudflareProvider
 from .mocks import MockRule, MockRuleWithToDict
 
 
+def _acct(account_id: str = "acct-123") -> Scope:
+    return Scope(account_id=account_id)
+
+
 class TestListMethods:
     """Tests for CloudflareProvider list-related methods."""
 
@@ -126,6 +130,30 @@ class TestListMethods:
             account_id="acct-123", kind="ip", name="my_list", description=""
         )
 
+    def test_create_list_auth_error_wraps(self, mock_cf_client):
+        """AuthenticationError on create_list is wrapped as ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rules.lists.create.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Invalid API token"):
+            provider.create_list(_acct(), "my_list", "ip")
+
+    def test_create_list_api_error_wraps(self, mock_cf_client):
+        """APIError on create_list is wrapped as ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rules.lists.create.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Server Error"):
+            provider.create_list(_acct(), "my_list", "ip")
+
     # --- delete_list ---
 
     def test_delete_list(self, mock_cf_client):
@@ -135,6 +163,30 @@ class TestListMethods:
         scope = Scope(account_id="acct-123")
         provider.delete_list(scope, "lst-1")
         mock_cf_client.rules.lists.delete.assert_called_once_with("lst-1", account_id="acct-123")
+
+    def test_delete_list_auth_error_wraps(self, mock_cf_client):
+        """AuthenticationError on delete_list is wrapped as ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rules.lists.delete.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Invalid API token"):
+            provider.delete_list(_acct(), "lst-1")
+
+    def test_delete_list_api_error_wraps(self, mock_cf_client):
+        """APIError on delete_list is wrapped as ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rules.lists.delete.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Server Error"):
+            provider.delete_list(_acct(), "lst-1")
 
     # --- update_list_description ---
 
@@ -147,6 +199,30 @@ class TestListMethods:
         mock_cf_client.rules.lists.update.assert_called_once_with(
             "lst-1", account_id="acct-123", description="new description"
         )
+
+    def test_update_list_description_auth_error_wraps(self, mock_cf_client):
+        """AuthenticationError on update_list_description is wrapped as ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rules.lists.update.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Invalid API token"):
+            provider.update_list_description(_acct(), "lst-1", "new desc")
+
+    def test_update_list_description_api_error_wraps(self, mock_cf_client):
+        """APIError on update_list_description is wrapped as ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rules.lists.update.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Server Error"):
+            provider.update_list_description(_acct(), "lst-1", "new desc")
 
     # --- get_list_items ---
 
@@ -310,6 +386,43 @@ class TestListMethods:
         scope = Scope(account_id="acct-123")
         op_id = provider.put_list_items(scope, "lst-1", [])
         assert op_id == ""
+
+    def test_put_list_items_auth_error_wraps(self, mock_cf_client):
+        """AuthenticationError on put_list_items is wrapped as ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rules.lists.items.update.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Invalid API token"):
+            provider.put_list_items(_acct(), "lst-1", [{"ip": "1.2.3.4/32"}])
+
+    def test_put_list_items_api_error_wraps(self, mock_cf_client):
+        """APIError on put_list_items is wrapped as ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rules.lists.items.update.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Server Error"):
+            provider.put_list_items(_acct(), "lst-1", [{"ip": "1.2.3.4/32"}])
+
+    def test_put_list_items_permission_denied_wraps(self, mock_cf_client):
+        """PermissionDeniedError on put_list_items is wrapped as ProviderAuthError."""
+        from cloudflare import PermissionDeniedError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_cf_client.rules.lists.items.update.side_effect = PermissionDeniedError(
+            message="Forbidden", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Forbidden"):
+            provider.put_list_items(_acct(), "lst-1", [])
 
     # --- poll_bulk_operation ---
 

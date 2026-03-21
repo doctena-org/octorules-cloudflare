@@ -884,6 +884,75 @@ class TestCFApiResilience:
         assert "http_request_sbfm" not in result.failed_phases
 
 
+class TestListZones:
+    """Tests for CloudflareProvider.list_zones."""
+
+    def test_list_zones_returns_names(self, mock_cf_client):
+        """list_zones returns list of zone names."""
+        zone1 = MagicMock()
+        zone1.name = "example.com"
+        zone2 = MagicMock()
+        zone2.name = "other.com"
+        mock_cf_client.zones.list.return_value = [zone1, zone2]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        result = provider.list_zones()
+        assert result == ["example.com", "other.com"]
+        mock_cf_client.zones.list.assert_called_once()
+
+    def test_list_zones_empty(self, mock_cf_client):
+        """list_zones returns empty list when no zones accessible."""
+        mock_cf_client.zones.list.return_value = []
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        result = provider.list_zones()
+        assert result == []
+
+    def test_list_zones_auth_error_wraps(self, mock_cf_client):
+        """AuthenticationError on list_zones is wrapped as ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.zones.list.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Invalid API token"):
+            provider.list_zones()
+
+    def test_list_zones_api_error_wraps(self, mock_cf_client):
+        """APIError on list_zones is wrapped as ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.zones.list.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Server Error"):
+            provider.list_zones()
+
+    def test_list_zones_permission_denied_wraps(self, mock_cf_client):
+        """PermissionDeniedError on list_zones is wrapped as ProviderAuthError."""
+        from cloudflare import PermissionDeniedError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_cf_client.zones.list.side_effect = PermissionDeniedError(
+            message="Forbidden", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Forbidden"):
+            provider.list_zones()
+
+    def test_list_zones_connection_error_wraps(self, mock_cf_client):
+        """APIConnectionError on list_zones is wrapped as ProviderError."""
+        from cloudflare import APIConnectionError
+
+        mock_cf_client.zones.list.side_effect = APIConnectionError(request=MagicMock())
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError):
+            provider.list_zones()
+
+
 class TestResolveZoneId:
     """Tests for CloudflareProvider.resolve_zone_id."""
 
