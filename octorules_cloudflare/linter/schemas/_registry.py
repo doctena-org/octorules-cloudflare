@@ -91,7 +91,11 @@ def load_schema() -> dict:
     if data is not None:
         log.debug("Schema loaded from wirefilter + overlay.toml")
         return data
-    log.debug("wirefilter not installed, using frozen schemas.json fallback")
+    log.info(
+        "octorules-wirefilter not installed — using frozen schema fallback. "
+        "Some lint checks (unknown fields, type errors) may be less accurate. "
+        "Install with: pip install octorules-cloudflare[wirefilter]"
+    )
     return _load_fallback()
 
 
