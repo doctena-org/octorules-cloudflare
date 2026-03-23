@@ -1609,3 +1609,118 @@ class TestSupports:
         assert provider_supports(prov, SUPPORTS_LISTS)
         assert provider_supports(prov, SUPPORTS_PAGE_SHIELD)
         assert provider_supports(prov, SUPPORTS_ZONE_DISCOVERY)
+
+
+class TestMalformedProviderResponse:
+    """Stability tests: provider handles API responses with missing fields."""
+
+    def test_get_phase_rules_missing_id_in_response(self, mock_cf_client):
+        """Provider handles rules with missing 'id' field in API response."""
+        mock_cf_client.rulesets.phases.get.return_value = MockRuleset(
+            rules=[
+                {"expression": "true", "action": "block"},  # No id, no ref
+                {"id": "rule-2", "ref": "r2", "expression": "false", "action": "skip"},
+            ]
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        rules = provider.get_phase_rules(_zs(), "http_request_firewall_custom")
+        # Should not crash (no KeyError) — returns both rules as dicts
+        assert len(rules) == 2
+        assert "id" not in rules[0]
+        assert "ref" not in rules[0]
+        assert rules[0]["expression"] == "true"
+        assert rules[1]["id"] == "rule-2"
+
+    def test_get_phase_rules_completely_empty_rule_dict(self, mock_cf_client):
+        """Provider handles a rule that converts to an empty dict."""
+        # _rule_to_dict will produce {} for an unconvertible object, but
+        # plain dict passthrough returns it as-is
+        mock_cf_client.rulesets.phases.get.return_value = MockRuleset(
+            rules=[
+                {},  # Completely empty rule
+                {"ref": "r1", "expression": "true", "action": "block"},
+            ]
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        rules = provider.get_phase_rules(_zs(), "http_request_firewall_custom")
+        assert len(rules) == 2
+        assert rules[0] == {}
+        assert rules[1]["ref"] == "r1"
+
+    def test_get_all_lists_missing_name_in_response(self, mock_cf_client):
+        """Provider handles list entries with missing 'name' field gracefully."""
+        import json
+
+        # Mock list_lists to return entries where _ruleset_to_dict gives
+        # dicts with missing fields — list_lists uses .get() so it fills
+        # defaults, but the upstream SDK object might be strange.
+        # Simulate: one list with a name, one without.
+        list_with_name = MagicMock()
+        list_with_name.model_dump.return_value = {
+            "id": "lst-1",
+            "name": "my_list",
+            "kind": "ip",
+            "description": "A list",
+        }
+        list_without_name = MagicMock()
+        list_without_name.model_dump.return_value = {
+            "id": "lst-2",
+            "kind": "hostname",
+            # "name" is missing entirely
+        }
+        mock_cf_client.rules.lists.list.return_value = [list_with_name, list_without_name]
+
+        # Mock get_list_items for both lists
+        def _mock_raw(list_id, **kwargs):
+            body = {"result": [{"ip": "1.2.3.4"}], "result_info": {}}
+            raw = MagicMock()
+            raw.http_response.text = json.dumps(body)
+            return raw
+
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = _mock_raw
+
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        result = provider.get_all_lists(scope)
+        # Should not crash — the list without a name gets name=""
+        assert "my_list" in result
+        assert "" in result  # The nameless list uses empty string as key
+        assert result["my_list"]["id"] == "lst-1"
+        assert result[""]["id"] == "lst-2"
+
+    def test_list_lists_empty_ruleset_to_dict(self, mock_cf_client):
+        """list_lists handles SDK objects that convert to empty dicts."""
+
+        # _ruleset_to_dict returns {} for unconvertible objects
+        class Unconvertible:
+            pass
+
+        mock_cf_client.rules.lists.list.return_value = [Unconvertible()]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        result = provider.list_lists(scope)
+        # Should not crash — produces a list entry with all empty defaults
+        assert len(result) == 1
+        assert result[0]["id"] == ""
+        assert result[0]["name"] == ""
+        assert result[0]["kind"] == ""
+
+    def test_get_phase_rules_model_dump_returns_none_values(self, mock_cf_client):
+        """Rules where model_dump returns None values are handled (exclude_none)."""
+        rule = MockRule(
+            {
+                "id": None,
+                "ref": None,
+                "expression": "true",
+                "action": "block",
+                "description": None,
+            }
+        )
+        mock_cf_client.rulesets.phases.get.return_value = MockRuleset(rules=[rule])
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        rules = provider.get_phase_rules(_zs(), "http_request_firewall_custom")
+        assert len(rules) == 1
+        # model_dump(exclude_none=True) strips None values
+        assert "id" not in rules[0]
+        assert "ref" not in rules[0]
+        assert rules[0]["expression"] == "true"

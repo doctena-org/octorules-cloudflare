@@ -20,7 +20,7 @@ from octorules.extensions import (
     register_plan_zone_hook,
     register_validate_extension,
 )
-from octorules.phases import get_api_fields
+from octorules.phases import Phase, get_api_fields
 from octorules.planner import (
     ChangeType,
     RuleChange,
@@ -155,7 +155,7 @@ def validate_page_shield_policy(entry: dict, index: int) -> None:
 _PAGE_SHIELD_DIFF_FIELDS = ("action", "expression", "enabled", "value")
 
 
-def _make_page_shield_phase(description: str):
+def _make_page_shield_phase(description: str) -> Phase:
     """Create a synthetic Phase for a page shield policy."""
     return _make_synthetic_phase(
         "page_shield",
@@ -429,7 +429,7 @@ def _apply_page_shield(
                 for k, v in c.normalized_desired.items():
                     kwargs[k] = v
 
-        def create_fn(_psp=psp, _kwargs=dict(kwargs), _label=label):
+        def create_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:
             result = provider.create_page_shield_policy(scope, **_kwargs)
             _psp.policy_id = result.get("id", "")
             log.info("  %s/%s: created (id=%s)", zp.zone_name, _label, _psp.policy_id)
@@ -459,7 +459,7 @@ def _apply_page_shield(
                 for k, v in c.normalized_desired.items():
                     kwargs[k] = v
 
-        def update_fn(_psp=psp, _kwargs=dict(kwargs), _label=label):
+        def update_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:
             provider.update_page_shield_policy(scope, _psp.policy_id, **_kwargs)
             log.info("  %s/%s: updated", zp.zone_name, _label)
 
@@ -480,7 +480,7 @@ def _apply_page_shield(
         full_label = f"{zp.zone_name}/{label}"
         log.info("  %s/%s: deleting policy", zp.zone_name, label)
 
-        def del_fn(_psp=psp, _label=label):
+        def del_fn(_psp=psp, _label=label) -> None:
             provider.delete_page_shield_policy(scope, _psp.policy_id)
             log.info("  %s/%s: deleted", zp.zone_name, _label)
 

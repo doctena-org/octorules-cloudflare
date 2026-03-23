@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `create_custom_ruleset` and `delete_custom_ruleset` provider methods.
+  Required by the updated `BaseProvider` protocol for custom ruleset
+  lifecycle management. Cloudflare implementation calls the rulesets API
+  directly (`rulesets.create` / `rulesets.delete`).
+
+### Changed
+- Requires `octorules>=0.18.0`.
+- Consolidated `_ruleset_to_dict` and `_rule_to_dict` into shared `_to_dict`
+  helper with strict/lenient modes.
+- Moved `get_api_fields("list_item")` call outside pagination loop in
+  `get_list_items` for better performance.
+
 ## [0.2.0] - 2026-03-19
 
 ### Added

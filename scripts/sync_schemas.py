@@ -35,12 +35,7 @@ except ImportError:
     )
     sys.exit(1)
 
-SCHEMAS_DIR = (
-    Path(__file__).resolve().parent.parent
-    / "octorules_cloudflare"
-    / "linter"
-    / "schemas"
-)
+SCHEMAS_DIR = Path(__file__).resolve().parent.parent / "octorules_cloudflare" / "linter" / "schemas"
 OVERLAY_PATH = SCHEMAS_DIR / "overlay.toml"
 SCHEMAS_JSON = SCHEMAS_DIR / "schemas.json"
 

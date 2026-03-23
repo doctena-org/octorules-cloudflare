@@ -1459,3 +1459,29 @@ class TestA002DepthExceeded:
         monkeypatch.setattr(ast_linter, "parse_expression", lambda expr: fake_info)
         ctx = _lint("simple")
         assert "CF002" not in _ids(ctx)
+
+
+class TestLargeExpressionStability:
+    """Stability tests: very large expressions must not crash or hang."""
+
+    def test_very_large_expression_does_not_crash(self):
+        """10KB+ expression is handled gracefully (no crash, no exponential time)."""
+        import time
+
+        # Generate a 10KB+ expression: 500 OR clauses
+        clauses = [f"ip.src eq 1.2.3.{i % 256}" for i in range(500)]
+        expr = " or ".join(clauses)
+        assert len(expr) > 10_000, f"Expression too short: {len(expr)} bytes"
+
+        rule = {"ref": "big-rule", "expression": expr}
+        phase = PHASE_BY_NAME["waf_custom_rules"]
+        ctx = LintContext()
+
+        start = time.monotonic()
+        lint_expressions(rule, phase, ctx)
+        elapsed = time.monotonic() - start
+
+        # Must complete in under 5 seconds (generous; typical is < 1s)
+        assert elapsed < 5.0, f"lint_expressions took {elapsed:.1f}s on 10KB+ expression"
+        # Should produce results (at minimum, the expression was parsed)
+        # No crash is the main assertion — the function returned normally

@@ -8,6 +8,7 @@ import pytest
 
 from octorules_cloudflare.linter.expression_bridge import (
     WIREFILTER_AVAILABLE,
+    ExpressionInfo,
     _parse_with_regex,
     _parse_with_wirefilter,
     parse_expression,
@@ -346,3 +347,45 @@ class TestRegexParserEdgeCases:
         info = _parse_with_regex("cf.threat_score gt 50")
         assert 50 in info.int_literals
         assert "cf.threat_score" in info.fields_used
+
+
+class TestWirefilterCrashFallbackViaPublicAPI:
+    """Test that wirefilter FFI crashes are handled through the public parse_expression API.
+
+    Unlike TestWirefilterFFICrashFallback (which calls _parse_with_wirefilter
+    directly), these tests exercise the full path through parse_expression,
+    including normalize_expression and the WIREFILTER_AVAILABLE gate.
+    """
+
+    def test_wirefilter_crash_falls_back_to_regex(self, monkeypatch):
+        """If wirefilter FFI raises an unexpected exception, regex fallback is used."""
+        monkeypatch.setattr(
+            "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE", True
+        )
+
+        def _crash(expr, phase=None):
+            raise RuntimeError("simulated FFI segfault")
+
+        monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _crash)
+        info = parse_expression("ip.src eq 1.2.3.4")
+        # Should return an ExpressionInfo, not crash
+        assert isinstance(info, ExpressionInfo)
+        # Regex fallback extracted the field
+        assert "ip.src" in info.fields_used
+        # Error metadata is preserved
+        assert info.parse_error_type == "wirefilter_crash"
+        assert "RuntimeError" in info.parse_error
+
+    def test_wirefilter_crash_logs_warning(self, monkeypatch, caplog):
+        """Wirefilter crash is logged as a warning through the public API."""
+        monkeypatch.setattr(
+            "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE", True
+        )
+
+        def _crash(expr, phase=None):
+            raise RuntimeError("simulated FFI segfault")
+
+        monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _crash)
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare"):
+            parse_expression("ip.src eq 1.2.3.4")
+        assert any("wirefilter" in r.message.lower() for r in caplog.records)

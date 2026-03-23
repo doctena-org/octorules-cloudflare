@@ -152,7 +152,7 @@ class CloudflareProvider:
         max_workers: int = 1,
         client: cloudflare.Cloudflare | None = None,
         **_extra: object,
-    ):
+    ) -> None:
         if not token and client is None:
             raise ConfigError("Cloudflare provider requires a 'token'")
         if client is not None:
@@ -317,7 +317,7 @@ class CloudflareProvider:
         if not phases_to_fetch:
             return PhaseRulesResult({}, failed_phases=[])
 
-        def _result_fn(phase, rules):
+        def _result_fn(phase: str, rules: list[dict]) -> tuple[str, list[dict]] | None:
             return (phase, rules) if rules else None
 
         rules, failed = _fetch_parallel(
@@ -383,6 +383,25 @@ class CloudflareProvider:
         return response_count
 
     @_wrap_provider_errors
+    def create_custom_ruleset(
+        self, scope: Scope, name: str, phase: str, capacity: int, description: str = ""
+    ) -> dict:
+        """Create a custom ruleset. Cloudflare ignores capacity (no limit)."""
+        sl = _fmt_scope(scope)
+        log.debug("CREATE ruleset %s %s phase=%s", name, sl, phase)
+        result = self._client.rulesets.create(
+            **scope.api_kwargs, name=name, kind="custom", phase=phase, rules=[]
+        )
+        return {"id": result.id, "name": result.name}
+
+    @_wrap_provider_errors
+    def delete_custom_ruleset(self, scope: Scope, ruleset_id: str) -> None:
+        """Delete a custom ruleset."""
+        sl = _fmt_scope(scope)
+        log.debug("DELETE ruleset %s %s", ruleset_id, sl)
+        self._client.rulesets.delete(ruleset_id, **scope.api_kwargs)
+
+    @_wrap_provider_errors
     def get_all_custom_rulesets(
         self, scope: Scope, *, ruleset_ids: list[str] | None = None
     ) -> dict[str, dict]:
@@ -402,7 +421,7 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("Fetching %d custom ruleset(s) for %s", len(rulesets_meta), sl)
 
-        def _result_fn(rs, rules):
+        def _result_fn(rs: dict, rules: list[dict]) -> tuple[str, dict]:
             return (
                 rs["id"],
                 {"name": rs.get("name", ""), "phase": rs.get("phase", ""), "rules": rules},
@@ -482,6 +501,7 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("GET rules/lists/%s/items %s", list_id, sl)
         all_items: list[dict] = []
+        list_item_api_fields = get_api_fields("list_item")
         cursor: str | None = None
         while True:
             kwargs: dict = {**scope.api_kwargs, "per_page": 500}
@@ -515,7 +535,6 @@ class CloudflareProvider:
                         time.sleep(delay)
             if last_exc is not None:
                 raise last_exc
-            list_item_api_fields = get_api_fields("list_item")
             for item in body.get("result", []):
                 cleaned = {k: v for k, v in item.items() if k not in list_item_api_fields}
                 all_items.append(cleaned)
@@ -600,7 +619,7 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("Fetching items for %d list(s) for %s", len(all_meta), sl)
 
-        def _result_fn(meta, items):
+        def _result_fn(meta: dict, items: list[dict]) -> tuple[str, dict]:
             return (
                 meta["name"],
                 {
@@ -716,37 +735,42 @@ class CloudflareProvider:
         return [{k: v for k, v in p.items() if k not in psp_api_fields} for p in policies]
 
 
-def _ruleset_to_dict(ruleset) -> dict:
-    """Convert a Cloudflare SDK ruleset object to a plain dict."""
-    if isinstance(ruleset, dict):
-        return ruleset
-    if hasattr(ruleset, "model_dump"):
-        return ruleset.model_dump(exclude_none=True)
-    if hasattr(ruleset, "to_dict"):
-        return ruleset.to_dict()
+def _to_dict(obj: object, *, strict: bool = False) -> dict:
+    """Convert a Cloudflare SDK object to a plain dict.
+
+    The SDK returns Pydantic-like model objects.  This handles all
+    variants: ``model_dump``, ``to_dict``, and ``dict()`` fallback.
+
+    When *strict* is True (used for individual rules), conversion
+    failure raises ``TypeError``.  When False (used for rulesets/lists),
+    failure logs a warning and returns ``{}``.
+    """
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(exclude_none=True)
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()
     try:
-        return dict(ruleset)
-    except (TypeError, ValueError):
+        return dict(obj)
+    except (TypeError, ValueError) as e:
+        if strict:
+            raise TypeError(f"Cannot convert {type(obj).__name__} to dict: {e}") from e
         log.warning(
-            "Failed to convert ruleset to dict (type=%s), returning empty",
-            type(ruleset).__name__,
+            "Failed to convert object to dict (type=%s), returning empty",
+            type(obj).__name__,
         )
         return {}
 
 
-def _rule_to_dict(rule) -> dict:
-    """Convert a Cloudflare SDK rule object to a plain dict."""
-    if isinstance(rule, dict):
-        return rule
-    # The cloudflare SDK returns Pydantic-like model objects
-    if hasattr(rule, "model_dump"):
-        return rule.model_dump(exclude_none=True)
-    if hasattr(rule, "to_dict"):
-        return rule.to_dict()
-    try:
-        return dict(rule)
-    except (TypeError, ValueError) as e:
-        raise TypeError(f"Cannot convert rule of type {type(rule).__name__} to dict: {e}") from e
+def _ruleset_to_dict(obj: object) -> dict:
+    """Convert a Cloudflare SDK ruleset/list object to a plain dict (lenient)."""
+    return _to_dict(obj, strict=False)
+
+
+def _rule_to_dict(obj: object) -> dict:
+    """Convert a Cloudflare SDK rule object to a plain dict (strict)."""
+    return _to_dict(obj, strict=True)
 
 
 __all__ = [
