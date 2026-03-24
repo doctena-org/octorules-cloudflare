@@ -237,12 +237,12 @@ class TestCloudflareProvider:
     @patch("octorules_cloudflare.provider.cloudflare.Cloudflare")
     def test_max_retries_passed_to_client(self, mock_cf_cls):
         CloudflareProvider(token="token", max_retries=5)
-        mock_cf_cls.assert_called_once_with(api_token="token", max_retries=5)
+        mock_cf_cls.assert_called_once_with(api_token="token", max_retries=5, timeout=30.0)
 
     @patch("octorules_cloudflare.provider.cloudflare.Cloudflare")
     def test_default_max_retries(self, mock_cf_cls):
         CloudflareProvider(token="token")
-        mock_cf_cls.assert_called_once_with(api_token="token", max_retries=2)
+        mock_cf_cls.assert_called_once_with(api_token="token", max_retries=2, timeout=30.0)
 
     @patch("octorules_cloudflare.provider.cloudflare.Cloudflare")
     def test_timeout_passed_to_client(self, mock_cf_cls):
@@ -1724,3 +1724,546 @@ class TestMalformedProviderResponse:
         assert "id" not in rules[0]
         assert "ref" not in rules[0]
         assert rules[0]["expression"] == "true"
+
+
+class TestFetchParallelConcurrency:
+    """Tests for _fetch_parallel with actual ThreadPoolExecutor concurrency (max_workers > 1)."""
+
+    def test_partial_failure_some_succeed_some_fail(self):
+        """Some items succeed, some raise ProviderError -- verify results + failed keys."""
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        def submit_fn(executor, item):
+            def work(name):
+                if name == "bad":
+                    raise ProviderError(f"Transient error for {name}")
+                return f"result-{name}"
+
+            return executor.submit(work, item)
+
+        results, failed = _fetch_parallel(
+            ["good1", "bad", "good2"],
+            submit_fn=submit_fn,
+            key_fn=lambda item: item,
+            result_fn=lambda item, value: (item, value),
+            label="test-item",
+            scope_label="test-scope",
+            max_workers=3,
+        )
+        assert results == {"good1": "result-good1", "good2": "result-good2"}
+        assert failed == ["bad"]
+
+    def test_all_succeed_with_max_workers_gt_1(self):
+        """All items succeed under actual concurrency -- verify correct results."""
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        items = [f"item-{i}" for i in range(10)]
+
+        def submit_fn(executor, item):
+            return executor.submit(lambda x: x.upper(), item)
+
+        results, failed = _fetch_parallel(
+            items,
+            submit_fn=submit_fn,
+            key_fn=lambda item: item,
+            result_fn=lambda item, value: (item, value),
+            label="test-item",
+            scope_label="test-scope",
+            max_workers=4,
+        )
+        assert len(results) == 10
+        for item in items:
+            assert results[item] == item.upper()
+        assert failed == []
+
+    def test_auth_error_propagates_and_cancels_remaining(self):
+        """ProviderAuthError from one item propagates and cancels remaining futures."""
+        import threading
+        import time
+
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        barrier = threading.Barrier(3, timeout=5)
+
+        def submit_fn(executor, item):
+            def work(name):
+                if name == "auth-fail":
+                    barrier.wait()
+                    raise ProviderAuthError("Invalid token")
+                else:
+                    barrier.wait()
+                    time.sleep(0.5)
+                    return f"result-{name}"
+
+            return executor.submit(work, item)
+
+        with pytest.raises(ProviderAuthError, match="Invalid token"):
+            _fetch_parallel(
+                ["auth-fail", "slow", "other"],
+                submit_fn=submit_fn,
+                key_fn=lambda item: item,
+                result_fn=lambda item, value: (item, value),
+                label="test-item",
+                scope_label="test-scope",
+                max_workers=3,
+            )
+
+    def test_mixed_success_and_failure_with_concurrency(self):
+        """Mixed results with max_workers=2 -- verify correct results under concurrency."""
+        import threading
+
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        call_threads: dict = {}
+        lock = threading.Lock()
+
+        def submit_fn(executor, item):
+            def work(name):
+                with lock:
+                    call_threads[name] = threading.current_thread().ident
+                if name.startswith("fail-"):
+                    raise ProviderError(f"Failed: {name}")
+                return f"ok-{name}"
+
+            return executor.submit(work, item)
+
+        items = ["a", "fail-b", "c", "fail-d", "e"]
+        results, failed = _fetch_parallel(
+            items,
+            submit_fn=submit_fn,
+            key_fn=lambda item: item,
+            result_fn=lambda item, value: (item, value),
+            label="test-item",
+            scope_label="test-scope",
+            max_workers=2,
+        )
+        assert results == {"a": "ok-a", "c": "ok-c", "e": "ok-e"}
+        assert sorted(failed) == ["fail-b", "fail-d"]
+        # Verify all items were actually executed
+        assert set(call_threads.keys()) == set(items)
+
+    def test_result_fn_returning_none_skips_entry(self):
+        """result_fn returning None should skip adding to results dict."""
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        def submit_fn(executor, item):
+            return executor.submit(lambda x: x, item)
+
+        def result_fn(item, value):
+            if item == "skip-me":
+                return None
+            return (item, value)
+
+        results, failed = _fetch_parallel(
+            ["keep", "skip-me", "also-keep"],
+            submit_fn=submit_fn,
+            key_fn=lambda item: item,
+            result_fn=result_fn,
+            label="test-item",
+            scope_label="test-scope",
+            max_workers=3,
+        )
+        assert results == {"keep": "keep", "also-keep": "also-keep"}
+        assert "skip-me" not in results
+        assert failed == []
+
+    def test_single_item_with_high_max_workers(self):
+        """Single item with high max_workers should still work correctly."""
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        results, failed = _fetch_parallel(
+            ["only-one"],
+            submit_fn=lambda ex, item: ex.submit(lambda x: f"done-{x}", item),
+            key_fn=lambda item: item,
+            result_fn=lambda item, value: (item, value),
+            label="test-item",
+            scope_label="test-scope",
+            max_workers=8,
+        )
+        assert results == {"only-one": "done-only-one"}
+        assert failed == []
+
+    def test_workers_capped_to_item_count(self):
+        """max_workers should be capped to len(items) -- no more threads than items."""
+        from unittest.mock import patch as _patch
+
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        with _patch("octorules_cloudflare.provider.ThreadPoolExecutor") as mock_tpe:
+            mock_executor = MagicMock()
+            mock_executor.__enter__ = MagicMock(return_value=mock_executor)
+            mock_executor.__exit__ = MagicMock(return_value=False)
+            mock_tpe.return_value = mock_executor
+
+            future = MagicMock()
+            future.result.return_value = "val"
+            mock_executor.submit.return_value = future
+
+            with _patch("octorules_cloudflare.provider.as_completed", return_value=iter([future])):
+                _fetch_parallel(
+                    ["only-one"],
+                    submit_fn=lambda ex, item: ex.submit(lambda: "val"),
+                    key_fn=lambda item: item,
+                    result_fn=lambda item, value: (item, value),
+                    label="test",
+                    scope_label="scope",
+                    max_workers=10,
+                )
+            # min(10, 1) = 1
+            mock_tpe.assert_called_once_with(max_workers=1)
+
+    def test_provider_get_all_phase_rules_with_max_workers_gt_1(self, mock_cf_client):
+        """Integration: get_all_phase_rules with max_workers=4 produces correct results."""
+        from cloudflare import NotFoundError
+
+        def mock_get(provider_id, **kwargs):
+            if provider_id == "http_request_dynamic_redirect":
+                return MockRuleset(
+                    rules=[{"ref": "r1", "expression": "true", "action": "redirect"}]
+                )
+            if provider_id == "http_request_cache_settings":
+                return MockRuleset(
+                    rules=[{"ref": "c1", "expression": "true", "action": "set_cache_settings"}]
+                )
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            raise NotFoundError(message="Not Found", response=mock_response, body=None)
+
+        mock_cf_client.rulesets.phases.get.side_effect = mock_get
+        provider = CloudflareProvider(token="token", max_workers=4, client=mock_cf_client)
+        result = provider.get_all_phase_rules(_zs())
+        assert "http_request_dynamic_redirect" in result
+        assert "http_request_cache_settings" in result
+        assert result["http_request_dynamic_redirect"][0]["ref"] == "r1"
+        assert result["http_request_cache_settings"][0]["ref"] == "c1"
+        assert result.failed_phases == []
+
+    def test_provider_get_all_phase_rules_partial_failure_max_workers_gt_1(
+        self, mock_cf_client, caplog
+    ):
+        """Integration: partial failure with max_workers=4 tracks failed phases."""
+        from cloudflare import APIError, NotFoundError
+
+        def mock_get(provider_id, **kwargs):
+            if provider_id == "http_request_dynamic_redirect":
+                return MockRuleset(
+                    rules=[{"ref": "r1", "expression": "true", "action": "redirect"}]
+                )
+            if provider_id == "http_request_cache_settings":
+                raise APIError("Server Error", request=MagicMock(), body=None)
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            raise NotFoundError(message="Not Found", response=mock_response, body=None)
+
+        mock_cf_client.rulesets.phases.get.side_effect = mock_get
+        provider = CloudflareProvider(token="token", max_workers=4, client=mock_cf_client)
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare"):
+            result = provider.get_all_phase_rules(_zs())
+        assert "http_request_dynamic_redirect" in result
+        assert "http_request_cache_settings" not in result
+        assert "http_request_cache_settings" in result.failed_phases
+        assert "Failed to fetch phase" in caplog.text
+
+    def test_provider_get_all_phase_rules_auth_error_max_workers_gt_1(self, mock_cf_client):
+        """Integration: auth error with max_workers=4 propagates immediately."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rulesets.phases.get.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", max_workers=4, client=mock_cf_client)
+        with pytest.raises(ProviderAuthError):
+            provider.get_all_phase_rules(_zs())
+
+
+class TestErrorMapping:
+    """Tests for _wrap_provider_errors: CF SDK exception -> octorules exception mapping."""
+
+    def test_authentication_error_maps_to_provider_auth_error(self, mock_cf_client):
+        """cloudflare.AuthenticationError maps to ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rulesets.phases.get.side_effect = AuthenticationError(
+            message="Invalid API Token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Invalid API Token"):
+            provider.get_phase_rules(_zs(), "http_request_firewall_custom")
+
+    def test_permission_denied_maps_to_provider_auth_error_on_list_zones(self, mock_cf_client):
+        """cloudflare.PermissionDeniedError maps to ProviderAuthError on list_zones."""
+        from cloudflare import PermissionDeniedError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_cf_client.zones.list.side_effect = PermissionDeniedError(
+            message="Insufficient permissions", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError, match="Insufficient permissions"):
+            provider.list_zones()
+
+    def test_api_error_maps_to_provider_error(self, mock_cf_client):
+        """cloudflare.APIError maps to ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rulesets.phases.update.side_effect = APIError(
+            "Rate limit exceeded", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Rate limit exceeded"):
+            provider.put_phase_rules(_zs(), "http_request_firewall_custom", [])
+
+    def test_api_connection_error_maps_to_provider_error(self, mock_cf_client):
+        """cloudflare.APIConnectionError maps to ProviderError."""
+        from cloudflare import APIConnectionError
+
+        mock_cf_client.zones.list.side_effect = APIConnectionError(request=MagicMock())
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError):
+            provider.list_zones()
+
+    def test_error_message_preserved_auth(self, mock_cf_client):
+        """Error message from AuthenticationError is preserved in ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.zones.list.side_effect = AuthenticationError(
+            message="Token expired at 2026-03-24", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError) as exc_info:
+            provider.list_zones()
+        assert "Token expired at 2026-03-24" in str(exc_info.value)
+
+    def test_error_message_preserved_api_error(self, mock_cf_client):
+        """Error message from APIError is preserved in ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.zones.list.side_effect = APIError(
+            "Internal Server Error (code: 10000)", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError) as exc_info:
+            provider.resolve_zone_id("example.com")
+        assert "Internal Server Error (code: 10000)" in str(exc_info.value)
+
+    def test_error_message_preserved_permission_denied(self, mock_cf_client):
+        """Error message from PermissionDeniedError is preserved in ProviderAuthError."""
+        from cloudflare import PermissionDeniedError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_cf_client.zones.list.side_effect = PermissionDeniedError(
+            message="Zone read permission required", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError) as exc_info:
+            provider.list_zones()
+        assert "Zone read permission required" in str(exc_info.value)
+
+    def test_error_message_preserved_connection_error(self, mock_cf_client):
+        """Error message from APIConnectionError is preserved in ProviderError."""
+        from cloudflare import APIConnectionError
+
+        mock_cf_client.zones.list.side_effect = APIConnectionError(request=MagicMock())
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError) as exc_info:
+            provider.list_zones()
+        # APIConnectionError message should be in the wrapped error
+        assert str(exc_info.value)  # Not empty
+
+    def test_original_exception_chained(self, mock_cf_client):
+        """Wrapped ProviderError should chain the original CF exception as __cause__."""
+        from cloudflare import APIError
+
+        original = APIError("Original CF error", request=MagicMock(), body=None)
+        mock_cf_client.zones.list.side_effect = original
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError) as exc_info:
+            provider.list_zones()
+        assert exc_info.value.__cause__ is original
+
+    def test_original_auth_exception_chained(self, mock_cf_client):
+        """Wrapped ProviderAuthError should chain the original CF exception as __cause__."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        original = AuthenticationError(message="Bad token", response=mock_response, body=None)
+        mock_cf_client.zones.list.side_effect = original
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderAuthError) as exc_info:
+            provider.list_zones()
+        assert exc_info.value.__cause__ is original
+
+    def test_already_wrapped_provider_error_not_double_wrapped(self, mock_cf_client):
+        """ProviderError raised inside a wrapped method should not be double-wrapped."""
+        # get_list_items raises ProviderError on invalid JSON. The @_wrap_provider_errors
+        # should re-raise it as-is, not wrap it again.
+        raw = MagicMock()
+        raw.http_response.text = "not-json"
+        mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="Invalid JSON"):
+            provider.get_list_items(Scope(account_id="a"), "lst-1")
+
+    def test_all_cf_exceptions_on_resolve_zone_id(self, mock_cf_client):
+        """All four CF exception types should be correctly mapped on resolve_zone_id."""
+        from cloudflare import (
+            APIConnectionError,
+            APIError,
+            AuthenticationError,
+            PermissionDeniedError,
+        )
+
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+
+        # AuthenticationError -> ProviderAuthError
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.zones.list.side_effect = AuthenticationError(
+            message="auth fail", response=mock_response, body=None
+        )
+        with pytest.raises(ProviderAuthError, match="auth fail"):
+            provider.resolve_zone_id("a.com")
+
+        # PermissionDeniedError -> ProviderAuthError
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_cf_client.zones.list.side_effect = PermissionDeniedError(
+            message="perm fail", response=mock_response, body=None
+        )
+        with pytest.raises(ProviderAuthError, match="perm fail"):
+            provider.resolve_zone_id("b.com")
+
+        # APIError -> ProviderError
+        mock_cf_client.zones.list.side_effect = APIError("api fail", request=MagicMock(), body=None)
+        with pytest.raises(ProviderError, match="api fail"):
+            provider.resolve_zone_id("c.com")
+
+        # APIConnectionError -> ProviderError
+        mock_cf_client.zones.list.side_effect = APIConnectionError(request=MagicMock())
+        with pytest.raises(ProviderError):
+            provider.resolve_zone_id("d.com")
+
+
+class TestGetListItemsRetryExhaustion:
+    """Tests for get_list_items retry exhaustion -- all retries fail."""
+
+    @staticmethod
+    def _mock_raw_items_response(items):
+        import json
+
+        body = {"result": items, "result_info": {}}
+        raw = MagicMock()
+        raw.http_response.text = json.dumps(body)
+        return raw
+
+    def test_all_retries_fail_api_error(self, mock_cf_client):
+        """All retries fail with APIError -- should raise ProviderError after exhaustion."""
+        from cloudflare import APIError
+
+        err = APIError("Server Error", request=MagicMock(), body=None)
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with patch("octorules_cloudflare.provider.time.sleep"):
+            with pytest.raises(ProviderError, match="Server Error"):
+                provider.get_list_items(scope, "lst-1", _page_retries=2)
+        # 1 initial + 2 retries = 3 total
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
+
+    def test_all_retries_fail_connection_error(self, mock_cf_client):
+        """All retries fail with APIConnectionError -- should raise ProviderError."""
+        from cloudflare import APIConnectionError
+
+        err = APIConnectionError(request=MagicMock())
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with patch("octorules_cloudflare.provider.time.sleep"):
+            with pytest.raises(ProviderError):
+                provider.get_list_items(scope, "lst-1", _page_retries=3)
+        # 1 initial + 3 retries = 4 total
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 4
+
+    def test_retry_exhaustion_on_second_page(self, mock_cf_client):
+        """Retry exhaustion on page 2 should raise ProviderError."""
+        from cloudflare import APIError
+
+        page1 = self._mock_raw_items_response([{"ip": "1.1.1.1/32"}])
+        # Add cursor to page1 so pagination continues
+        import json
+
+        body = json.loads(page1.http_response.text)
+        body["result_info"]["cursors"] = {"after": "page2-cursor"}
+        page1.http_response.text = json.dumps(body)
+
+        err = APIError("Page 2 Server Error", request=MagicMock(), body=None)
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = [
+            page1,  # Page 1 succeeds
+            err,  # Page 2 attempt 1 fails
+            err,  # Page 2 attempt 2 (retry) fails
+        ]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with patch("octorules_cloudflare.provider.time.sleep"):
+            with pytest.raises(ProviderError, match="Page 2 Server Error"):
+                provider.get_list_items(scope, "lst-1", _page_retries=1)
+        # 1 for page 1 success + 2 for page 2 (initial + 1 retry)
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
+
+    def test_retry_exhaustion_preserves_original_error(self, mock_cf_client):
+        """After retry exhaustion, the raised error should be the original CF exception."""
+        from cloudflare import APIError
+
+        original_err = APIError("Specific CF Error 42", request=MagicMock(), body=None)
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = original_err
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with patch("octorules_cloudflare.provider.time.sleep"):
+            with pytest.raises(ProviderError) as exc_info:
+                provider.get_list_items(scope, "lst-1", _page_retries=1)
+        # The wrapper re-raises the CF exception, which is then caught by
+        # @_wrap_provider_errors and wrapped as ProviderError. The __cause__
+        # should be the original CF exception.
+        assert exc_info.value.__cause__ is original_err
+
+    def test_zero_retries_fails_immediately(self, mock_cf_client):
+        """_page_retries=0 means no retries -- fail on first attempt."""
+        from cloudflare import APIError
+
+        err = APIError("Immediate fail", request=MagicMock(), body=None)
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderError, match="Immediate fail"):
+            provider.get_list_items(scope, "lst-1", _page_retries=0)
+        # Only 1 attempt, no retries
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 1
+
+    def test_retry_logs_warnings(self, mock_cf_client, caplog):
+        """Each retry attempt should log a warning message."""
+        from cloudflare import APIError
+
+        err = APIError("Transient error", request=MagicMock(), body=None)
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with (
+            caplog.at_level(logging.WARNING, logger="octorules_cloudflare"),
+            patch("octorules_cloudflare.provider.time.sleep"),
+        ):
+            with pytest.raises(ProviderError):
+                provider.get_list_items(scope, "lst-1", _page_retries=2)
+        # Should have 2 retry warnings (attempts 1 and 2 of retries, not the last)
+        retry_warnings = [r for r in caplog.records if "Retrying page fetch" in r.message]
+        assert len(retry_warnings) == 2
+        assert "attempt 1/3" in retry_warnings[0].message
+        assert "attempt 2/3" in retry_warnings[1].message

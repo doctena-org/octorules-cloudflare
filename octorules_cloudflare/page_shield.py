@@ -359,7 +359,7 @@ def _finalize_page_shield(
     future, executor, ps_desired = ctx
     try:
         try:
-            current_policies = future.result()
+            current_policies = future.result(timeout=120)
         except ProviderAuthError:
             raise
         except ProviderError as e:

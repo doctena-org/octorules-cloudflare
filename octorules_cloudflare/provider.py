@@ -56,6 +56,8 @@ def _account_phase_set() -> set[str]:
 log = logging.getLogger(__name__)
 
 _KNOWN_PLANS = {"free", "pro", "business", "enterprise"}
+_LIST_ITEMS_PER_PAGE = 500
+_POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
 
 
 def _normalize_plan_name(raw: str) -> str:
@@ -148,7 +150,7 @@ class CloudflareProvider:
         *,
         token: str = "",
         max_retries: int = 2,
-        timeout: float | None = None,
+        timeout: float | None = 30.0,
         max_workers: int = 1,
         client: cloudflare.Cloudflare | None = None,
         **_extra: object,
@@ -504,7 +506,7 @@ class CloudflareProvider:
         list_item_api_fields = get_api_fields("list_item")
         cursor: str | None = None
         while True:
-            kwargs: dict = {**scope.api_kwargs, "per_page": 500}
+            kwargs: dict = {**scope.api_kwargs, "per_page": _LIST_ITEMS_PER_PAGE}
             if cursor:
                 kwargs["cursor"] = cursor
             last_exc: APIError | APIConnectionError | None = None
@@ -574,7 +576,7 @@ class CloudflareProvider:
         """
         sl = _fmt_scope(scope)
         log.debug("POLL bulk_operations/%s %s", operation_id, sl)
-        _BACKOFF = (1.0, 2.0, 3.0, 5.0)
+        backoff = _POLL_BACKOFF
         start = time.monotonic()
         poll_count = 0
         while True:
@@ -595,7 +597,7 @@ class CloudflareProvider:
                 raise ProviderError(
                     f"Bulk operation {operation_id} timed out after {timeout}s (status={status})"
                 )
-            interval = _BACKOFF[min(poll_count, len(_BACKOFF) - 1)]
+            interval = backoff[min(poll_count, len(backoff) - 1)]
             time.sleep(interval)
             poll_count += 1
 

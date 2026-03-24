@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-24
+
+### Changed
+- Default `timeout` from `None` to `30.0` seconds in `CloudflareProvider`.
+  Prevents silent hangs if the Cloudflare API becomes unresponsive.
+  Pass `timeout=None` explicitly to restore the previous behavior (SDK default).
+- Extract `_LIST_ITEMS_PER_PAGE` and `_POLL_BACKOFF` module-level constants
+  from inline magic numbers in `provider.py`.
+- Add `timeout=120` to `future.result()` in Page Shield prefetch to prevent
+  indefinite hangs during plan operations.
+
+### Added
+- `TestFetchParallelConcurrency` tests: partial failure, auth error
+  propagation, worker capping, and mixed success under real concurrency.
+- `TestErrorMapping` tests: verify each Cloudflare SDK exception type maps
+  to the correct octorules exception, with message and chain preservation.
+- `TestGetListItemsRetryExhaustion` tests: all retries fail, partial page
+  success, zero-retries mode, and retry warning logging.
+
 ## [0.3.0] - 2026-03-23
 
 ### Added
