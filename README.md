@@ -80,6 +80,7 @@ forwarded to the provider):
 | Page Shield policies (zone-level) | Supported |
 | Zone discovery (`list_zones`) | Supported |
 | Account-level scopes | Supported |
+| Audit IP extraction (`octorules audit`) | Supported |
 
 ## Supported phases
 

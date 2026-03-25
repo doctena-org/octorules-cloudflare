@@ -92,4 +92,9 @@ from octorules_cloudflare.page_shield import register_page_shield  # noqa: E402
 
 register_page_shield()
 
+# Register audit IP extractor.
+from octorules_cloudflare.audit import register_cloudflare_audit  # noqa: E402
+
+register_cloudflare_audit()
+
 __all__ = ["CloudflareProvider"]

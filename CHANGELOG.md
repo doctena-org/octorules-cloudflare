@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-25
+
+### Added
+- Audit IP extractor: extracts IP literals from wirefilter expressions and
+  `$list_name` references for use by `octorules audit`.
+- Export `CF_PHASE_NAMES` frozenset from package root.
+
 ## [0.3.1] - 2026-03-24
 
 ### Changed
