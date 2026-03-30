@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-03-30
+
+### Fixed
+- `_fetch_parallel()`: catch `concurrent.futures.TimeoutError` explicitly
+  instead of `builtins.TimeoutError`, which did not match on Python 3.10.
+
+### Changed
+- `_normalize_plan_name()` now logs a warning when encountering an
+  unrecognized Cloudflare plan name instead of silently returning the
+  lowercased value.
+
 ## [0.4.1] - 2026-03-30
 
 ### Changed

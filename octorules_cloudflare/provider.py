@@ -12,6 +12,7 @@ import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 import cloudflare
 import httpx
@@ -71,6 +72,7 @@ def _normalize_plan_name(raw: str) -> str:
     for plan in _KNOWN_PLANS:
         if plan in lower:
             return plan
+    log.warning("Unknown Cloudflare plan name %r, using %r as tier", raw, lower)
     return lower
 
 
@@ -133,7 +135,7 @@ def _fetch_parallel(
                 for f in future_to_item:
                     f.cancel()
                 raise
-            except TimeoutError:
+            except (FuturesTimeoutError, TimeoutError):
                 log.warning("Timed out fetching %s %s for %s", label, key, scope_label)
                 failed.append(key)
                 continue

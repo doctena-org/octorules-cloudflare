@@ -1195,6 +1195,13 @@ class TestNormalizePlanName:
     def test_normalize(self, raw, expected):
         assert _normalize_plan_name(raw) == expected
 
+    def test_unknown_plan_name_warns(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare.provider"):
+            result = _normalize_plan_name("Unknown Plan XYZ")
+        assert result == "unknown plan xyz"
+        assert "Unknown Cloudflare plan name" in caplog.text
+        assert "'Unknown Plan XYZ'" in caplog.text
+
 
 class TestScopeApiKwargsCache:
     """Tests for Scope.api_kwargs caching."""
@@ -1770,6 +1777,95 @@ class TestFetchParallelConcurrency:
         )
         assert results == {"good1": "result-good1", "good2": "result-good2"}
         assert failed == ["bad"]
+
+    def test_timeout_error_lands_in_failed(self):
+        """concurrent.futures.TimeoutError should land the key in the failed list."""
+        from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        def submit_fn(executor, item):
+            def work(name):
+                if name == "slow":
+                    raise FuturesTimeoutError("timed out")
+                return f"result-{name}"
+
+            return executor.submit(work, item)
+
+        results, failed = _fetch_parallel(
+            ["fast", "slow", "also-fast"],
+            submit_fn=submit_fn,
+            key_fn=lambda item: item,
+            result_fn=lambda item, value: (item, value),
+            label="test-item",
+            scope_label="test-scope",
+            max_workers=3,
+        )
+        assert results == {"fast": "result-fast", "also-fast": "result-also-fast"}
+        assert "slow" in failed
+
+    def test_builtins_timeout_error_lands_in_failed_with_warning(self, caplog):
+        """builtins.TimeoutError is a parent of FuturesTimeoutError on 3.11+.
+
+        Since ``concurrent.futures.TimeoutError`` is a subclass of the builtin
+        ``TimeoutError``, raising ``builtins.TimeoutError`` inside a worker is
+        caught by the ``except FuturesTimeoutError`` clause.  Verify it lands
+        in *failed* and generates the "Timed out" warning.
+        """
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        def submit_fn(executor, item):
+            def work(name):
+                if name == "slow":
+                    raise TimeoutError("socket timed out")  # builtins.TimeoutError
+                return f"result-{name}"
+
+            return executor.submit(work, item)
+
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare"):
+            results, failed = _fetch_parallel(
+                ["fast", "slow"],
+                submit_fn=submit_fn,
+                key_fn=lambda item: item,
+                result_fn=lambda item, value: (item, value),
+                label="test-item",
+                scope_label="test-scope",
+                max_workers=2,
+            )
+        assert results == {"fast": "result-fast"}
+        assert "slow" in failed
+        assert "Timed out" in caplog.text
+        assert "slow" in caplog.text
+
+    def test_timeout_error_generates_warning_log(self, caplog):
+        """FuturesTimeoutError generates a WARNING log with key name and 'Timed out'."""
+        from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+        from octorules_cloudflare.provider import _fetch_parallel
+
+        def submit_fn(executor, item):
+            def work(name):
+                if name == "slow":
+                    raise FuturesTimeoutError("timed out")
+                return f"result-{name}"
+
+            return executor.submit(work, item)
+
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare"):
+            results, failed = _fetch_parallel(
+                ["fast", "slow", "also-fast"],
+                submit_fn=submit_fn,
+                key_fn=lambda item: item,
+                result_fn=lambda item, value: (item, value),
+                label="test-item",
+                scope_label="test-scope",
+                max_workers=3,
+            )
+        assert results == {"fast": "result-fast", "also-fast": "result-also-fast"}
+        assert "slow" in failed
+        assert "Timed out" in caplog.text
+        assert "slow" in caplog.text
+        assert "test-scope" in caplog.text
 
     def test_all_succeed_with_max_workers_gt_1(self):
         """All items succeed under actual concurrency -- verify correct results."""

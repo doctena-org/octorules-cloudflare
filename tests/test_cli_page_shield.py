@@ -39,7 +39,7 @@ def sample_config(tmp_path):
 class TestPageShieldPoliciesCLI:
     """Tests for Page Shield policy integration in CLI."""
 
-    @patch("octorules.commands._init_providers")
+    @patch("octorules.commands._providers._init_providers")
     def test_plan_with_page_shield_policies(self, mock_init_provs, sample_config, caplog):
         """Plan should detect Page Shield policy additions."""
         rules_file = sample_config.rules_dir / "example.com.yaml"
@@ -61,7 +61,7 @@ class TestPageShieldPoliciesCLI:
         assert result == 0
         assert "CSP on all" in caplog.text or True  # plan output goes to stdout
 
-    @patch("octorules.commands._init_providers")
+    @patch("octorules.commands._providers._init_providers")
     def test_plan_no_page_shield_key_skips(self, mock_init_provs, sample_config):
         """When page_shield_policies key is absent, skip policy planning."""
         rules_file = sample_config.rules_dir / "example.com.yaml"
@@ -75,7 +75,7 @@ class TestPageShieldPoliciesCLI:
         # get_all_page_shield_policies should NOT be called
         mock_prov.get_all_page_shield_policies.assert_not_called()
 
-    @patch("octorules.commands._init_providers")
+    @patch("octorules.commands._providers._init_providers")
     def test_dump_includes_page_shield_policies(self, mock_init_provs, sample_config):
         """Dump should fetch and include Page Shield policies."""
         import yaml
@@ -100,7 +100,7 @@ class TestPageShieldPoliciesCLI:
         assert "page_shield_policies" in data
         assert data["page_shield_policies"][0]["description"] == "CSP on all"
 
-    @patch("octorules.commands._init_providers")
+    @patch("octorules.commands._providers._init_providers")
     def test_dump_no_policies_no_section(self, mock_init_provs, sample_config):
         """Dump with no policies should not include page_shield_policies key."""
         import yaml
@@ -163,7 +163,7 @@ class TestPageShieldPoliciesCLI:
             result = cmd_validate(sample_config, ["example.com"])
         assert result == 1
 
-    @patch("octorules.commands._init_providers")
+    @patch("octorules.commands._providers._init_providers")
     def test_sync_creates_page_shield_policy(self, mock_init_provs, sample_config, caplog):
         """Sync should create new Page Shield policies."""
         rules_file = sample_config.rules_dir / "example.com.yaml"
@@ -187,7 +187,7 @@ class TestPageShieldPoliciesCLI:
         assert result == 0
         mock_prov.create_page_shield_policy.assert_called_once()
 
-    @patch("octorules.commands._init_providers")
+    @patch("octorules.commands._providers._init_providers")
     def test_sync_deletes_page_shield_policy(self, mock_init_provs, sample_config, caplog):
         """Sync should delete policies in CF but not in YAML."""
         rules_file = sample_config.rules_dir / "example.com.yaml"
