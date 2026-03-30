@@ -22,7 +22,7 @@ from octorules.phases import (
     ACCOUNT_PROVIDER_IDS,
     ALL_PROVIDER_IDS,
     ZONE_PROVIDER_IDS,
-    get_api_fields,
+    strip_api_fields,
 )
 from octorules.provider.base import PhaseRulesResult, Scope
 from octorules.provider.exceptions import (
@@ -249,7 +249,7 @@ class CloudflareProvider:
                 **scope.api_kwargs,
             )
             rules = ruleset.rules or []
-            return [_rule_to_dict(r) for r in rules]
+            return [_to_dict(r) for r in rules]
         except NotFoundError:
             return []
         except BadRequestError:
@@ -353,7 +353,7 @@ class CloudflareProvider:
         result = self._client.rulesets.list(**scope.api_kwargs)
         custom = []
         for rs in result:
-            rs_dict = _ruleset_to_dict(rs)
+            rs_dict = _to_dict(rs)
             if rs_dict.get("kind") != "custom":
                 continue
             custom.append(
@@ -373,7 +373,7 @@ class CloudflareProvider:
         log.debug("GET rulesets/%s %s", ruleset_id, sl)
         ruleset = self._client.rulesets.get(ruleset_id, **scope.api_kwargs)
         rules = ruleset.rules or []
-        return [_rule_to_dict(r) for r in rules]
+        return [_to_dict(r) for r in rules]
 
     @_wrap_provider_errors
     def put_custom_ruleset(self, scope: Scope, ruleset_id: str, rules: list[dict]) -> int:
@@ -462,7 +462,7 @@ class CloudflareProvider:
         result = self._client.rules.lists.list(**scope.api_kwargs)
         lists = []
         for item in result:
-            d = _ruleset_to_dict(item)
+            d = _to_dict(item)
             lists.append(
                 {
                     "id": d.get("id", ""),
@@ -481,7 +481,7 @@ class CloudflareProvider:
         result = self._client.rules.lists.create(
             **scope.api_kwargs, kind=kind, name=name, description=description
         )
-        return _ruleset_to_dict(result)
+        return _to_dict(result)
 
     @_wrap_provider_errors
     def delete_list(self, scope: Scope, list_id: str) -> None:
@@ -512,7 +512,6 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("GET rules/lists/%s/items %s", list_id, sl)
         all_items: list[dict] = []
-        list_item_api_fields = get_api_fields("list_item")
         cursor: str | None = None
         while True:
             kwargs: dict = {**scope.api_kwargs, "per_page": _LIST_ITEMS_PER_PAGE}
@@ -547,8 +546,7 @@ class CloudflareProvider:
                     ) from last_exc
                 raise last_exc
             for item in body.get("result", []):
-                cleaned = {k: v for k, v in item.items() if k not in list_item_api_fields}
-                all_items.append(cleaned)
+                all_items.append(strip_api_fields(item, "list_item"))
             # Extract next cursor from result_info
             cursor = None
             result_info = body.get("result_info")
@@ -571,7 +569,7 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("PUT rules/lists/%s/items %s items=%d", list_id, sl, len(items))
         result = self._client.rules.lists.items.update(list_id, **scope.api_kwargs, body=items)
-        d = _ruleset_to_dict(result)
+        d = _to_dict(result)
         return d.get("operation_id", "")
 
     @_wrap_provider_errors
@@ -590,7 +588,7 @@ class CloudflareProvider:
         poll_count = 0
         while True:
             result = self._client.rules.lists.bulk_operations.get(operation_id, **scope.api_kwargs)
-            d = _ruleset_to_dict(result)
+            d = _to_dict(result)
             status = d.get("status", "")
             if status == "completed":
                 return "completed"
@@ -602,6 +600,14 @@ class CloudflareProvider:
                     body=None,
                 )
             elapsed = time.monotonic() - start
+            log.debug(
+                "Bulk operation %s status=%r elapsed=%.1fs poll=%d %s",
+                operation_id,
+                status,
+                elapsed,
+                poll_count,
+                sl,
+            )
             if elapsed >= timeout:
                 raise ProviderError(
                     f"Bulk operation {operation_id} timed out after {timeout}s (status={status})"
@@ -665,7 +671,7 @@ class CloudflareProvider:
         result = self._client.page_shield.policies.list(zone_id=scope.zone_id)
         policies = []
         for item in result:
-            d = _ruleset_to_dict(item)
+            d = _to_dict(item)
             policies.append(
                 {
                     "id": d.get("id", ""),
@@ -700,7 +706,7 @@ class CloudflareProvider:
             enabled=enabled,
             value=value,
         )
-        return _ruleset_to_dict(result)
+        return _to_dict(result)
 
     @_wrap_provider_errors
     def update_page_shield_policy(
@@ -726,7 +732,7 @@ class CloudflareProvider:
             enabled=enabled,
             value=value,
         )
-        return _ruleset_to_dict(result)
+        return _to_dict(result)
 
     @_wrap_provider_errors
     def delete_page_shield_policy(self, scope: Scope, policy_id: str) -> None:
@@ -742,19 +748,16 @@ class CloudflareProvider:
         Returns list of {description, action, expression, enabled, value} dicts.
         """
         policies = self.list_page_shield_policies(scope)
-        psp_api_fields = get_api_fields("page_shield_policy")
-        return [{k: v for k, v in p.items() if k not in psp_api_fields} for p in policies]
+        return [strip_api_fields(p, "page_shield_policy") for p in policies]
 
 
-def _to_dict(obj: object, *, strict: bool = False) -> dict:
+def _to_dict(obj: object) -> dict:
     """Convert a Cloudflare SDK object to a plain dict.
 
     The SDK returns Pydantic-like model objects.  This handles all
     variants: ``model_dump``, ``to_dict``, and ``dict()`` fallback.
 
-    When *strict* is True (used for individual rules), conversion
-    failure raises ``TypeError``.  When False (used for rulesets/lists),
-    failure logs a warning and returns ``{}``.
+    Raises ``ProviderError`` if none of the methods succeed.
     """
     if isinstance(obj, dict):
         return obj
@@ -765,23 +768,7 @@ def _to_dict(obj: object, *, strict: bool = False) -> dict:
     try:
         return dict(obj)
     except (TypeError, ValueError) as e:
-        if strict:
-            raise TypeError(f"Cannot convert {type(obj).__name__} to dict: {e}") from e
-        log.warning(
-            "Failed to convert object to dict (type=%s), returning empty",
-            type(obj).__name__,
-        )
-        return {}
-
-
-def _ruleset_to_dict(obj: object) -> dict:
-    """Convert a Cloudflare SDK ruleset/list object to a plain dict (lenient)."""
-    return _to_dict(obj, strict=False)
-
-
-def _rule_to_dict(obj: object) -> dict:
-    """Convert a Cloudflare SDK rule object to a plain dict (strict)."""
-    return _to_dict(obj, strict=True)
+        raise ProviderError(f"Cannot convert {type(obj).__name__} to dict: {e}") from e
 
 
 __all__ = [

@@ -10,7 +10,7 @@ from octorules.provider.base import PhaseRulesResult, Scope
 from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
 from octorules_cloudflare import CloudflareProvider
-from octorules_cloudflare.provider import _normalize_plan_name, _rule_to_dict
+from octorules_cloudflare.provider import _normalize_plan_name, _to_dict
 
 from .mocks import MockRule, MockRuleIterableOnly, MockRuleset, MockRuleWithToDict
 
@@ -56,21 +56,21 @@ class TestScope:
 class TestRuleToDict:
     def test_dict_passthrough(self):
         rule = {"ref": "r1", "expression": "true"}
-        assert _rule_to_dict(rule) == rule
+        assert _to_dict(rule) == rule
 
     def test_model_dump(self):
         rule = MockRule({"ref": "r1", "expression": "true", "version": None})
-        result = _rule_to_dict(rule)
+        result = _to_dict(rule)
         assert result == {"ref": "r1", "expression": "true"}
 
     def test_to_dict_fallback(self):
         rule = MockRuleWithToDict({"ref": "r1", "expression": "true"})
-        result = _rule_to_dict(rule)
+        result = _to_dict(rule)
         assert result == {"ref": "r1", "expression": "true"}
 
     def test_dict_constructor_fallback(self):
         rule = MockRuleIterableOnly({"ref": "r1", "expression": "true"})
-        result = _rule_to_dict(rule)
+        result = _to_dict(rule)
         assert result == {"ref": "r1", "expression": "true"}
 
 
@@ -1658,8 +1658,7 @@ class TestMalformedProviderResponse:
 
     def test_get_phase_rules_completely_empty_rule_dict(self, mock_cf_client):
         """Provider handles a rule that converts to an empty dict."""
-        # _rule_to_dict will produce {} for an unconvertible object, but
-        # plain dict passthrough returns it as-is
+        # An empty dict is a valid dict, so _to_dict passes it through
         mock_cf_client.rulesets.phases.get.return_value = MockRuleset(
             rules=[
                 {},  # Completely empty rule
@@ -1676,7 +1675,7 @@ class TestMalformedProviderResponse:
         """Provider handles list entries with missing 'name' field gracefully."""
         import json
 
-        # Mock list_lists to return entries where _ruleset_to_dict gives
+        # Mock list_lists to return entries where _to_dict gives
         # dicts with missing fields — list_lists uses .get() so it fills
         # defaults, but the upstream SDK object might be strange.
         # Simulate: one list with a name, one without.
@@ -1713,22 +1712,17 @@ class TestMalformedProviderResponse:
         assert result["my_list"]["id"] == "lst-1"
         assert result[""]["id"] == "lst-2"
 
-    def test_list_lists_empty_ruleset_to_dict(self, mock_cf_client):
-        """list_lists handles SDK objects that convert to empty dicts."""
+    def test_list_lists_unconvertible_raises(self, mock_cf_client):
+        """list_lists raises ProviderError for unconvertible SDK objects."""
 
-        # _ruleset_to_dict returns {} for unconvertible objects
         class Unconvertible:
             pass
 
         mock_cf_client.rules.lists.list.return_value = [Unconvertible()]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        result = provider.list_lists(scope)
-        # Should not crash — produces a list entry with all empty defaults
-        assert len(result) == 1
-        assert result[0]["id"] == ""
-        assert result[0]["name"] == ""
-        assert result[0]["kind"] == ""
+        with pytest.raises(ProviderError, match="Cannot convert Unconvertible"):
+            provider.list_lists(scope)
 
     def test_get_phase_rules_model_dump_returns_none_values(self, mock_cf_client):
         """Rules where model_dump returns None values are handled (exclude_none)."""

@@ -12,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from octorules.commands._helpers import _apply_parallel
 from octorules.expression import normalize_expression
 from octorules.extensions import (
     register_apply_extension,
@@ -387,28 +388,6 @@ def _finalize_page_shield(
 # ---------------------------------------------------------------------------
 # Apply extension
 # ---------------------------------------------------------------------------
-
-
-def _apply_parallel(
-    tasks: list[tuple[str, Callable[[], None]]],
-    max_workers: int = 0,
-) -> tuple[list[str], str | None]:
-    """Run tasks, collecting successes. Minimal reimplementation."""
-    if not tasks:
-        return [], None
-    # Sequential
-    successes: list[str] = []
-    for label, fn in tasks:
-        try:
-            fn()
-        except ProviderAuthError:
-            raise
-        except ProviderError as e:
-            return successes, f"{label}: {_format_api_error(e)}"
-        except TimeoutError as e:
-            return successes, f"{label}: {e}"
-        successes.append(label)
-    return successes, None
 
 
 def _apply_page_shield(

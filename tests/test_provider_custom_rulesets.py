@@ -10,27 +10,27 @@ from octorules.provider.base import Scope
 from octorules.provider.exceptions import ProviderAuthError
 
 from octorules_cloudflare import CloudflareProvider
-from octorules_cloudflare.provider import _ruleset_to_dict
+from octorules_cloudflare.provider import _to_dict
 
 from .mocks import MockRule, MockRuleset, MockRuleWithToDict
 
 
 class TestRulesetToDict:
-    """Tests for _ruleset_to_dict helper."""
+    """Tests for _to_dict helper."""
 
     def test_dict_passthrough(self):
         rs = {"id": "rs1", "kind": "custom", "name": "Test"}
-        assert _ruleset_to_dict(rs) == rs
+        assert _to_dict(rs) == rs
 
     def test_model_dump(self):
         rs = MockRule({"id": "rs1", "kind": "custom", "name": "Test", "extra": None})
-        result = _ruleset_to_dict(rs)
+        result = _to_dict(rs)
         assert result["id"] == "rs1"
         assert "extra" not in result
 
     def test_to_dict_fallback(self):
         rs = MockRuleWithToDict({"id": "rs1", "kind": "custom"})
-        result = _ruleset_to_dict(rs)
+        result = _to_dict(rs)
         assert result["id"] == "rs1"
 
 

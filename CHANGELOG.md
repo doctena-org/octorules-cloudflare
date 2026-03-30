@@ -4,7 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.5.0] - 2026-03-30
+
+### Changed
+- `_to_dict()` now raises `ProviderError` on conversion failure instead of
+  silently returning an empty dict. Removed lenient/strict split
+  (`_ruleset_to_dict` / `_rule_to_dict` helpers deleted).
+- Page Shield apply replaced local sequential `_apply_parallel()` stub with
+  the shared core `_apply_parallel()` import.
+- API field filtering uses shared `strip_api_fields()` from core instead of
+  inline `get_api_fields()` + dict comprehension.
+
+### Fixed
+- Bulk operation polling logs status at DEBUG level for diagnosability.
 
 ## [0.4.2] - 2026-03-30
 
