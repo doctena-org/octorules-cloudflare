@@ -38,7 +38,7 @@ class TestScope:
     def test_no_id_raises(self):
         scope = Scope()
         with pytest.raises(ValueError, match="either zone_id or account_id"):
-            scope.api_kwargs
+            scope.api_kwargs  # noqa: B018
 
     def test_is_account_true(self):
         scope = Scope(account_id="a456")
@@ -1327,15 +1327,32 @@ class TestGetListItemsRetry:
             provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 1
 
-    def test_json_decode_error_no_retry(self, mock_cf_client):
-        """JSONDecodeError raises ValueError immediately without retrying."""
+    def test_json_decode_error_retried_then_raises(self, mock_cf_client):
+        """JSONDecodeError is retried (may be transient truncation), then raises."""
         raw = MagicMock()
         raw.http_response.text = "not json {"
         mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Invalid JSON"):
-            provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
-        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 1
+        with patch("octorules_cloudflare.provider.time.sleep"):
+            with pytest.raises(ProviderError, match="Invalid JSON"):
+                provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
+        # 1 initial + 2 retries = 3 attempts
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
+
+    def test_json_decode_error_retried_then_succeeds(self, mock_cf_client):
+        """JSONDecodeError on first attempt succeeds on retry."""
+        bad_raw = MagicMock()
+        bad_raw.http_response.text = "not json {"
+        good_raw = self._mock_raw_items_response([{"ip": "1.1.1.1/32"}])
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = [
+            bad_raw,
+            good_raw,
+        ]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with patch("octorules_cloudflare.provider.time.sleep"):
+            items = provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
+        assert len(items) == 1
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
 
     def test_api_connection_error_retried(self, mock_cf_client):
         """APIConnectionError is retried, then succeeds."""
@@ -1351,7 +1368,7 @@ class TestGetListItemsRetry:
             items = provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert len(items) == 1
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
-        mock_sleep.assert_called_once_with(1.0)
+        mock_sleep.assert_called_once()
 
     def test_retry_succeeds_on_second_attempt(self, mock_cf_client):
         """APIError on first attempt, success on second."""
@@ -1366,11 +1383,11 @@ class TestGetListItemsRetry:
         with patch("octorules_cloudflare.provider.time.sleep") as mock_sleep:
             items = provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert items == [{"ip": "2.2.2.2/32"}]
-        mock_sleep.assert_called_once_with(1.0)
+        mock_sleep.assert_called_once()
 
     @patch("octorules_cloudflare.provider.time.sleep")
-    def test_backoff_timing_linear(self, mock_sleep, mock_cf_client):
-        """Backoff delays are linear: 1s, 2s."""
+    def test_backoff_uses_poll_backoff_schedule(self, mock_sleep, mock_cf_client):
+        """Backoff delays use _POLL_BACKOFF schedule: 1s, 2s."""
         from cloudflare import APIError
 
         err = APIError("fail", request=MagicMock(), body=None)
@@ -1379,6 +1396,7 @@ class TestGetListItemsRetry:
         with pytest.raises(ProviderError):
             provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert mock_sleep.call_count == 2
+        # Uses _POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0) indexed by attempt
         assert mock_sleep.call_args_list[0] == ((1.0,),)
         assert mock_sleep.call_args_list[1] == ((2.0,),)
 

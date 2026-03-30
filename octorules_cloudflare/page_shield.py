@@ -107,6 +107,7 @@ def normalize_csp_value(value: str) -> str:
 # ---------------------------------------------------------------------------
 
 _VALID_PAGE_SHIELD_ACTIONS = frozenset({"allow", "log"})
+_PREFETCH_TIMEOUT = 120  # seconds; join timeout for background Page Shield fetch
 
 
 def _require_field(entry: dict, field_name: str, context: str, expected_type: type) -> object:
@@ -333,7 +334,12 @@ def _prefetch_page_shield(
         )
         return None
 
-    executor = ThreadPoolExecutor(max_workers=1)
+    # The executor is returned to the caller (finalize hook) which is
+    # responsible for shutdown.  If submit fails, we clean up immediately.
+    # If finalize is never called (e.g. unrelated exception between
+    # prefetch and finalize), the executor is garbage-collected and its
+    # __del__ calls shutdown().  We set thread name prefix for debuggability.
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ps-prefetch")
     try:
         future = executor.submit(provider.get_all_page_shield_policies, scope)
     except Exception:
@@ -359,7 +365,7 @@ def _finalize_page_shield(
     future, executor, ps_desired = ctx
     try:
         try:
-            current_policies = future.result(timeout=120)
+            current_policies = future.result(timeout=_PREFETCH_TIMEOUT)
         except ProviderAuthError:
             raise
         except ProviderError as e:
@@ -429,7 +435,7 @@ def _apply_page_shield(
                 for k, v in c.normalized_desired.items():
                     kwargs[k] = v
 
-        def create_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:
+        def create_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:  # noqa: B006
             result = provider.create_page_shield_policy(scope, **_kwargs)
             _psp.policy_id = result.get("id", "")
             log.info("  %s/%s: created (id=%s)", zp.zone_name, _label, _psp.policy_id)
@@ -459,7 +465,7 @@ def _apply_page_shield(
                 for k, v in c.normalized_desired.items():
                     kwargs[k] = v
 
-        def update_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:
+        def update_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:  # noqa: B006
             provider.update_page_shield_policy(scope, _psp.policy_id, **_kwargs)
             log.info("  %s/%s: updated", zp.zone_name, _label)
 

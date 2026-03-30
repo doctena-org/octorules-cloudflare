@@ -58,6 +58,7 @@ log = logging.getLogger(__name__)
 _KNOWN_PLANS = {"free", "pro", "business", "enterprise"}
 _LIST_ITEMS_PER_PAGE = 500
 _POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
+_PARALLEL_FETCH_TIMEOUT = 300  # seconds; generous to tolerate slow API responses
 
 
 def _normalize_plan_name(raw: str) -> str:
@@ -125,11 +126,17 @@ def _fetch_parallel(
             item = future_to_item[future]
             key = key_fn(item)
             try:
-                value = future.result()
+                value = future.result(timeout=_PARALLEL_FETCH_TIMEOUT)
             except ProviderAuthError:
+                # Cancel pending futures; already-running ones will fail
+                # on their own since auth is invalid.
                 for f in future_to_item:
                     f.cancel()
                 raise
+            except TimeoutError:
+                log.warning("Timed out fetching %s %s for %s", label, key, scope_label)
+                failed.append(key)
+                continue
             except ProviderError as e:
                 log.warning("Failed to fetch %s %s for %s: %s", label, key, scope_label, e)
                 failed.append(key)
@@ -509,7 +516,7 @@ class CloudflareProvider:
             kwargs: dict = {**scope.api_kwargs, "per_page": _LIST_ITEMS_PER_PAGE}
             if cursor:
                 kwargs["cursor"] = cursor
-            last_exc: APIError | APIConnectionError | None = None
+            last_exc: APIError | APIConnectionError | _json.JSONDecodeError | None = None
             for attempt in range(_page_retries + 1):
                 try:
                     raw = self._client.rules.lists.items.with_raw_response.list(list_id, **kwargs)
@@ -518,14 +525,10 @@ class CloudflareProvider:
                     break
                 except (AuthenticationError, PermissionDeniedError):
                     raise
-                except _json.JSONDecodeError as e:
-                    raise ProviderError(
-                        f"Invalid JSON in list items response for {list_id}: {e}"
-                    ) from e
-                except (APIError, APIConnectionError) as e:
+                except (APIError, APIConnectionError, _json.JSONDecodeError) as e:
                     last_exc = e
                     if attempt < _page_retries:
-                        delay = (attempt + 1) * 1.0
+                        delay = _POLL_BACKOFF[min(attempt, len(_POLL_BACKOFF) - 1)]
                         log.warning(
                             "Retrying page fetch for list %s (%s, attempt %d/%d): %s",
                             list_id,
@@ -536,6 +539,10 @@ class CloudflareProvider:
                         )
                         time.sleep(delay)
             if last_exc is not None:
+                if isinstance(last_exc, _json.JSONDecodeError):
+                    raise ProviderError(
+                        f"Invalid JSON in list items response for {list_id}: {last_exc}"
+                    ) from last_exc
                 raise last_exc
             for item in body.get("result", []):
                 cleaned = {k: v for k, v in item.items() if k not in list_item_api_fields}

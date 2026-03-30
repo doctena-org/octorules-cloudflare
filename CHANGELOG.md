@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-30
+
+### Changed
+- `_fetch_parallel()`: add `_PARALLEL_FETCH_TIMEOUT` (300 s) to
+  `future.result()` to prevent indefinite hangs; `TimeoutError` is now
+  caught and treated as a transient failure.
+- Page Shield prefetch timeout extracted to `_PREFETCH_TIMEOUT` constant.
+- Document `ThreadPoolExecutor` lifecycle in `_prefetch_page_shield`.
+- `get_list_items()`: `JSONDecodeError` is now retried (may be caused by
+  truncated HTTP responses) alongside `APIError` / `APIConnectionError`.
+- `get_list_items()`: retry backoff now uses the shared `_POLL_BACKOFF`
+  schedule instead of a linear `(attempt + 1) * 1.0` calculation.
+
+### Added
+- Ruff `B` (bugbear) and `RUF` lint rule categories to `pyproject.toml`.
+- Per-file ruff ignores for test files (intentional unicode, regex patterns).
+- Tests for `JSONDecodeError` retry-then-succeed path.
+
 ## [0.4.0] - 2026-03-25
 
 ### Added
