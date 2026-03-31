@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1] - 2026-03-31
+
+### Changed
+- CF203 (`unknown action_parameters key`) severity corrected from ERROR to WARNING, matching its rule definition.
+- `ExpressionInfo` is now a frozen dataclass for cache safety.
+- `parse_expression()` results are cached per expression, eliminating redundant wirefilter FFI calls across linter passes.
+- `_load_overlay()` is now cached with `lru_cache`, avoiding repeated disk reads of `overlay.toml`.
+- `sync_schemas.py` reuses `merge_wirefilter_overlay()` from the registry module instead of duplicating schema merge logic.
+
+### Fixed
+- CF421 now fires when `ssl` is a non-string type (e.g., YAML `off` parsed as boolean `False`).
+
+### Added
+- Tests for `create_custom_ruleset` and `delete_custom_ruleset` (account/zone scope, error wrapping).
+
+### Removed
+- Dead `py.typed` marker file.
+- Empty `linter/rules/` directory.
+
 ## [0.5.0] - 2026-03-30
 
 ### Changed

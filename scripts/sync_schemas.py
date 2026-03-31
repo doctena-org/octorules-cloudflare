@@ -19,11 +19,6 @@ import sys
 from pathlib import Path
 
 try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
-
-try:
     _wf_version = importlib.metadata.version("octorules-wirefilter")
     from octorules_wirefilter import get_schema_info
 except ImportError:
@@ -35,55 +30,16 @@ except ImportError:
     )
     sys.exit(1)
 
+from octorules_cloudflare.linter.schemas._registry import merge_wirefilter_overlay
+
 SCHEMAS_DIR = Path(__file__).resolve().parent.parent / "octorules_cloudflare" / "linter" / "schemas"
-OVERLAY_PATH = SCHEMAS_DIR / "overlay.toml"
 SCHEMAS_JSON = SCHEMAS_DIR / "schemas.json"
-
-
-def load_overlay() -> dict:
-    with open(OVERLAY_PATH, "rb") as f:
-        return tomllib.load(f)
 
 
 def build_schema() -> dict:
     """Build the merged schema data from wirefilter + overlay."""
-    schema = get_schema_info()
-    overlay = load_overlay()
-    field_overlay = overlay.get("fields", {})
-    func_overlay = overlay.get("functions", {})
-
-    fields = []
-    for entry in schema["fields"]:
-        name = entry["name"]
-        meta = field_overlay.get(name, {})
-        f: dict = {"name": name, "type": entry["type"]}
-        if meta.get("requires_plan"):
-            f["requires_plan"] = meta["requires_plan"]
-        if meta.get("is_response"):
-            f["is_response"] = True
-        fields.append(f)
-
-    # Include functions from wirefilter + any overlay-only functions
-    all_func_names = list(schema["functions"])
-    for name in func_overlay:
-        if name not in all_func_names:
-            all_func_names.append(name)
-
-    functions = []
-    for name in all_func_names:
-        meta = func_overlay.get(name, {})
-        f = {"name": name}
-        if meta.get("restricted_phases"):
-            f["restricted_phases"] = sorted(meta["restricted_phases"])
-        if meta.get("requires_plan"):
-            f["requires_plan"] = meta["requires_plan"]
-        functions.append(f)
-
-    return {
-        "_generated_with": f"octorules-wirefilter {_wf_version}",
-        "fields": fields,
-        "functions": functions,
-    }
+    merged = merge_wirefilter_overlay(get_schema_info())
+    return {"_generated_with": f"octorules-wirefilter {_wf_version}", **merged}
 
 
 def main() -> None:

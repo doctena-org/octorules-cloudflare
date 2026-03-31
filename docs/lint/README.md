@@ -233,7 +233,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF200](stage2-per-rule.md#cf200--invalid-action-for-phase) | Invalid action for phase | ERROR |
 | [CF201](stage2-per-rule.md#cf201--missing-required-action) | Missing required action | ERROR |
 | [CF202](stage2-per-rule.md#cf202--missing-required-action_parameters) | Missing required action_parameters | ERROR |
-| [CF203](stage2-per-rule.md#cf203--unknown-action_parameters-key) | Unknown action_parameters key | ERROR |
+| [CF203](stage2-per-rule.md#cf203--unknown-action_parameters-key) | Unknown action_parameters key | WARNING |
 | [CF204](stage2-per-rule.md#cf204--invalid-action_parameters-type) | Invalid action_parameters type | ERROR |
 | [CF205](stage2-per-rule.md#cf205--invalid-status_code-type-or-value) | Invalid status_code type or value | ERROR |
 | [CF206](stage2-per-rule.md#cf206--missing-required-status_code-for-redirect) | Missing required status_code for redirect | ERROR |

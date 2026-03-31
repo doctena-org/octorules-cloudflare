@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from octorules.provider.base import Scope
-from octorules.provider.exceptions import ProviderAuthError
+from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
 from octorules_cloudflare import CloudflareProvider
 from octorules_cloudflare.provider import _to_dict
@@ -212,3 +212,138 @@ class TestCustomRulesets:
         assert "rs1" not in result
         assert "rs2" in result
         assert "Failed to fetch custom ruleset rs1" in caplog.text
+
+
+class TestCreateCustomRuleset:
+    """Tests for create_custom_ruleset."""
+
+    def test_create_success(self, mock_cf_client):
+        """create_custom_ruleset sends correct SDK args and returns id+name."""
+        mock_result = MagicMock()
+        mock_result.id = "new-rs-id"
+        mock_result.name = "My Custom Ruleset"
+        mock_cf_client.rulesets.create.return_value = mock_result
+
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        result = provider.create_custom_ruleset(
+            scope, name="My Custom Ruleset", phase="http_request_firewall_custom", capacity=100
+        )
+
+        assert result == {"id": "new-rs-id", "name": "My Custom Ruleset"}
+        mock_cf_client.rulesets.create.assert_called_once_with(
+            account_id="acct-123",
+            name="My Custom Ruleset",
+            kind="custom",
+            phase="http_request_firewall_custom",
+            rules=[],
+        )
+
+    def test_create_zone_scope(self, mock_cf_client):
+        """create_custom_ruleset works with zone scope."""
+        mock_result = MagicMock()
+        mock_result.id = "zone-rs-id"
+        mock_result.name = "Zone Ruleset"
+        mock_cf_client.rulesets.create.return_value = mock_result
+
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(zone_id="zone-456")
+        result = provider.create_custom_ruleset(
+            scope, name="Zone Ruleset", phase="http_request_firewall_custom", capacity=50
+        )
+
+        assert result == {"id": "zone-rs-id", "name": "Zone Ruleset"}
+        mock_cf_client.rulesets.create.assert_called_once_with(
+            zone_id="zone-456",
+            name="Zone Ruleset",
+            kind="custom",
+            phase="http_request_firewall_custom",
+            rules=[],
+        )
+
+    def test_create_auth_error(self, mock_cf_client):
+        """AuthenticationError wraps to ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rulesets.create.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderAuthError):
+            provider.create_custom_ruleset(
+                scope,
+                name="Test",
+                phase="http_request_firewall_custom",
+                capacity=10,
+            )
+
+    def test_create_api_error(self, mock_cf_client):
+        """Generic APIError wraps to ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rulesets.create.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderError):
+            provider.create_custom_ruleset(
+                scope,
+                name="Test",
+                phase="http_request_firewall_custom",
+                capacity=10,
+            )
+
+
+class TestDeleteCustomRuleset:
+    """Tests for delete_custom_ruleset."""
+
+    def test_delete_success(self, mock_cf_client):
+        """delete_custom_ruleset calls SDK with correct args."""
+        mock_cf_client.rulesets.delete.return_value = None
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        result = provider.delete_custom_ruleset(scope, "rs-to-delete")
+
+        assert result is None
+        mock_cf_client.rulesets.delete.assert_called_once_with(
+            "rs-to-delete", account_id="acct-123"
+        )
+
+    def test_delete_zone_scope(self, mock_cf_client):
+        """delete_custom_ruleset works with zone scope."""
+        mock_cf_client.rulesets.delete.return_value = None
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(zone_id="zone-789")
+        provider.delete_custom_ruleset(scope, "rs-zone-del")
+
+        mock_cf_client.rulesets.delete.assert_called_once_with("rs-zone-del", zone_id="zone-789")
+
+    def test_delete_auth_error(self, mock_cf_client):
+        """AuthenticationError wraps to ProviderAuthError."""
+        from cloudflare import AuthenticationError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_cf_client.rulesets.delete.side_effect = AuthenticationError(
+            message="Invalid API token", response=mock_response, body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderAuthError):
+            provider.delete_custom_ruleset(scope, "rs-del")
+
+    def test_delete_api_error(self, mock_cf_client):
+        """Generic APIError wraps to ProviderError."""
+        from cloudflare import APIError
+
+        mock_cf_client.rulesets.delete.side_effect = APIError(
+            "Server Error", request=MagicMock(), body=None
+        )
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderError):
+            provider.delete_custom_ruleset(scope, "rs-del")

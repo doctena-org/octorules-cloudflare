@@ -93,7 +93,7 @@ Fix: Add the required `action_parameters`.
 
 | Severity | Category |
 |----------|----------|
-| ERROR | action |
+| WARNING | action |
 
 Triggers when `action_parameters` contains a key not recognized by the action's schema. Phase-specific overrides narrow the allowed keys further (e.g. `response_header_rules` only allows `headers`, not `uri`).
 
@@ -484,7 +484,7 @@ Fix: Use a valid security level.
 |----------|----------|
 | ERROR | config |
 
-Triggers when `ssl` is not one of: `off`, `flexible`, `full`, `strict`, `origin_pull`.
+Triggers when `ssl` is not one of: `off`, `flexible`, `full`, `strict`, `origin_pull`. Also fires when `ssl` is a non-string type (e.g., YAML `off` without quotes is parsed as boolean `False`).
 
 Fix: Use a valid SSL mode.
 

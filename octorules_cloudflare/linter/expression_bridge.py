@@ -11,7 +11,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ except ImportError:
     WIREFILTER_AVAILABLE = False
 
 
-@dataclass
+@dataclass(frozen=True)
 class ExpressionInfo:
     """Extracted information from a parsed expression."""
 
@@ -127,6 +127,18 @@ _IPV6_CANDIDATE_PATTERN = re.compile(
 # Set/list literal: { "val1" "val2" }
 _SET_LITERAL_PATTERN = re.compile(r"\{([^}]*)\}")
 
+# Cache for parsed expressions — avoids repeated FFI calls across linter passes.
+# Keyed on (normalized_expr, expect_parse_error, wirefilter_available).
+_parse_cache: dict[tuple[str, bool, bool], ExpressionInfo] = {}
+
+
+def _clear_parse_cache() -> None:
+    """Clear the expression parse cache.
+
+    Intended for tests that monkeypatch wirefilter internals.
+    """
+    _parse_cache.clear()
+
 
 def parse_expression(
     expr: str,
@@ -135,6 +147,9 @@ def parse_expression(
     expect_parse_error: bool = False,
 ) -> ExpressionInfo:
     """Parse a Cloudflare ruleset expression and extract components.
+
+    Results are cached so the same expression is parsed at most once per
+    ``expect_parse_error`` mode.
 
     Uses wirefilter FFI when available, falls back to regex analysis.
     The *phase* parameter is accepted for API compatibility but currently
@@ -154,16 +169,24 @@ def parse_expression(
 
     expr = normalize_expression(expr)
 
+    cache_key = (expr, expect_parse_error, WIREFILTER_AVAILABLE)
+    cached = _parse_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Cloudflare accepts standalone 'true'/'false' as valid expressions
     # but wirefilter does not — handle them directly.
     if expr.strip("() ").lower() in ("true", "false"):
-        return ExpressionInfo(raw=expr)
+        result = ExpressionInfo(raw=expr)
+        _parse_cache[cache_key] = result
+        return result
 
     if WIREFILTER_AVAILABLE:
-        return _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error)
-    info = _parse_with_regex(expr)
-    info.parse_error_type = "regex_fallback"
-    return info
+        result = _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error)
+    else:
+        result = replace(_parse_with_regex(expr), parse_error_type="regex_fallback")
+    _parse_cache[cache_key] = result
+    return result
 
 
 def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> ExpressionInfo:
@@ -183,7 +206,6 @@ def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> Ex
     material to produce its own diagnostics, while ``parse_error`` still
     records the authoritative wirefilter rejection.
     """
-    info = ExpressionInfo(raw=expr)
     try:
         result = _wf_parse(expr)
         if isinstance(result, dict):
@@ -197,53 +219,64 @@ def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> Ex
                 else:
                     log.debug("Wirefilter parse error, falling back to regex: %s", err)
                 info = _parse_with_regex(expr)
-                info.parse_error = result["error"]
-                info.parse_error_type = "wirefilter_parse"
-                return info
-            info.fields_used = result.get("fields", [])
-            info.functions_used = result.get("functions", [])
-            info.operators_used = result.get("operators", [])
-            info.string_literals = result.get("string_literals", [])
-            info.regex_literals = result.get("regex_literals", [])
-            info.ip_literals = result.get("ip_literals", [])
-            info.int_literals = result.get("int_literals", [])
-            info.has_regex = bool(info.regex_literals)
-            info.depth_exceeded = result.get("depth_exceeded", False)
+                return replace(
+                    info,
+                    parse_error=result["error"],
+                    parse_error_type="wirefilter_parse",
+                )
+            regex_literals = result.get("regex_literals", [])
+            return ExpressionInfo(
+                raw=expr,
+                fields_used=result.get("fields", []),
+                functions_used=result.get("functions", []),
+                operators_used=result.get("operators", []),
+                string_literals=result.get("string_literals", []),
+                regex_literals=regex_literals,
+                ip_literals=result.get("ip_literals", []),
+                int_literals=result.get("int_literals", []),
+                has_regex=bool(regex_literals),
+                depth_exceeded=result.get("depth_exceeded", False),
+            )
     except (RuntimeError, TypeError, ValueError, OSError) as e:
         # FFI call crashed — fall back to regex extraction.
         log.warning("Wirefilter FFI crashed, falling back to regex: %s", e, exc_info=True)
         info = _parse_with_regex(expr)
-        info.parse_error = f"{type(e).__name__}: {e}"
-        info.parse_error_type = "wirefilter_crash"
-    return info
+        return replace(
+            info,
+            parse_error=f"{type(e).__name__}: {e}",
+            parse_error_type="wirefilter_crash",
+        )
+    return ExpressionInfo(raw=expr)
 
 
 def _parse_with_regex(expr: str) -> ExpressionInfo:
     """Best-effort regex-based expression analysis (fallback)."""
-    info = ExpressionInfo(raw=expr)
+    # Build all data into local variables, then construct a single frozen instance.
 
     # Extract fields
-    info.fields_used = list(dict.fromkeys(_FIELD_PATTERN.findall(expr)))
+    fields_used = list(dict.fromkeys(_FIELD_PATTERN.findall(expr)))
 
     # Extract function calls (anything followed by '(')
     raw_funcs = _FUNCTION_PATTERN.findall(expr)
     # Filter out pure operators, but keep operator-functions (starts_with, ends_with)
-    info.functions_used = list(dict.fromkeys(f for f in raw_funcs if f not in _OPERATORS))
+    functions_used = list(dict.fromkeys(f for f in raw_funcs if f not in _OPERATORS))
 
     # Extract operators used
+    operators_used: list[str] = []
     all_ops = _OPERATORS | _OPERATOR_FUNCTIONS
     for op in all_ops:
         if op == "strict_wildcard":
             # Two-word operator: match "strict wildcard" in expression text
             if re.search(r"\bstrict\s+wildcard\b", expr):
-                info.operators_used.append(op)
+                operators_used.append(op)
         elif op in ("and", "or", "not", "xor") or op in _OPERATOR_FUNCTIONS:
             if re.search(rf"\b{op}\b", expr):
-                info.operators_used.append(op)
+                operators_used.append(op)
         elif op in expr:
-            info.operators_used.append(op)
+            operators_used.append(op)
 
     # Extract regex literals (regular and raw string formats)
+    regex_literals: list[str] = []
     for match in _REGEX_LITERAL_PATTERN.finditer(expr):
         # Groups: 1=~"", 2=~r"", 3=~r#""#, 4=matches"", 5=matches r"", 6=matches r#""#
         val = (
@@ -255,8 +288,8 @@ def _parse_with_regex(expr: str) -> ExpressionInfo:
             or match.group(6)
         )
         if val:
-            info.regex_literals.append(val)
-    info.has_regex = bool(info.regex_literals) or "matches" in expr or "~" in expr
+            regex_literals.append(val)
+    has_regex = bool(regex_literals) or "matches" in expr or "~" in expr
 
     # Collect raw string contents to exclude from string_literals
     raw_string_contents: set[str] = set()
@@ -266,33 +299,45 @@ def _parse_with_regex(expr: str) -> ExpressionInfo:
             raw_string_contents.add(val)
 
     # Extract string literals (excluding regex literals and raw string contents)
+    string_literals: list[str] = []
     for match in _STRING_LITERAL_PATTERN.finditer(expr):
         val = match.group(1)
-        if val and val not in info.regex_literals and val not in raw_string_contents:
-            info.string_literals.append(val)
+        if val and val not in regex_literals and val not in raw_string_contents:
+            string_literals.append(val)
 
     # Extract IP literals (IPv4 + IPv6)
-    info.ip_literals = _IPV4_LITERAL_PATTERN.findall(expr)
+    ip_literals: list[str] = _IPV4_LITERAL_PATTERN.findall(expr)
     for candidate in _IPV6_CANDIDATE_PATTERN.findall(expr):
         # Validate candidate is a real IPv6 address/network
         try:
             ipaddress.ip_address(candidate)
-            info.ip_literals.append(candidate)
+            ip_literals.append(candidate)
             continue
         except ValueError:
             pass
         # Try as network (e.g. 2001:db8::/32)
         try:
             ipaddress.ip_network(candidate, strict=False)
-            info.ip_literals.append(candidate)
+            ip_literals.append(candidate)
         except ValueError:
             pass
 
     # Extract integer literals
+    int_literals: list[int] = []
     for match in _INT_LITERAL_PATTERN.finditer(expr):
         try:
-            info.int_literals.append(int(match.group(1)))
+            int_literals.append(int(match.group(1)))
         except ValueError:
             pass
 
-    return info
+    return ExpressionInfo(
+        raw=expr,
+        fields_used=fields_used,
+        functions_used=functions_used,
+        operators_used=operators_used,
+        string_literals=string_literals,
+        regex_literals=regex_literals,
+        ip_literals=ip_literals,
+        int_literals=int_literals,
+        has_regex=has_regex,
+    )

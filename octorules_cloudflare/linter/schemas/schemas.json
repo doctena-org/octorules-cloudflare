@@ -1,5 +1,5 @@
 {
-  "_generated_with": "octorules-wirefilter 0.3.2",
+  "_generated_with": "octorules-wirefilter 0.3.3",
   "fields": [
     {
       "name": "cf.api_gateway.auth_id_present",

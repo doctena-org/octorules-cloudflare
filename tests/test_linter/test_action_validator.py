@@ -134,7 +134,7 @@ class TestPhaseParameterOverrides:
             },
             "response_header_rules",
         )
-        assert_lint(ctx, "CF203", count=1, severity=Severity.ERROR)
+        assert_lint(ctx, "CF203", count=1, severity=Severity.WARNING)
         assert "uri" in ctx.results[0].message
 
     def test_headers_in_response_header_rules_ok(self):
@@ -539,6 +539,21 @@ class TestConfigParams:
             "config_rules",
         )
         assert "CF421" in _ids(ctx)
+
+    def test_cf421_ssl_non_string_type(self):
+        """YAML `off` without quotes becomes boolean False — should emit CF421."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_config",
+                "action_parameters": {"ssl": False},
+            },
+            "config_rules",
+        )
+        assert "CF421" in _ids(ctx)
+        diag = next(r for r in ctx.results if r.rule_id == "CF421")
+        assert "bool" in diag.message
 
     def test_cf422_invalid_polish(self):
         ctx = _lint_rule(

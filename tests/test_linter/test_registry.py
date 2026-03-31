@@ -110,3 +110,33 @@ class TestErrorPaths:
         with patch("octorules_cloudflare.linter.schemas._registry._load_overlay", return_value={}):
             result = load_managed_lists()
         assert result == frozenset()
+
+
+class TestLoadOverlayCache:
+    """Tests that _load_overlay's lru_cache actually caches results."""
+
+    def test_cache_returns_same_object(self):
+        """Two _load_overlay() calls return the exact same object (identity)."""
+        _load_overlay.cache_clear()
+        try:
+            result1 = _load_overlay()
+            result2 = _load_overlay()
+            assert result1 is result2
+        finally:
+            _load_overlay.cache_clear()
+
+    def test_file_read_only_once(self):
+        """The underlying file is only read once across two _load_overlay() calls.
+
+        Uses lru_cache's built-in cache_info() to verify the second call
+        was a cache hit rather than a second file read.
+        """
+        _load_overlay.cache_clear()
+        try:
+            _load_overlay()
+            _load_overlay()
+            info = _load_overlay.cache_info()
+            assert info.misses == 1, f"Expected exactly 1 miss (first call), got {info.misses}"
+            assert info.hits == 1, f"Expected exactly 1 hit (second call), got {info.hits}"
+        finally:
+            _load_overlay.cache_clear()

@@ -181,7 +181,7 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
             ctx.add(
                 LintResult(
                     rule_id="CF203",
-                    severity=Severity.ERROR,
+                    severity=Severity.WARNING,
                     message=(
                         f"Unknown action_parameters key {key!r}"
                         f" for action {action!r} in phase {phase_name!r}"
@@ -483,7 +483,19 @@ def _lint_config_params(params: dict, phase_name: str, ref: str, ctx: LintContex
             )
 
     ssl = params.get("ssl")
-    if isinstance(ssl, str) and not _check_enum(
+    if ssl is not None and not isinstance(ssl, str):
+        # CF421: ssl must be a string
+        ctx.add(
+            LintResult(
+                rule_id="CF421",
+                severity=Severity.ERROR,
+                message=f"'ssl' must be a string, got {type(ssl).__name__}",
+                phase=phase_name,
+                ref=ref,
+                field="action_parameters.ssl",
+            )
+        )
+    elif isinstance(ssl, str) and not _check_enum(
         ssl,
         VALID_SSL_VALUES,
         rule_id="CF421",
