@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **127 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **137 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 ### Suppressing rules
 
@@ -65,10 +65,10 @@ Suppressed findings are excluded from the report but counted in the summary line
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
 | 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF018 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 89 | [stage2-per-rule.md](stage2-per-rule.md) |
-| 2b. Custom rulesets | Custom ruleset structure, duplicate refs + full per-rule checks (actions, expressions, phase restrictions) | CF022–CF025 | 4 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 96 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
-| 2d. List validation | List structure, item validity, duplicates | CF470–CF475 | 6 | [stage2d-lists.md](stage2d-lists.md) |
+| 2d. List validation | List structure, item validity, duplicates, count | CF470–CF476 | 7 | [stage2d-lists.md](stage2d-lists.md) |
 | 3. Plan-tier limits | Regex availability, rule count limits | CF500–CF502 | 3 | [stage3-plan-tier.md](stage3-plan-tier.md) |
 | 4. Cross-rule analysis | Duplicates, unreachable rules, list references | CF100–CF104 | 5 | [stage4-cross-rule.md](stage4-cross-rule.md) |
 
@@ -79,19 +79,19 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF001–CF002 | Parse / syntax errors | 2 |
 | CF003–CF018 | Structure | 16 |
 | CF019–CF021 | Phase restrictions | 3 |
-| CF022–CF025 | Custom ruleset validation | 4 |
+| CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF104 | Cross-rule | 5 |
-| CF200–CF217 | Action validation | 18 |
+| CF200–CF219 | Action validation | 20 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
-| CF400–CF405 | Rate limiting | 6 |
-| CF410–CF413 | Cache rules | 4 |
+| CF400–CF407 | Rate limiting | 8 |
+| CF410–CF414 | Cache rules | 5 |
 | CF420–CF424 | Config rules | 5 |
-| CF430–CF431 | Redirect rules | 2 |
+| CF430–CF432 | Redirect rules | 3 |
 | CF440–CF445 | Transform rules | 6 |
-| CF450 | Origin rules | 1 |
+| CF450–CF452 | Origin rules | 3 |
 | CF460–CF463 | Page Shield structure | 4 |
-| CF470–CF475 | List validation | 6 |
+| CF470–CF476 | List validation | 7 |
 | CF500–CF502 | Plan/entitlement | 3 |
 | CF510–CF515 | Best practice / style | 6 |
 | CF520–CF545 | Value constraints | 26 |
