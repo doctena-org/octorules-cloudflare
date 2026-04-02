@@ -5,6 +5,7 @@
 #   ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
 set -euo pipefail
 
+.venv/bin/pip install -e ".[dev,wirefilter]" -q
 .venv/bin/ruff check
 .venv/bin/ruff format --check
 
