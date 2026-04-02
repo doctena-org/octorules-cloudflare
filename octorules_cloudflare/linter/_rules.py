@@ -69,6 +69,8 @@ CF214 = RuleMeta("CF214", "action", "Invalid block response parameter", Severity
 CF215 = RuleMeta("CF215", "action", "Missing execute ruleset id", Severity.ERROR)
 CF216 = RuleMeta("CF216", "action", "Invalid execute ruleset id format", Severity.WARNING)
 CF217 = RuleMeta("CF217", "action", "Terminal compression algorithm must be last", Severity.WARNING)
+CF218 = RuleMeta("CF218", "action", "Invalid execute overrides structure", Severity.ERROR)
+CF219 = RuleMeta("CF219", "action", "Skip action references empty ruleset ID", Severity.WARNING)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)
@@ -77,12 +79,17 @@ CF402 = RuleMeta("CF402", "rate_limit", "Missing requests_per_period threshold",
 CF403 = RuleMeta("CF403", "rate_limit", "mitigation_timeout exceeds period", Severity.WARNING)
 CF404 = RuleMeta("CF404", "rate_limit", "Invalid counting_expression", Severity.ERROR)
 CF405 = RuleMeta("CF405", "rate_limit", "Invalid counting_expression content", Severity.WARNING)
+CF406 = RuleMeta(
+    "CF406", "rate_limit", "Too many rate limit characteristics for plan tier", Severity.ERROR
+)
+CF407 = RuleMeta("CF407", "rate_limit", "requests_per_period outside valid range", Severity.ERROR)
 
 # Category I — Cache Rule Specific
 CF410 = RuleMeta("CF410", "cache", "Invalid TTL mode value", Severity.ERROR)
 CF411 = RuleMeta("CF411", "cache", "Missing TTL with override mode", Severity.ERROR)
 CF412 = RuleMeta("CF412", "cache", "Negative TTL value", Severity.ERROR)
 CF413 = RuleMeta("CF413", "cache", "Conflicting bypass and eligible settings", Severity.WARNING)
+CF414 = RuleMeta("CF414", "cache", "Cache TTL exceeds maximum (1 year)", Severity.WARNING)
 
 # Category J — Config Rule Specific
 CF420 = RuleMeta("CF420", "config", "Invalid security_level value", Severity.ERROR)
@@ -96,6 +103,7 @@ CF424 = RuleMeta("CF424", "config", "Security warning: SSL set to 'off'", Severi
 # Category K — Redirect Rule Specific
 CF430 = RuleMeta("CF430", "redirect", "Invalid redirect status code", Severity.ERROR)
 CF431 = RuleMeta("CF431", "redirect", "Missing target_url in redirect", Severity.ERROR)
+CF432 = RuleMeta("CF432", "redirect", "Redirect target_url is not a valid URL", Severity.WARNING)
 
 # Category L — Transform Rule Specific
 CF440 = RuleMeta("CF440", "transform", "Empty header name in transform", Severity.ERROR)
@@ -113,6 +121,8 @@ CF445 = RuleMeta(
 
 # Category N — Origin Rule Specific
 CF450 = RuleMeta("CF450", "origin", "Port number out of range (1-65535)", Severity.ERROR)
+CF451 = RuleMeta("CF451", "action", "Origin weight outside valid range (0.0-1.0)", Severity.ERROR)
+CF452 = RuleMeta("CF452", "action", "Origin route missing required fields", Severity.ERROR)
 
 # Category B — Phase Restrictions
 CF019 = RuleMeta(
@@ -220,6 +230,9 @@ CF024 = RuleMeta("CF024", "custom_ruleset", "Duplicate ref within custom ruleset
 CF025 = RuleMeta(
     "CF025", "custom_ruleset", "Duplicate ref across custom rulesets", Severity.WARNING
 )
+CF026 = RuleMeta(
+    "CF026", "custom_ruleset", "Custom ruleset exceeds maximum rule count (1,000)", Severity.WARNING
+)
 
 # Category Q — List Validation
 CF470 = RuleMeta("CF470", "list", "Missing or invalid list name", Severity.ERROR)
@@ -228,6 +241,7 @@ CF472 = RuleMeta("CF472", "list", "Missing required item field for list kind", S
 CF473 = RuleMeta("CF473", "list", "Invalid IP address in list", Severity.ERROR)
 CF474 = RuleMeta("CF474", "list", "Invalid ASN value in list", Severity.ERROR)
 CF475 = RuleMeta("CF475", "list", "Duplicate item in list", Severity.WARNING)
+CF476 = RuleMeta("CF476", "list", "List exceeds maximum item count (10,000)", Severity.WARNING)
 
 # Collect all rule metas for registration
 CF_RULE_METAS: list[RuleMeta] = [obj for obj in globals().values() if isinstance(obj, RuleMeta)]

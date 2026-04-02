@@ -363,6 +363,27 @@ class TestListMethods:
         items = provider.get_list_items(Scope(account_id="acct-123"), "lst-1")
         assert len(items) == 1
 
+    @patch("octorules_cloudflare.provider.time.sleep")
+    def test_get_list_items_retries_on_json_error(self, mock_sleep, mock_cf_client):
+        """get_list_items retries when a page returns invalid JSON."""
+        import json as _json
+
+        good_body = {"result": [{"ip": "1.1.1.1/32"}], "result_info": {"total": 1}}
+        good_raw = MagicMock()
+        good_raw.http_response.text = _json.dumps(good_body)
+
+        bad_raw = MagicMock()
+        bad_raw.http_response.text = "NOT JSON{{{{"
+
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = [
+            bad_raw,
+            good_raw,
+        ]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        items = provider.get_list_items(Scope(account_id="acct-123"), "lst-1")
+        assert len(items) == 1
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
+
     # --- put_list_items ---
 
     def test_put_list_items(self, mock_cf_client):

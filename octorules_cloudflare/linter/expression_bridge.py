@@ -129,6 +129,8 @@ _SET_LITERAL_PATTERN = re.compile(r"\{([^}]*)\}")
 
 # Cache for parsed expressions — avoids repeated FFI calls across linter passes.
 # Keyed on (normalized_expr, expect_parse_error, wirefilter_available).
+# Bounded to prevent unbounded growth in long-running processes.
+_PARSE_CACHE_MAX_SIZE = 2048
 _parse_cache: dict[tuple[str, bool, bool], ExpressionInfo] = {}
 
 
@@ -178,13 +180,13 @@ def parse_expression(
     # but wirefilter does not — handle them directly.
     if expr.strip("() ").lower() in ("true", "false"):
         result = ExpressionInfo(raw=expr)
-        _parse_cache[cache_key] = result
-        return result
-
-    if WIREFILTER_AVAILABLE:
+    elif WIREFILTER_AVAILABLE:
         result = _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error)
     else:
         result = replace(_parse_with_regex(expr), parse_error_type="regex_fallback")
+
+    if len(_parse_cache) >= _PARSE_CACHE_MAX_SIZE:
+        _parse_cache.clear()
     _parse_cache[cache_key] = result
     return result
 

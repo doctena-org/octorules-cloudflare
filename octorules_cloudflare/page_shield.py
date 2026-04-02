@@ -567,22 +567,18 @@ class PageShieldFormatter:
     """Formatter for Page Shield policy plans."""
 
     def format_text(self, plans: list, use_color: bool) -> list[str]:
-        from octorules.formatter import (
-            BOLD,
-            GREEN,
-            RED,
-            _color,
-            format_change,
-        )
+        from octorules._color import Pen
+        from octorules.formatter import format_change
 
+        p = Pen(use_color)
         lines: list[str] = []
         for psp in plans:
             header = f"  page_shield: {psp.description}"
-            lines.append(_color(header, BOLD, use_color))
+            lines.append(p.header(header))
             if psp.create:
-                lines.append(_color("  + create policy", GREEN, use_color))
+                lines.append(p.success("  + create policy"))
             if psp.delete:
-                lines.append(_color("  - delete policy", RED, use_color))
+                lines.append(p.error("  - delete policy"))
             for change in psp.changes:
                 lines.extend(format_change(change, use_color))
         return lines

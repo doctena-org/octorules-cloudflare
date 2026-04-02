@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-04-02
+
+### Added
+- CF026: Custom ruleset rule count limit 1,000 per ruleset (WARNING).
+- CF218: Execute overrides structure validation (ERROR).
+- CF219: Skip action empty ruleset ID (WARNING).
+- CF406: Rate limit characteristics per plan tier limit (ERROR).
+- CF407: ``requests_per_period`` range validation 1–10,000,000 (ERROR).
+- CF414: Cache TTL upper bound 31,536,000 seconds / 1 year (WARNING).
+- CF432: Redirect ``target_url`` format validation (WARNING).
+- CF451: Origin weight outside valid range 0.0–1.0 (ERROR).
+- CF452: Origin route missing required fields (ERROR).
+- CF476: List item count limit 10,000 per list (WARNING).
+
+### Changed
+- Expression parser cache is now bounded to 2,048 entries to prevent unbounded
+  memory growth in long-running processes.
+- `PageShieldFormatter.format_text()` migrated from raw ANSI codes to the
+  `octorules._color.Pen` API (requires octorules ≥ 0.21.2).
+- Pre-commit hook now runs `ruff check` and `ruff format --check` before the
+  conditional schema regeneration, and uses `.venv/bin/python` instead of bare
+  `python`.
+- Removed CI `concurrency` blocks from lint and test workflows.
+
+### Fixed
+- CF401/CF402 no longer fire on ``execute`` action rules in
+  ``rate_limiting_rules`` phase (ruleset references don't have rate limit
+  parameters — thresholds live in the child rules).
+- CF526 heuristic removed — it falsely flagged user-agent strings and other
+  hyphenated values as header names.  Header name checks now only apply to
+  bracket-accessed header maps (``http.request.headers["name"]``).
+
 ## [0.5.1] - 2026-03-31
 
 ### Changed

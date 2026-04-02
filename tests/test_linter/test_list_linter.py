@@ -200,6 +200,18 @@ class TestRedirectListItems:
         assert "CF475" in _ids(ctx)
 
 
+class TestCF476ListItemCount:
+    def test_cf476_over_limit(self):
+        items = [{"ip": f"10.0.{i // 256}.{i % 256}"} for i in range(10001)]
+        ctx = _lint({"lists": [{"name": "biglist", "kind": "ip", "items": items}]})
+        assert "CF476" in _ids(ctx)
+
+    def test_cf476_at_limit(self):
+        items = [{"ip": f"10.0.{i // 256}.{i % 256}"} for i in range(10000)]
+        ctx = _lint({"lists": [{"name": "biglist", "kind": "ip", "items": items}]})
+        assert "CF476" not in _ids(ctx)
+
+
 class TestNoListsSection:
     def test_no_lists_no_errors(self):
         ctx = _lint({"waf_custom_rules": []})

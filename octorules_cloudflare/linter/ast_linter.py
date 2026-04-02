@@ -549,27 +549,9 @@ def _check_string_literal_values(
                         suggestion=f"Use {val.lower()!r}",
                     )
                 )
-        # Also check string_literals that look like header names (heuristic)
-        for lit in info.string_literals:
-            if (
-                lit != lit.lower()
-                and "-" in lit
-                and " " not in lit
-                and len(lit) <= 80
-                and lit not in _g007_flagged
-            ):
-                _g007_flagged.add(lit)
-                ctx.add(
-                    LintResult(
-                        rule_id="CF526",
-                        severity=Severity.INFO,
-                        message=(f"Header name {lit!r} should be lowercase ({lit.lower()!r})"),
-                        phase=phase_name,
-                        ref=ref,
-                        field="expression",
-                        suggestion=f"Use {lit.lower()!r}",
-                    )
-                )
+        # Heuristic for header-like string literals removed — it produced
+        # false positives on user-agent strings and other hyphenated values.
+        # The bracket check above catches actual header names reliably.
 
     # CF528: Duplicate values in 'in' set
     # Must operate on the raw expression because wirefilter deduplicates in its AST.

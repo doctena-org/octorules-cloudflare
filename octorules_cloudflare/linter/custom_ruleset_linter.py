@@ -11,7 +11,7 @@ from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity
 
-RULE_IDS = frozenset({"CF022", "CF023", "CF024", "CF025"})
+RULE_IDS = frozenset({"CF022", "CF023", "CF024", "CF025", "CF026"})
 
 _HEX_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
@@ -98,3 +98,18 @@ def lint_custom_rulesets(rules_data: dict[str, Any], ctx: LintContext) -> None:
                         )
                     )
                 all_refs[ref] = rs_label
+
+            # CF026: custom ruleset exceeds maximum rule count (1,000)
+            if len(rules) > 1000:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF026",
+                        severity=Severity.WARNING,
+                        message=(
+                            f"Custom ruleset {rs_label} has {len(rules):,} rules"
+                            " (exceeds 1,000 rule limit)"
+                        ),
+                        phase="custom_rulesets",
+                        ref=rs_label,
+                    )
+                )

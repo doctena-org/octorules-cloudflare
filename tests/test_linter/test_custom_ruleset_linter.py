@@ -145,6 +145,40 @@ class TestCustomRulesetDuplicateRefs:
         assert "CF025" in _ids(ctx)
 
 
+class TestCF026RuleCount:
+    def test_cf026_over_limit(self):
+        rules = [{"ref": f"rule-{i}", "expression": "true", "action": "block"} for i in range(1001)]
+        ctx = _lint(
+            {
+                "custom_rulesets": [
+                    {
+                        "id": "abc12345def67890abc12345def67890",
+                        "name": "Big Ruleset",
+                        "phase": "http_request_firewall_custom",
+                        "rules": rules,
+                    }
+                ]
+            }
+        )
+        assert "CF026" in _ids(ctx)
+
+    def test_cf026_at_limit(self):
+        rules = [{"ref": f"rule-{i}", "expression": "true", "action": "block"} for i in range(1000)]
+        ctx = _lint(
+            {
+                "custom_rulesets": [
+                    {
+                        "id": "abc12345def67890abc12345def67890",
+                        "name": "Big Ruleset",
+                        "phase": "http_request_firewall_custom",
+                        "rules": rules,
+                    }
+                ]
+            }
+        )
+        assert "CF026" not in _ids(ctx)
+
+
 class TestNoCustomRulesets:
     def test_no_custom_rulesets_no_errors(self):
         ctx = _lint({"waf_custom_rules": []})

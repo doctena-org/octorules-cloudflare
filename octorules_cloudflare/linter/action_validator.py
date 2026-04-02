@@ -18,6 +18,7 @@ from octorules.phases import Phase
 
 from octorules_cloudflare.linter.schemas.actions import (
     ACTION_SCHEMAS,
+    MAX_CHARACTERISTICS,
     PHASE_PARAMETER_OVERRIDES,
     VALID_ACTIONS_BY_PHASE,
     VALID_BLOCK_RESPONSE_STATUS_CODES,
@@ -60,10 +61,13 @@ RULE_IDS = frozenset(
         "CF403",
         "CF404",
         "CF405",
+        "CF406",
+        "CF407",
         "CF410",
         "CF411",
         "CF412",
         "CF413",
+        "CF414",
         "CF420",
         "CF421",
         "CF422",
@@ -71,6 +75,7 @@ RULE_IDS = frozenset(
         "CF424",
         "CF430",
         "CF431",
+        "CF432",
         "CF440",
         "CF441",
         "CF442",
@@ -78,6 +83,10 @@ RULE_IDS = frozenset(
         "CF444",
         "CF445",
         "CF450",
+        "CF451",
+        "CF452",
+        "CF218",
+        "CF219",
     }
 )
 
@@ -213,7 +222,8 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
         _lint_cache_params(action_params, phase_name, ref, ctx)
     elif phase_name == "config_rules":
         _lint_config_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "rate_limiting_rules":
+    elif phase_name == "rate_limiting_rules" and action not in ("execute", "skip"):
+        # execute/skip are ruleset references — thresholds live in the child rules.
         _lint_rate_limit_params(action_params, phase_name, ref, ctx)
     elif phase_name == "origin_rules":
         _lint_origin_params(action_params, phase_name, ref, ctx)
@@ -339,6 +349,22 @@ def _lint_ttl(
             )
         )
 
+    # CF414: TTL exceeds maximum (1 year)
+    _MAX_TTL = 31536000  # 1 year in seconds
+    if isinstance(default_val, (int, float)) and default_val > _MAX_TTL:
+        ctx.add(
+            LintResult(
+                rule_id="CF414",
+                severity=Severity.WARNING,
+                message=(
+                    f"{ttl_name} value ({default_val}s) exceeds maximum ({_MAX_TTL}s / 1 year)"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field=f"action_parameters.{ttl_name}.default",
+            )
+        )
+
 
 # ---------------------------------------------------------------------------
 # Phase-specific validators
@@ -375,6 +401,27 @@ def _lint_redirect_params(params: dict, phase_name: str, ref: str, ctx: LintCont
             "action_parameters.from_value.target_url",
             ctx,
         )
+
+        # CF432: target_url value should be a valid URL
+        url_value = target_url.get("value")
+        if isinstance(url_value, str) and not (
+            url_value.startswith("http://")
+            or url_value.startswith("https://")
+            or url_value.startswith("/")
+        ):
+            ctx.add(
+                LintResult(
+                    rule_id="CF432",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Redirect target_url {url_value!r} does not start with"
+                        " 'http://', 'https://', or '/'"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action_parameters.from_value.target_url.value",
+                )
+            )
 
     status_code = from_value.get("status_code")
     if status_code is None:
@@ -566,6 +613,23 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
             )
         )
 
+    # CF407: requests_per_period range (1-10,000,000)
+    rpp = params.get("requests_per_period")
+    if isinstance(rpp, int) and not isinstance(rpp, bool):
+        if rpp < 1 or rpp > 10_000_000:
+            ctx.add(
+                LintResult(
+                    rule_id="CF407",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"requests_per_period ({rpp}) is outside the valid range (1-10,000,000)"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action_parameters.requests_per_period",
+                )
+            )
+
     # CF401: missing characteristics
     characteristics = params.get("characteristics")
     if characteristics is None:
@@ -599,6 +663,23 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                         field="action_parameters.characteristics",
                     )
                 )
+
+        # CF406: too many characteristics for plan tier
+        max_chars = MAX_CHARACTERISTICS.get(ctx.plan_tier)
+        if max_chars is not None and len(characteristics) > max_chars:
+            ctx.add(
+                LintResult(
+                    rule_id="CF406",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"Too many rate limit characteristics ({len(characteristics)})"
+                        f" for {ctx.plan_tier!r} plan (max {max_chars})"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action_parameters.characteristics",
+                )
+            )
 
     # CF403: mitigation_timeout > period
     mitigation_timeout = params.get("mitigation_timeout")
@@ -654,7 +735,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
 
 
 def _lint_origin_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate origin rule action_parameters (CF450)."""
+    """Validate origin rule action_parameters (CF450, CF451, CF452)."""
     origin = params.get("origin")
     if isinstance(origin, dict):
         port = origin.get("port")
@@ -678,6 +759,39 @@ def _lint_origin_params(params: dict, phase_name: str, ref: str, ctx: LintContex
                     phase=phase_name,
                     ref=ref,
                     field="action_parameters.origin.port",
+                )
+            )
+
+        # CF451: Origin weight must be between 0.0 and 1.0
+        weight = origin.get("weight")
+        if isinstance(weight, (int, float)) and not isinstance(weight, bool):
+            if weight < 0.0 or weight > 1.0:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF451",
+                        severity=Severity.ERROR,
+                        message=(f"Origin weight {weight} is outside the valid range (0.0-1.0)"),
+                        phase=phase_name,
+                        ref=ref,
+                        field="action_parameters.origin.weight",
+                    )
+                )
+
+        # CF452: Origin route must have 'host', or both 'sni' and 'host_header'
+        has_host = "host" in origin
+        has_sni = "sni" in origin
+        has_host_header = "host_header" in origin
+        if not has_host and not (has_sni and has_host_header):
+            ctx.add(
+                LintResult(
+                    rule_id="CF452",
+                    severity=Severity.ERROR,
+                    message=(
+                        "Origin route requires 'host' field, or both 'sni' and 'host_header' fields"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action_parameters.origin",
                 )
             )
 
@@ -926,6 +1040,30 @@ def _lint_execute_params(params: dict, phase_name: str, ref: str, ctx: LintConte
             )
         )
 
+    # CF218: Validate overrides.rules structure
+    overrides = params.get("overrides")
+    if isinstance(overrides, dict):
+        rules = overrides.get("rules")
+        if isinstance(rules, list):
+            for i, entry in enumerate(rules):
+                if not isinstance(entry, dict):
+                    continue
+                rule_id = entry.get("id")
+                if not isinstance(rule_id, str) or not rule_id.strip():
+                    ctx.add(
+                        LintResult(
+                            rule_id="CF218",
+                            severity=Severity.ERROR,
+                            message=(
+                                f"Execute overrides rule at index {i} is missing"
+                                " a valid 'id' (must be a non-empty string)"
+                            ),
+                            phase=phase_name,
+                            ref=ref,
+                            field=f"action_parameters.overrides.rules[{i}].id",
+                        )
+                    )
+
 
 def _lint_skip_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
     """Validate skip action_parameters (CF210, CF211)."""
@@ -942,6 +1080,22 @@ def _lint_skip_params(params: dict, phase_name: str, ref: str, ctx: LintContext)
                         phase=phase_name,
                         ref=ref,
                         field="action_parameters.phases",
+                    )
+                )
+
+    # CF219: validate rulesets values (each must be a non-empty string)
+    rulesets = params.get("rulesets")
+    if isinstance(rulesets, list):
+        for ruleset_val in rulesets:
+            if not isinstance(ruleset_val, str) or not ruleset_val.strip():
+                ctx.add(
+                    LintResult(
+                        rule_id="CF219",
+                        severity=Severity.WARNING,
+                        message="Skip action references empty or invalid ruleset ID",
+                        phase=phase_name,
+                        ref=ref,
+                        field="action_parameters.rulesets",
                     )
                 )
 

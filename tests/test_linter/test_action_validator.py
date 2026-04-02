@@ -17,9 +17,9 @@ _needs_wirefilter = pytest.mark.skipif(
 )
 
 
-def _lint_rule(rule, phase_name="redirect_rules"):
+def _lint_rule(rule, phase_name="redirect_rules", **ctx_kwargs):
     phase = PHASE_BY_NAME[phase_name]
-    ctx = LintContext()
+    ctx = LintContext(**ctx_kwargs)
     lint_actions(rule, phase, ctx)
     return ctx
 
@@ -608,6 +608,30 @@ class TestRateLimitParams:
             "rate_limiting_rules",
         )
         assert "CF401" in _ids(ctx)
+
+    def test_execute_action_skips_rate_limit_checks(self):
+        """Execute action in rate_limiting_rules is a ruleset reference
+        (e.g., account-level custom rulesets). The thresholds and
+        characteristics live on the child rules inside the referenced
+        ruleset, not on the execute rule itself.
+        CF401/CF402 should not fire."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "description": "Test execute ruleset ref",
+                "expression": '(cf.zone.name in {"example.com"})',
+                "action": "execute",
+                "action_parameters": {
+                    "id": "00000000000000000000000000000001",
+                    "version": "latest",
+                },
+                "enabled": True,
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF401" not in _ids(ctx)
+        assert "CF402" not in _ids(ctx)
+        assert "CF400" not in _ids(ctx)
 
     def test_cf402_missing_threshold(self):
         ctx = _lint_rule(
@@ -1578,3 +1602,409 @@ class TestRequestHeaderAdd:
             "response_header_rules",
         )
         assert "CF445" not in _ids(ctx)
+
+
+class TestCF406CharacteristicsPerPlan:
+    def test_cf406_too_many_characteristics(self):
+        """Free plan allows only 1 characteristic — 5 should trigger CF406."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 100,
+                    "characteristics": [
+                        "ip.src",
+                        "cf.colo.id",
+                        'http.request.headers["x-api-key"]',
+                        'http.request.headers["x-client"]',
+                        'http.request.headers["x-token"]',
+                    ],
+                },
+            },
+            "rate_limiting_rules",
+            plan_tier="free",
+        )
+        assert "CF406" in _ids(ctx)
+
+    def test_cf406_within_limit(self):
+        """Enterprise plan allows 4 characteristics — 2 should be fine."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 100,
+                    "characteristics": ["ip.src", "cf.colo.id"],
+                },
+            },
+            "rate_limiting_rules",
+            plan_tier="enterprise",
+        )
+        assert "CF406" not in _ids(ctx)
+
+
+class TestCF407RequestsPerPeriodRange:
+    def test_cf407_out_of_range_zero(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 0,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF407" in _ids(ctx)
+
+    def test_cf407_out_of_range_too_high(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 20000000,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF407" in _ids(ctx)
+
+    def test_cf407_in_range(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 100,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF407" not in _ids(ctx)
+
+    def test_cf407_boundary_one(self):
+        """requests_per_period=1 is the lower boundary — should pass."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 1,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF407" not in _ids(ctx)
+
+    def test_cf407_boundary_max(self):
+        """requests_per_period=10000000 is the upper boundary — should pass."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "requests_per_period": 10_000_000,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF407" not in _ids(ctx)
+
+
+class TestCF414CacheTTLUpperBound:
+    def test_cf414_over_limit(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {
+                    "edge_ttl": {"mode": "override_origin", "default": 31536001},
+                },
+            },
+            "cache_rules",
+        )
+        assert "CF414" in _ids(ctx)
+
+    def test_cf414_at_limit(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {
+                    "edge_ttl": {"mode": "override_origin", "default": 31536000},
+                },
+            },
+            "cache_rules",
+        )
+        assert "CF414" not in _ids(ctx)
+
+
+class TestCF432RedirectTargetURL:
+    def test_cf432_bad_url(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "redirect",
+                "action_parameters": {
+                    "from_value": {
+                        "target_url": {"value": "example.com"},
+                        "status_code": 301,
+                    }
+                },
+            },
+            "redirect_rules",
+        )
+        assert "CF432" in _ids(ctx)
+
+    def test_cf432_good_url(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "redirect",
+                "action_parameters": {
+                    "from_value": {
+                        "target_url": {"value": "https://example.com/path"},
+                        "status_code": 301,
+                    }
+                },
+            },
+            "redirect_rules",
+        )
+        assert "CF432" not in _ids(ctx)
+
+
+class TestCF218ExecuteOverridesStructure:
+    def test_cf218_override_rule_missing_id(self):
+        """Override rule entry without 'id' triggers CF218."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "abc12345def67890abc12345def67890",
+                    "overrides": {
+                        "rules": [{"enabled": False}],
+                    },
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert_lint(ctx, "CF218", count=1, severity=Severity.ERROR)
+        assert "index 0" in ctx.results[0].message
+
+    def test_cf218_override_rules_valid(self):
+        """Override rule entries with valid 'id' do not trigger CF218."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "abc12345def67890abc12345def67890",
+                    "overrides": {
+                        "rules": [
+                            {"id": "abc12345def67890abc12345def67890", "enabled": False},
+                        ],
+                    },
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert "CF218" not in _ids(ctx)
+
+
+class TestCF219SkipRulesetId:
+    def test_cf219_empty_ruleset_id(self):
+        """Empty string in rulesets list triggers CF219."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "skip",
+                "action_parameters": {"rulesets": [""]},
+            },
+            "waf_custom_rules",
+        )
+        assert_lint(ctx, "CF219", count=1, severity=Severity.WARNING)
+
+    def test_cf219_valid_ruleset_ids(self):
+        """Non-empty string rulesets do not trigger CF219."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "skip",
+                "action_parameters": {
+                    "rulesets": ["abc12345def67890abc12345def67890"],
+                },
+            },
+            "waf_custom_rules",
+        )
+        assert "CF219" not in _ids(ctx)
+
+
+class TestCF451OriginWeight:
+    def test_cf451_weight_out_of_range(self):
+        """Weight > 1.0 triggers CF451."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"host": "example.com", "weight": 1.5},
+                },
+            },
+            "origin_rules",
+        )
+        assert_lint(ctx, "CF451", count=1, severity=Severity.ERROR)
+
+    def test_cf451_weight_in_range(self):
+        """Weight within 0.0-1.0 does not trigger CF451."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"host": "example.com", "weight": 0.5},
+                },
+            },
+            "origin_rules",
+        )
+        assert "CF451" not in _ids(ctx)
+
+    def test_cf451_weight_zero(self):
+        """Weight 0.0 is the lower boundary — should pass."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"host": "example.com", "weight": 0.0},
+                },
+            },
+            "origin_rules",
+        )
+        assert "CF451" not in _ids(ctx)
+
+    def test_cf451_weight_one(self):
+        """Weight 1.0 is the upper boundary — should pass."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"host": "example.com", "weight": 1.0},
+                },
+            },
+            "origin_rules",
+        )
+        assert "CF451" not in _ids(ctx)
+
+    def test_cf451_weight_negative(self):
+        """Weight -0.1 is below the valid range — should trigger CF451."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"host": "example.com", "weight": -0.1},
+                },
+            },
+            "origin_rules",
+        )
+        assert_lint(ctx, "CF451", count=1, severity=Severity.ERROR)
+
+
+class TestCF452OriginRouteRequiredFields:
+    def test_cf452_missing_host_and_sni(self):
+        """Origin with neither 'host' nor 'sni'+'host_header' triggers CF452."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {"origin": {"port": 8443}},
+            },
+            "origin_rules",
+        )
+        assert_lint(ctx, "CF452", count=1, severity=Severity.ERROR)
+
+    def test_cf452_has_host(self):
+        """Origin with 'host' does not trigger CF452."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"host": "backend.example.com", "port": 8443},
+                },
+            },
+            "origin_rules",
+        )
+        assert "CF452" not in _ids(ctx)
+
+    def test_cf452_sni_without_host_header(self):
+        """Origin with 'sni' but no 'host_header' should trigger CF452."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {"sni": {"value": "backend.example.com"}, "port": 8443},
+                },
+            },
+            "origin_rules",
+        )
+        assert_lint(ctx, "CF452", count=1, severity=Severity.ERROR)
+
+    def test_cf452_sni_and_host_header(self):
+        """Origin with both 'sni' and 'host_header' (no 'host') should pass."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "route",
+                "action_parameters": {
+                    "origin": {
+                        "sni": {"value": "backend.example.com"},
+                        "host_header": "backend.example.com",
+                        "port": 8443,
+                    },
+                },
+            },
+            "origin_rules",
+        )
+        assert "CF452" not in _ids(ctx)

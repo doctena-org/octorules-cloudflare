@@ -11,7 +11,7 @@ from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity
 
-RULE_IDS = frozenset({"CF470", "CF471", "CF472", "CF473", "CF474", "CF475"})
+RULE_IDS = frozenset({"CF470", "CF471", "CF472", "CF473", "CF474", "CF475", "CF476"})
 
 _VALID_KINDS = frozenset({"ip", "asn", "hostname", "redirect"})
 
@@ -97,6 +97,20 @@ def lint_lists(rules_data: dict[str, Any], ctx: LintContext) -> None:
             continue
 
         _lint_list_items(items, kind, name_label, ctx)
+
+        # CF476: list exceeds maximum item count (10,000)
+        if len(items) > 10000:
+            ctx.add(
+                LintResult(
+                    rule_id="CF476",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"List {name_label!r} has {len(items):,} items (exceeds 10,000 item limit)"
+                    ),
+                    phase="lists",
+                    ref=name_label,
+                )
+            )
 
 
 def _lint_list_items(items: list[Any], kind: str, name_label: str, ctx: LintContext) -> None:
