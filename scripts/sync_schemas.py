@@ -10,8 +10,6 @@ Usage:
     python scripts/sync_schemas.py --check   # compare only, exit 1 if different
 """
 
-from __future__ import annotations
-
 import argparse
 import importlib.metadata
 import json

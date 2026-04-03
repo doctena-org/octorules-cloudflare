@@ -5,8 +5,6 @@ catch-all expressions (CF015/CF016), and delegates expression-level analysis
 (E, F, G, O) to the AST linter.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from octorules.linter.engine import (

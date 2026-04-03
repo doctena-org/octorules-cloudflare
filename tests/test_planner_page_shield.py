@@ -1,7 +1,5 @@
 """Tests for the diff engine (planner) – page shield policies."""
 
-from __future__ import annotations
-
 import logging
 
 import pytest
@@ -365,11 +363,11 @@ class TestDiffPageShieldPolicies:
 
 
 class TestZonePlanWithPageShieldPolicies:
-    """Tests for ZonePlan including page_shield_policy_plans."""
+    """Tests for ZonePlan including page shield extension plans."""
 
     def test_has_changes_with_policies_only(self):
         pp = PageShieldPolicyPlan(description="CSP", create=True)
-        zp = ZonePlan(zone_name="test.com", page_shield_policy_plans=[pp])
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [pp]})
         assert zp.has_changes
 
     def test_total_changes_includes_policies(self):
@@ -382,7 +380,11 @@ class TestZonePlanWithPageShieldPolicies:
             phase=REDIRECT_PHASE,
             changes=[RuleChange(ChangeType.ADD, "r1", REDIRECT_PHASE)],
         )
-        zp = ZonePlan(zone_name="test.com", phase_plans=[pp], page_shield_policy_plans=[psp])
+        zp = ZonePlan(
+            zone_name="test.com",
+            phase_plans=[pp],
+            extension_plans={"page_shield": [psp]},
+        )
         # 1 (phase) + 1 (create) + 1 (field add) = 3
         assert zp.total_changes == 3
 
@@ -408,15 +410,15 @@ class TestComputeChecksumWithPageShieldPolicies:
                 RuleChange(ChangeType.ADD, "action", REDIRECT_PHASE, desired={"action": "allow"})
             ],
         )
-        zp = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
         h = compute_checksum([zp])
         assert len(h) == 64
 
     def test_checksum_differs_with_policies(self):
         psp1 = PageShieldPolicyPlan(description="CSP-A", create=True)
         psp2 = PageShieldPolicyPlan(description="CSP-B", create=True)
-        zp1 = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp1])
-        zp2 = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp2])
+        zp1 = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp1]})
+        zp2 = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp2]})
         assert compute_checksum([zp1]) != compute_checksum([zp2])
 
 
@@ -440,7 +442,7 @@ class TestCheckSafetyWithPageShieldPolicies:
             policy_id="pol-1",
             delete=True,
         )
-        zp = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
         current = {"http_request_dynamic_redirect": [{"ref": f"r{i}"} for i in range(3)]}
         violations = check_safety(zp, current, self._zone_cfg(delete_threshold=30.0))
         assert len(violations) == 1
@@ -456,7 +458,7 @@ class TestCheckSafetyWithPageShieldPolicies:
             policy_id="pol-1",
             changes=changes,
         )
-        zp = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
         current = {"http_request_dynamic_redirect": [{"ref": f"r{i}"} for i in range(10)]}
         violations = check_safety(zp, current, self._zone_cfg())
         assert len(violations) == 1
@@ -473,7 +475,7 @@ class TestCheckSafetyWithPageShieldPolicies:
             policy_id="pol-1",
             changes=changes,
         )
-        zp = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
         current = {"http_request_dynamic_redirect": [{"ref": f"r{i}"} for i in range(10)]}
         violations = check_safety(zp, current, self._zone_cfg())
         assert len(violations) == 1
@@ -490,7 +492,7 @@ class TestCheckSafetyWithPageShieldPolicies:
             policy_id="pol-1",
             changes=changes,
         )
-        zp = ZonePlan(zone_name="test.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
         current = {"http_request_dynamic_redirect": [{"ref": f"r{i}"} for i in range(5)]}
         violations = check_safety(zp, current, self._zone_cfg())
         assert violations == []
@@ -502,7 +504,11 @@ class TestCheckSafetyWithPageShieldPolicies:
         pp = PhasePlan(phase=REDIRECT_PHASE, changes=phase_changes)
         psp_changes = [RuleChange(ChangeType.REMOVE, f"field{i}", synthetic) for i in range(2)]
         psp = PageShieldPolicyPlan(description="CSP", policy_id="pol-1", changes=psp_changes)
-        zp = ZonePlan(zone_name="test.com", phase_plans=[pp], page_shield_policy_plans=[psp])
+        zp = ZonePlan(
+            zone_name="test.com",
+            phase_plans=[pp],
+            extension_plans={"page_shield": [psp]},
+        )
         # 4 deletes out of 10 existing = 40%
         current = {"http_request_dynamic_redirect": [{"ref": f"r{i}"} for i in range(10)]}
         violations = check_safety(zp, current, self._zone_cfg())

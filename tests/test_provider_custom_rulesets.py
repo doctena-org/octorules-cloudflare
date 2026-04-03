@@ -1,7 +1,5 @@
 """Tests for custom ruleset provider methods."""
 
-from __future__ import annotations
-
 import logging
 from unittest.mock import MagicMock
 

@@ -4,8 +4,6 @@ Validates the structural correctness of zone rules files:
 required fields, types, duplicates, unknown phases, etc.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from octorules.linter.engine import (

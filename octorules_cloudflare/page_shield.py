@@ -5,8 +5,6 @@ octorules.  All five hooks (plan, apply, format, validate, dump) are
 registered at import time via ``register_page_shield()``.
 """
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -45,8 +43,6 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # PageShieldPolicyPlan dataclass
 # ---------------------------------------------------------------------------
-
-
 @dataclass
 class PageShieldPolicyPlan:
     description: str
@@ -73,8 +69,6 @@ class PageShieldPolicyPlan:
 # CSP normalization — sort sources within each directive to prevent
 # phantom diffs when Cloudflare reorders CSP source values.
 # ---------------------------------------------------------------------------
-
-
 def normalize_csp_value(value: str) -> str:
     """Normalize a CSP value by sorting sources within each directive.
 
@@ -284,8 +278,6 @@ def diff_page_shield_policies(
 # ---------------------------------------------------------------------------
 # CSP value formatting (for dump output)
 # ---------------------------------------------------------------------------
-
-
 def format_csp_value(value: str, max_line: int = 80) -> str:
     """Format a CSP value string for readable multi-line YAML.
 
@@ -311,8 +303,6 @@ def format_csp_value(value: str, max_line: int = 80) -> str:
 # ---------------------------------------------------------------------------
 # Plan zone hook
 # ---------------------------------------------------------------------------
-
-
 def _prefetch_page_shield(
     all_desired: dict,
     scope: Scope,
@@ -388,8 +378,6 @@ def _finalize_page_shield(
 # ---------------------------------------------------------------------------
 # Apply extension
 # ---------------------------------------------------------------------------
-
-
 def _apply_page_shield(
     zp: ZonePlan,
     plans: list,
@@ -483,8 +471,6 @@ def _apply_page_shield(
 # ---------------------------------------------------------------------------
 # Validate extension
 # ---------------------------------------------------------------------------
-
-
 def _validate_page_shield(
     desired: dict,
     zone_name: str,
@@ -510,8 +496,6 @@ def _validate_page_shield(
 # ---------------------------------------------------------------------------
 # Dump extension
 # ---------------------------------------------------------------------------
-
-
 def _clean_page_shield_policies(policies: list[dict]) -> list[dict]:
     """Clean and format page shield policies for YAML dump output."""
     from octorules.dumper import _literalize, _LiteralStr, _strip_trailing_whitespace
@@ -561,8 +545,6 @@ def _dump_page_shield(
 # ---------------------------------------------------------------------------
 # Format extension
 # ---------------------------------------------------------------------------
-
-
 class PageShieldFormatter:
     """Formatter for Page Shield policy plans."""
 

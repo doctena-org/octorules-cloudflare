@@ -6,8 +6,6 @@ Cloudflare uses). When not installed, falls back to a best-effort regex
 parser that extracts fields, operators, and values from expressions.
 """
 
-from __future__ import annotations
-
 import ipaddress
 import logging
 import re

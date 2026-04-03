@@ -1,7 +1,5 @@
 """Tests for list validation (Category Q)."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext
 
 from octorules_cloudflare.linter.list_linter import lint_lists

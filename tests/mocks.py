@@ -1,7 +1,5 @@
 """Shared mock classes for provider tests."""
 
-from __future__ import annotations
-
 
 class MockRuleset:
     def __init__(self, rules=None):

@@ -1,7 +1,5 @@
 """Tests for the Cloudflare provider."""
 
-from __future__ import annotations
-
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -1269,7 +1267,8 @@ class TestProviderErrorScenarios:
         assert count == 0
         assert "sent 1 rule(s) but response contains 0" in caplog.text
 
-    def test_get_list_items_retry_exhaustion(self, mock_cf_client):
+    @patch("octorules.retry.time.sleep")
+    def test_get_list_items_retry_exhaustion(self, _mock_sleep, mock_cf_client):
         """get_list_items should raise after all retries are exhausted."""
         from cloudflare import APIError
 
@@ -1283,7 +1282,8 @@ class TestProviderErrorScenarios:
         # Should have been called 2 times (1 initial + 1 retry)
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
 
-    def test_poll_bulk_operation_timeout(self, mock_cf_client):
+    @patch("octorules_cloudflare.provider.time.sleep")
+    def test_poll_bulk_operation_timeout(self, _mock_sleep, mock_cf_client):
         """poll_bulk_operation should raise ProviderError when status stays 'running'."""
         mock_cf_client.rules.lists.bulk_operations.get.return_value = MockRule(
             {"status": "running"}
@@ -1340,7 +1340,7 @@ class TestGetListItemsRetry:
         raw.http_response.text = "not json {"
         mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError, match="Invalid JSON"):
                 provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         # 1 initial + 2 retries = 3 attempts
@@ -1356,7 +1356,7 @@ class TestGetListItemsRetry:
             good_raw,
         ]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             items = provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert len(items) == 1
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
@@ -1371,7 +1371,7 @@ class TestGetListItemsRetry:
             raw_ok,
         ]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with patch("octorules_cloudflare.provider.time.sleep") as mock_sleep:
+        with patch("octorules.retry.time.sleep") as mock_sleep:
             items = provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert len(items) == 1
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
@@ -1387,14 +1387,14 @@ class TestGetListItemsRetry:
             raw_ok,
         ]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with patch("octorules_cloudflare.provider.time.sleep") as mock_sleep:
+        with patch("octorules.retry.time.sleep") as mock_sleep:
             items = provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert items == [{"ip": "2.2.2.2/32"}]
         mock_sleep.assert_called_once()
 
-    @patch("octorules_cloudflare.provider.time.sleep")
+    @patch("octorules.retry.time.sleep")
     def test_backoff_uses_poll_backoff_schedule(self, mock_sleep, mock_cf_client):
-        """Backoff delays use _POLL_BACKOFF schedule: 1s, 2s."""
+        """Backoff delays use _LIST_PAGE_BACKOFF schedule: 1s, 2s (+ jitter up to 0.5s)."""
         from cloudflare import APIError
 
         err = APIError("fail", request=MagicMock(), body=None)
@@ -1403,9 +1403,11 @@ class TestGetListItemsRetry:
         with pytest.raises(ProviderError):
             provider.get_list_items(Scope(account_id="a"), "lst-1", _page_retries=2)
         assert mock_sleep.call_count == 2
-        # Uses _POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0) indexed by attempt
-        assert mock_sleep.call_args_list[0] == ((1.0,),)
-        assert mock_sleep.call_args_list[1] == ((2.0,),)
+        # Uses _LIST_PAGE_BACKOFF = (1.0, 2.0, 3.0, 5.0) + jitter [0, 0.5]
+        delay_0 = mock_sleep.call_args_list[0][0][0]
+        delay_1 = mock_sleep.call_args_list[1][0][0]
+        assert 1.0 <= delay_0 <= 1.5
+        assert 2.0 <= delay_1 <= 2.5
 
     def test_default_page_retries_is_two(self, mock_cf_client):
         """Default _page_retries=2 means 3 total attempts."""
@@ -1414,7 +1416,7 @@ class TestGetListItemsRetry:
         err = APIError("fail", request=MagicMock(), body=None)
         mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError):
                 provider.get_list_items(Scope(account_id="a"), "lst-1")
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
@@ -1465,9 +1467,9 @@ class TestFutureCancellationOnAuthError:
         mock_executor.submit.side_effect = mock_submit
 
         with (
-            patch("octorules_cloudflare.provider.ThreadPoolExecutor", return_value=mock_executor),
+            patch("octorules.provider.utils.ThreadPoolExecutor", return_value=mock_executor),
             patch(
-                "octorules_cloudflare.provider.as_completed",
+                "octorules.provider.utils.as_completed",
                 return_value=iter([failing_future, ok_future_1, ok_future_2]),
             ),
         ):
@@ -1507,9 +1509,9 @@ class TestFutureCancellationOnAuthError:
         mock_executor.submit.side_effect = mock_submit
 
         with (
-            patch("octorules_cloudflare.provider.ThreadPoolExecutor", return_value=mock_executor),
+            patch("octorules.provider.utils.ThreadPoolExecutor", return_value=mock_executor),
             patch(
-                "octorules_cloudflare.provider.as_completed",
+                "octorules.provider.utils.as_completed",
                 return_value=iter([failing_future, ok_future]),
             ),
         ):
@@ -1552,9 +1554,9 @@ class TestFutureCancellationOnAuthError:
         mock_executor.submit.side_effect = mock_submit
 
         with (
-            patch("octorules_cloudflare.provider.ThreadPoolExecutor", return_value=mock_executor),
+            patch("octorules.provider.utils.ThreadPoolExecutor", return_value=mock_executor),
             patch(
-                "octorules_cloudflare.provider.as_completed",
+                "octorules.provider.utils.as_completed",
                 return_value=iter([failing_future, ok_future_1, ok_future_2]),
             ),
         ):
@@ -1598,9 +1600,9 @@ class TestFutureCancellationOnAuthError:
         mock_executor.submit.side_effect = mock_submit
 
         with (
-            patch("octorules_cloudflare.provider.ThreadPoolExecutor", return_value=mock_executor),
+            patch("octorules.provider.utils.ThreadPoolExecutor", return_value=mock_executor),
             patch(
-                "octorules_cloudflare.provider.as_completed",
+                "octorules.provider.utils.as_completed",
                 return_value=iter([failing_future, ok_future_1, ok_future_2]),
             ),
         ):
@@ -1750,7 +1752,7 @@ class TestFetchParallelConcurrency:
 
     def test_partial_failure_some_succeed_some_fail(self):
         """Some items succeed, some raise ProviderError -- verify results + failed keys."""
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         def submit_fn(executor, item):
             def work(name):
@@ -1776,7 +1778,7 @@ class TestFetchParallelConcurrency:
         """concurrent.futures.TimeoutError should land the key in the failed list."""
         from concurrent.futures import TimeoutError as FuturesTimeoutError
 
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         def submit_fn(executor, item):
             def work(name):
@@ -1806,7 +1808,7 @@ class TestFetchParallelConcurrency:
         caught by the ``except FuturesTimeoutError`` clause.  Verify it lands
         in *failed* and generates the "Timed out" warning.
         """
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         def submit_fn(executor, item):
             def work(name):
@@ -1835,7 +1837,7 @@ class TestFetchParallelConcurrency:
         """FuturesTimeoutError generates a WARNING log with key name and 'Timed out'."""
         from concurrent.futures import TimeoutError as FuturesTimeoutError
 
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         def submit_fn(executor, item):
             def work(name):
@@ -1863,7 +1865,7 @@ class TestFetchParallelConcurrency:
 
     def test_all_succeed_with_max_workers_gt_1(self):
         """All items succeed under actual concurrency -- verify correct results."""
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         items = [f"item-{i}" for i in range(10)]
 
@@ -1889,7 +1891,7 @@ class TestFetchParallelConcurrency:
         import threading
         import time
 
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         barrier = threading.Barrier(3, timeout=5)
 
@@ -1920,7 +1922,7 @@ class TestFetchParallelConcurrency:
         """Mixed results with max_workers=2 -- verify correct results under concurrency."""
         import threading
 
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         call_threads: dict = {}
         lock = threading.Lock()
@@ -1952,7 +1954,7 @@ class TestFetchParallelConcurrency:
 
     def test_result_fn_returning_none_skips_entry(self):
         """result_fn returning None should skip adding to results dict."""
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         def submit_fn(executor, item):
             return executor.submit(lambda x: x, item)
@@ -1977,7 +1979,7 @@ class TestFetchParallelConcurrency:
 
     def test_single_item_with_high_max_workers(self):
         """Single item with high max_workers should still work correctly."""
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
         results, failed = _fetch_parallel(
             ["only-one"],
@@ -1995,9 +1997,9 @@ class TestFetchParallelConcurrency:
         """max_workers should be capped to len(items) -- no more threads than items."""
         from unittest.mock import patch as _patch
 
-        from octorules_cloudflare.provider import _fetch_parallel
+        from octorules.provider.utils import fetch_parallel as _fetch_parallel
 
-        with _patch("octorules_cloudflare.provider.ThreadPoolExecutor") as mock_tpe:
+        with _patch("octorules.provider.utils.ThreadPoolExecutor") as mock_tpe:
             mock_executor = MagicMock()
             mock_executor.__enter__ = MagicMock(return_value=mock_executor)
             mock_executor.__exit__ = MagicMock(return_value=False)
@@ -2007,7 +2009,7 @@ class TestFetchParallelConcurrency:
             future.result.return_value = "val"
             mock_executor.submit.return_value = future
 
-            with _patch("octorules_cloudflare.provider.as_completed", return_value=iter([future])):
+            with _patch("octorules.provider.utils.as_completed", return_value=iter([future])):
                 _fetch_parallel(
                     ["only-one"],
                     submit_fn=lambda ex, item: ex.submit(lambda: "val"),
@@ -2210,7 +2212,8 @@ class TestErrorMapping:
             provider.list_zones()
         assert exc_info.value.__cause__ is original
 
-    def test_already_wrapped_provider_error_not_double_wrapped(self, mock_cf_client):
+    @patch("octorules.retry.time.sleep")
+    def test_already_wrapped_provider_error_not_double_wrapped(self, _mock_sleep, mock_cf_client):
         """ProviderError raised inside a wrapped method should not be double-wrapped."""
         # get_list_items raises ProviderError on invalid JSON. The @_wrap_provider_errors
         # should re-raise it as-is, not wrap it again.
@@ -2281,7 +2284,7 @@ class TestGetListItemsRetryExhaustion:
         mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError, match="Server Error"):
                 provider.get_list_items(scope, "lst-1", _page_retries=2)
         # 1 initial + 2 retries = 3 total
@@ -2295,7 +2298,7 @@ class TestGetListItemsRetryExhaustion:
         mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = err
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError):
                 provider.get_list_items(scope, "lst-1", _page_retries=3)
         # 1 initial + 3 retries = 4 total
@@ -2321,7 +2324,7 @@ class TestGetListItemsRetryExhaustion:
         ]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError, match="Page 2 Server Error"):
                 provider.get_list_items(scope, "lst-1", _page_retries=1)
         # 1 for page 1 success + 2 for page 2 (initial + 1 retry)
@@ -2335,7 +2338,7 @@ class TestGetListItemsRetryExhaustion:
         mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = original_err
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        with patch("octorules_cloudflare.provider.time.sleep"):
+        with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError) as exc_info:
                 provider.get_list_items(scope, "lst-1", _page_retries=1)
         # The wrapper re-raises the CF exception, which is then caught by
@@ -2365,13 +2368,15 @@ class TestGetListItemsRetryExhaustion:
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
         with (
-            caplog.at_level(logging.WARNING, logger="octorules_cloudflare"),
-            patch("octorules_cloudflare.provider.time.sleep"),
+            caplog.at_level(logging.WARNING, logger="octorules.retry"),
+            patch("octorules.retry.time.sleep"),
         ):
             with pytest.raises(ProviderError):
                 provider.get_list_items(scope, "lst-1", _page_retries=2)
-        # Should have 2 retry warnings (attempts 1 and 2 of retries, not the last)
-        retry_warnings = [r for r in caplog.records if "Retrying page fetch" in r.message]
-        assert len(retry_warnings) == 2
-        assert "attempt 1/3" in retry_warnings[0].message
-        assert "attempt 2/3" in retry_warnings[1].message
+        # retry_with_backoff logs warnings for each retry attempt
+        retry_warnings = [
+            r for r in caplog.records if "attempt" in r.message and "failed" in r.message
+        ]
+        assert len(retry_warnings) >= 2
+        assert "1/3" in retry_warnings[0].message
+        assert "2/3" in retry_warnings[1].message

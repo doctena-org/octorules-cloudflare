@@ -1,7 +1,5 @@
 """Cloudflare linter — registers all CF-specific lint rules and plugins."""
 
-from __future__ import annotations
-
 import logging
 
 log = logging.getLogger(__name__)

@@ -1,7 +1,5 @@
 """Tests for expression bridge (regex fallback and wirefilter FFI)."""
 
-from __future__ import annotations
-
 import logging
 
 import pytest

@@ -1,7 +1,5 @@
 """Tests for Page Shield policies CLI functionality."""
 
-from __future__ import annotations
-
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -231,7 +229,7 @@ class TestApplyPageShield:
             },
         )
         psp = PageShieldPolicyPlan(description="CSP on all", create=True, changes=[change])
-        zp = ZonePlan(zone_name="example.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
         provider = MagicMock()
         provider.create_page_shield_policy.return_value = {"id": "new-id"}
@@ -245,7 +243,7 @@ class TestApplyPageShield:
     def test_apply_page_shield_delete(self):
         """_apply_page_shield should call delete for removed policies."""
         psp = PageShieldPolicyPlan(description="Old CSP", policy_id="policy-123", delete=True)
-        zp = ZonePlan(zone_name="example.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
         provider = MagicMock()
         provider.max_workers = 1
@@ -265,7 +263,7 @@ class TestApplyPageShield:
             desired={"action": "allow"},
         )
         psp = PageShieldPolicyPlan(description="CSP", policy_id="policy-456", changes=[change])
-        zp = ZonePlan(zone_name="example.com", page_shield_policy_plans=[psp])
+        zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
         provider = MagicMock()
         provider.update_page_shield_policy.return_value = {"id": "policy-456"}
@@ -278,7 +276,7 @@ class TestApplyPageShield:
 
     def test_apply_page_shield_empty(self):
         """Empty plans list should do nothing."""
-        zp = ZonePlan(zone_name="example.com", page_shield_policy_plans=[])
+        zp = ZonePlan(zone_name="example.com")
         scope = Scope(zone_id="zone-abc", label="example.com")
         provider = MagicMock()
         provider.max_workers = 1

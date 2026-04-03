@@ -4,8 +4,6 @@ Detects when fields or functions are used in phases where they're not available,
 e.g. response fields in request phases, body fields without body access.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity

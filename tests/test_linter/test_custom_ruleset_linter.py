@@ -1,7 +1,5 @@
 """Tests for custom ruleset validation (Category T)."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext
 
 from octorules_cloudflare.linter.custom_ruleset_linter import lint_custom_rulesets

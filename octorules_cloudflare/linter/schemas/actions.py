@@ -4,8 +4,6 @@ Defines which actions are valid in which phases, whether action_parameters
 is required, and the expected structure of action_parameters.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 

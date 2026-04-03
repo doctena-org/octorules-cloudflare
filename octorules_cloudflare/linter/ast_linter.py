@@ -7,8 +7,6 @@ Operates on parsed expression information to detect:
 - Best practice / style suggestions (O)
 """
 
-from __future__ import annotations
-
 import ipaddress
 import re
 import time

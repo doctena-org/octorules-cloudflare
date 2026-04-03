@@ -1,7 +1,5 @@
 """Tests for action and action_parameters validation (Categories C, D, I, J, K, L, N)."""
 
-from __future__ import annotations
-
 import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME

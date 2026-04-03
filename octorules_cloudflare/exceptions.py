@@ -1,7 +1,5 @@
 """Cloudflare SDK exception re-exports."""
 
-from __future__ import annotations
-
 from cloudflare import (
     APIConnectionError,
     APIError,

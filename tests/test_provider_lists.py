@@ -1,7 +1,5 @@
 """Tests for CloudflareProvider list-related methods."""
 
-from __future__ import annotations
-
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -313,7 +311,8 @@ class TestListMethods:
         items = provider.get_list_items(scope, "lst-1")
         assert items == []
 
-    def test_get_list_items_invalid_json_raises(self, mock_cf_client):
+    @patch("octorules.retry.time.sleep")
+    def test_get_list_items_invalid_json_raises(self, _mock_sleep, mock_cf_client):
         """get_list_items raises ValueError when response contains invalid JSON."""
         raw = MagicMock()
         raw.http_response.text = "not valid json {"
@@ -363,7 +362,7 @@ class TestListMethods:
         items = provider.get_list_items(Scope(account_id="acct-123"), "lst-1")
         assert len(items) == 1
 
-    @patch("octorules_cloudflare.provider.time.sleep")
+    @patch("octorules.retry.time.sleep")
     def test_get_list_items_retries_on_json_error(self, mock_sleep, mock_cf_client):
         """get_list_items retries when a page returns invalid JSON."""
         import json as _json
@@ -478,7 +477,8 @@ class TestListMethods:
         with pytest.raises(ProviderError, match="unknown error"):
             provider.poll_bulk_operation(scope, "op-123")
 
-    def test_poll_bulk_operation_timeout_raises(self, mock_cf_client):
+    @patch("octorules_cloudflare.provider.time.sleep")
+    def test_poll_bulk_operation_timeout_raises(self, _mock_sleep, mock_cf_client):
         """poll_bulk_operation raises ProviderError when timeout exceeded."""
         mock_cf_client.rules.lists.bulk_operations.get.return_value = MockRule(
             {"status": "running"}
@@ -488,7 +488,8 @@ class TestListMethods:
         with pytest.raises(ProviderError, match="Bulk operation op-123 timed out after 0.01s"):
             provider.poll_bulk_operation(scope, "op-123", timeout=0.01)
 
-    def test_poll_bulk_operation_completes_after_retries(self, mock_cf_client):
+    @patch("octorules_cloudflare.provider.time.sleep")
+    def test_poll_bulk_operation_completes_after_retries(self, _mock_sleep, mock_cf_client):
         """poll_bulk_operation succeeds after polling through pending status."""
         mock_cf_client.rules.lists.bulk_operations.get.side_effect = [
             MockRule({"status": "running"}),
@@ -501,9 +502,10 @@ class TestListMethods:
         assert result == "completed"
         assert mock_cf_client.rules.lists.bulk_operations.get.call_count == 3
 
+    @patch("octorules_cloudflare.provider.random.uniform", return_value=0.0)
     @patch("octorules_cloudflare.provider.time.sleep")
-    def test_poll_bulk_operation_graduated_backoff(self, mock_sleep, mock_cf_client):
-        """poll_bulk_operation uses graduated backoff: 1s, 2s, 3s, 5s cap."""
+    def test_poll_bulk_operation_graduated_backoff(self, mock_sleep, _mock_uniform, mock_cf_client):
+        """poll_bulk_operation uses graduated backoff: 1s, 2s, 3s, 5s cap (+ jitter)."""
         mock_cf_client.rules.lists.bulk_operations.get.side_effect = [
             MockRule({"status": "running"}),
             MockRule({"status": "running"}),
@@ -635,7 +637,8 @@ class TestListMethods:
         with pytest.raises(ProviderAuthError):
             provider.get_all_lists(scope)
 
-    def test_get_all_lists_transient_error_skips(self, mock_cf_client, caplog):
+    @patch("octorules.retry.time.sleep")
+    def test_get_all_lists_transient_error_skips(self, _mock_sleep, mock_cf_client, caplog):
         """Transient API error on one list should skip it and continue."""
         from cloudflare import APIError
 

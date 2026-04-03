@@ -1,7 +1,5 @@
 """Tests for YAML structure validation (Category M)."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext, Severity
 
 from octorules_cloudflare.linter.yaml_validator import lint_yaml_structure

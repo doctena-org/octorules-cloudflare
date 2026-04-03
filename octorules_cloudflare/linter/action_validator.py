@@ -8,8 +8,6 @@ container) early-return to skip further checks; value errors (bad enum,
 missing sub-field) continue so multiple issues are reported at once.
 """
 
-from __future__ import annotations
-
 import re
 from typing import Any
 
@@ -246,8 +244,6 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
-
-
 def _check_enum(
     value: object,
     valid: frozenset,
@@ -369,8 +365,6 @@ def _lint_ttl(
 # ---------------------------------------------------------------------------
 # Phase-specific validators
 # ---------------------------------------------------------------------------
-
-
 def _lint_redirect_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
     """Validate redirect action_parameters (CF430, CF431, CF206, CF207)."""
     from_value = params.get("from_value")

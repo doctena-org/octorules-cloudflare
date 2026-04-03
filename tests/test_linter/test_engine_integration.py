@@ -1,7 +1,5 @@
 """Integration tests for Cloudflare lint plugin — end-to-end lint_zone_file tests."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import (
     Severity,
     lint_zone_file,

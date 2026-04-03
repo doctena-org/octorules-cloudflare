@@ -1,7 +1,5 @@
 """Tests for the phase registry."""
 
-from __future__ import annotations
-
 import pytest
 from octorules.phases import (
     ACCOUNT_PROVIDER_IDS,

@@ -1,7 +1,5 @@
 """Tests for phase linter (Category B)."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext
 from octorules.phases import PHASE_BY_NAME
 

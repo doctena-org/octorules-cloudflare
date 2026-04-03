@@ -4,8 +4,6 @@ This is the provider-side equivalent of what ``lint_zone_file()`` used to do
 inline.  It is registered as a ``LintPlugin`` and called by the core engine.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from octorules.linter.engine import LintContext

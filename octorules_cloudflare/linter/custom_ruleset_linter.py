@@ -4,8 +4,6 @@ Validates the structural correctness of custom_rulesets entries:
 required fields, ID format, duplicate refs, etc.
 """
 
-from __future__ import annotations
-
 import re
 from typing import Any
 

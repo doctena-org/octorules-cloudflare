@@ -1,7 +1,5 @@
 """Tests for AST linter — expression-level rules (Categories A, E, F, G, O)."""
 
-from __future__ import annotations
-
 import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME

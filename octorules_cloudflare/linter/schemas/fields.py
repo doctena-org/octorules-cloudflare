@@ -7,8 +7,6 @@ The registry is populated at import time from wirefilter + overlay.toml if
 wirefilter is installed, or from schemas.json (frozen fallback) otherwise.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import Enum
 
@@ -72,8 +70,6 @@ def _load_fields() -> None:
 
 
 _load_fields()
-
-
 # --- Fields NOT in the schema --- #
 # These are intentionally kept as Python code because they are not returned
 # by wirefilter's get_schema_info(). DO NOT remove them — each serves a
@@ -103,8 +99,6 @@ _f("ip.geoip.is_in_european_union", FieldType.BOOL)
 # expressions. Removing them would cause false-positive CF308 warnings.
 _f("cf.zone.name", FieldType.STRING)
 _f("cf.zone.plan", FieldType.STRING)
-
-
 # --- Response-only phases ---
 # Phases where response fields are available
 RESPONSE_PHASES = frozenset(

@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.2] - 2026-04-03
+
+### Changed
+- List page retry uses shared `retry_with_backoff()` from core with jitter.
+- Parallel fetching uses shared `fetch_parallel()` from core (removed local
+  implementation).
+- Bulk operation polling adds random jitter to backoff intervals.
+- `page_shield_policy_plans` kwarg removed from `ZonePlan()` calls — uses
+  `extension_plans={"page_shield": [...]}` directly.
+- List items pagination cursor extraction now type-checks `result_info` and
+  `cursors` before access, preventing `AttributeError` on malformed API
+  responses.
+
+### Added
+- End-to-end linter pipeline tests exercising all 4 passes.
+
+### Removed
+- `from __future__ import annotations` from all source files.
+
 ## [0.6.1] - 2026-04-02
 
 ### Fixed

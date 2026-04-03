@@ -9,8 +9,6 @@ wirefilter is installed, or from schemas.json (frozen fallback) otherwise.
 Source: https://developers.cloudflare.com/ruleset-engine/rules-language/functions/
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 

@@ -1,7 +1,5 @@
 """Tests for the schema registry loader (_registry.py)."""
 
-from __future__ import annotations
-
 from unittest.mock import patch
 
 from octorules_cloudflare.linter.schemas._registry import (

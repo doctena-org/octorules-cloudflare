@@ -1,7 +1,5 @@
 """Tests for the Cloudflare audit IP extractor."""
 
-from __future__ import annotations
-
 from octorules_cloudflare.audit import _extract_ips
 
 

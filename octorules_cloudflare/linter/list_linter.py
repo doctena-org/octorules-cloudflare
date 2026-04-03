@@ -4,8 +4,6 @@ Validates the structural correctness and item validity of lists
 (IP, ASN, hostname, redirect).
 """
 
-from __future__ import annotations
-
 import ipaddress
 from typing import Any
 

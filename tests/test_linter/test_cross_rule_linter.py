@@ -1,7 +1,5 @@
 """Tests for cross-rule linter (Category P)."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext, Severity
 
 from octorules_cloudflare.linter.cross_rule_linter import lint_cross_rules

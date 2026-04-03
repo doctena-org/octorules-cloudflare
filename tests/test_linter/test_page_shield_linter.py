@@ -1,7 +1,5 @@
 """Tests for Page Shield policy linter — Category S rules + expression analysis."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext, lint_zone_file
 
 from octorules_cloudflare.linter.page_shield_linter import lint_page_shield_policies
@@ -33,8 +31,6 @@ def _ids(ctx):
 
 
 # ── CF460: Missing required fields ───────────────────────────────────────────
-
-
 class TestS001MissingFields:
     def test_missing_description(self):
         policy = _valid_policy()
@@ -73,8 +69,6 @@ class TestS001MissingFields:
 
 
 # ── CF461: Invalid action ────────────────────────────────────────────────────
-
-
 class TestS002InvalidAction:
     def test_invalid_action_block(self):
         ctx = _lint([_valid_policy(action="block")])
@@ -92,8 +86,6 @@ class TestS002InvalidAction:
 
 
 # ── CF462: Invalid field types ───────────────────────────────────────────────
-
-
 class TestS003InvalidTypes:
     def test_description_not_string(self):
         ctx = _lint([_valid_policy(description=123)])
@@ -121,8 +113,6 @@ class TestS003InvalidTypes:
 
 
 # ── CF463: Duplicate description ─────────────────────────────────────────────
-
-
 class TestS004DuplicateDescription:
     def test_duplicate_description(self):
         ctx = _lint(
@@ -147,8 +137,6 @@ class TestS004DuplicateDescription:
 
 
 # ── Valid policy ────────────────────────────────────────────────────────────
-
-
 class TestValidPolicy:
     def test_valid_policy_no_findings(self):
         ctx = _lint([_valid_policy()])
@@ -158,8 +146,6 @@ class TestValidPolicy:
 
 
 # ── CF015/CF016: Always-true/always-false ─────────────────────────────────────
-
-
 class TestCatchAllExpressions:
     def test_cf015_always_true(self):
         ctx = _lint([_valid_policy(expression="true")])
@@ -179,8 +165,6 @@ class TestCatchAllExpressions:
 
 
 # ── Expression analysis delegation ──────────────────────────────────────────
-
-
 class TestExpressionAnalysis:
     def test_cf522_regex_anchor_fires(self):
         ctx = _lint([_valid_policy(expression='http.request.uri.path eq "^/api"')])
@@ -201,8 +185,6 @@ class TestExpressionAnalysis:
 
 
 # ── Phase filter ────────────────────────────────────────────────────────────
-
-
 class TestPhaseFilter:
     def test_phase_filter_excludes_page_shield(self):
         ctx = _lint(
@@ -220,8 +202,6 @@ class TestPhaseFilter:
 
 
 # ── Integration with lint_zone_file ─────────────────────────────────────────
-
-
 class TestIntegration:
     def test_lint_zone_file_catches_page_shield_errors(self):
         rules_data = {
@@ -253,8 +233,6 @@ class TestIntegration:
 
 
 # ── Edge cases ──────────────────────────────────────────────────────────────
-
-
 class TestEdgeCases:
     def test_no_page_shield_key(self):
         """No page_shield_policies key should produce no findings."""

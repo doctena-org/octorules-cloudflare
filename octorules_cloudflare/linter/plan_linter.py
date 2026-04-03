@@ -4,8 +4,6 @@ Validates rules against Cloudflare plan tier limitations:
 regex availability, rule count limits, Enterprise-only features.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity

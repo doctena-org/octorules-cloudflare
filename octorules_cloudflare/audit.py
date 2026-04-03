@@ -1,7 +1,5 @@
 """Cloudflare audit extension — extracts IP ranges from wirefilter expressions."""
 
-from __future__ import annotations
-
 import re
 
 from octorules.audit import RuleIPInfo

@@ -4,8 +4,6 @@ Detects issues that only become visible when analyzing multiple rules together:
 duplicate expressions, unreachable rules after terminating actions, etc.
 """
 
-from __future__ import annotations
-
 import functools
 import re
 from typing import Any

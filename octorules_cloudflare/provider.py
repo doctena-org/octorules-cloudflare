@@ -4,15 +4,11 @@ Public API:
     CloudflareProvider
 """
 
-from __future__ import annotations
-
 import json as _json
 import logging
+import random
 import threading
 import time
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 import cloudflare
 import httpx
@@ -29,7 +25,8 @@ from octorules.provider.exceptions import (
     ProviderAuthError,
     ProviderError,
 )
-from octorules.provider.utils import make_error_wrapper
+from octorules.provider.utils import fetch_parallel, make_error_wrapper
+from octorules.retry import retry_with_backoff
 
 from octorules_cloudflare.exceptions import (
     APIConnectionError,
@@ -58,8 +55,8 @@ log = logging.getLogger(__name__)
 
 _KNOWN_PLANS = {"free", "pro", "business", "enterprise"}
 _LIST_ITEMS_PER_PAGE = 500
-_POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
-_PARALLEL_FETCH_TIMEOUT = 300  # seconds; generous to tolerate slow API responses
+_LIST_PAGE_BACKOFF = (1.0, 2.0, 3.0, 5.0)
+_BULK_POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
 
 
 def _normalize_plan_name(raw: str) -> str:
@@ -85,68 +82,6 @@ def _fmt_scope(scope: Scope) -> str:
     kw = scope.api_kwargs
     key = next(iter(kw))
     return f"{key}={kw[key]}"
-
-
-def _fetch_parallel(
-    items: list,
-    *,
-    submit_fn: Callable,
-    key_fn: Callable,
-    result_fn: Callable,
-    label: str,
-    scope_label: str,
-    max_workers: int,
-) -> tuple[dict, list]:
-    """Run *submit_fn* for each item in parallel, collecting results.
-
-    Args:
-        items: Items to iterate over.
-        submit_fn: ``submit_fn(executor, item)`` -> ``Future``.
-        key_fn: ``key_fn(item)`` -> hashable key for log messages and
-            the ``failed`` list.
-        result_fn: ``result_fn(item, future_result)`` -> ``(key, value)`` pair
-            to insert into the result dict, or *None* to skip.  Receives the
-            original *item*, not the key.
-        label: Human label for log messages (e.g. "phase", "custom ruleset").
-        scope_label: Pre-formatted scope string for log messages.
-        max_workers: Max concurrent workers.
-
-    Returns:
-        ``(results_dict, failed_keys)`` -- results for successful fetches and
-        keys of items that failed with transient errors.  Auth/permission
-        errors propagate immediately.
-    """
-    workers = min(max_workers, len(items))
-    results: dict = {}
-    failed: list = []
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_item: dict = {}
-        for item in items:
-            f = submit_fn(executor, item)
-            future_to_item[f] = item
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            key = key_fn(item)
-            try:
-                value = future.result(timeout=_PARALLEL_FETCH_TIMEOUT)
-            except ProviderAuthError:
-                # Cancel pending futures; already-running ones will fail
-                # on their own since auth is invalid.
-                for f in future_to_item:
-                    f.cancel()
-                raise
-            except (FuturesTimeoutError, TimeoutError):
-                log.warning("Timed out fetching %s %s for %s", label, key, scope_label)
-                failed.append(key)
-                continue
-            except ProviderError as e:
-                log.warning("Failed to fetch %s %s for %s: %s", label, key, scope_label, e)
-                failed.append(key)
-                continue
-            pair = result_fn(item, value)
-            if pair is not None:
-                results[pair[0]] = pair[1]
-    return results, failed
 
 
 class CloudflareProvider:
@@ -331,7 +266,7 @@ class CloudflareProvider:
         def _result_fn(phase: str, rules: list[dict]) -> tuple[str, list[dict]] | None:
             return (phase, rules) if rules else None
 
-        rules, failed = _fetch_parallel(
+        rules, failed = fetch_parallel(
             phases_to_fetch,
             submit_fn=lambda ex, p: ex.submit(self.get_phase_rules, scope, p),
             key_fn=lambda p: p,
@@ -438,7 +373,7 @@ class CloudflareProvider:
                 {"name": rs.get("name", ""), "phase": rs.get("phase", ""), "rules": rules},
             )
 
-        results, _ = _fetch_parallel(
+        results, _ = fetch_parallel(
             rulesets_meta,
             submit_fn=lambda ex, rs: ex.submit(self.get_custom_ruleset, scope, rs["id"]),
             key_fn=lambda rs: rs["id"],
@@ -506,53 +441,53 @@ class CloudflareProvider:
         returns a plain list without cursor metadata.
 
         Each page is retried up to *_page_retries* times on transient errors
-        (``APIError``, ``APIConnectionError``).  ``AuthenticationError`` and
-        ``PermissionDeniedError`` propagate immediately.
+        (``APIError``, ``APIConnectionError``, ``JSONDecodeError``) via
+        :func:`retry_with_backoff`.  ``AuthenticationError`` and
+        ``PermissionDeniedError`` propagate immediately (not in the
+        retryable set).
         """
         sl = _fmt_scope(scope)
         log.debug("GET rules/lists/%s/items %s", list_id, sl)
+        # Auth errors (AuthenticationError, PermissionDeniedError) are
+        # subclasses of APIError, so we re-raise them as ProviderAuthError
+        # inside the operation to bypass retry_with_backoff's catch.
+        _auth_errors = (AuthenticationError, PermissionDeniedError)
+        _retryable = (APIError, APIConnectionError, _json.JSONDecodeError)
         all_items: list[dict] = []
         cursor: str | None = None
         while True:
             kwargs: dict = {**scope.api_kwargs, "per_page": _LIST_ITEMS_PER_PAGE}
             if cursor:
                 kwargs["cursor"] = cursor
-            last_exc: APIError | APIConnectionError | _json.JSONDecodeError | None = None
-            for attempt in range(_page_retries + 1):
+
+            def _fetch_page(kw: dict = kwargs) -> dict:
                 try:
-                    raw = self._client.rules.lists.items.with_raw_response.list(list_id, **kwargs)
-                    body = _json.loads(raw.http_response.text)
-                    last_exc = None
-                    break
-                except (AuthenticationError, PermissionDeniedError):
-                    raise
-                except (APIError, APIConnectionError, _json.JSONDecodeError) as e:
-                    last_exc = e
-                    if attempt < _page_retries:
-                        delay = _POLL_BACKOFF[min(attempt, len(_POLL_BACKOFF) - 1)]
-                        log.warning(
-                            "Retrying page fetch for list %s (%s, attempt %d/%d): %s",
-                            list_id,
-                            sl,
-                            attempt + 1,
-                            _page_retries + 1,
-                            e,
-                        )
-                        time.sleep(delay)
-            if last_exc is not None:
-                if isinstance(last_exc, _json.JSONDecodeError):
-                    raise ProviderError(
-                        f"Invalid JSON in list items response for {list_id}: {last_exc}"
-                    ) from last_exc
-                raise last_exc
+                    raw = self._client.rules.lists.items.with_raw_response.list(list_id, **kw)
+                except _auth_errors as exc:
+                    raise ProviderAuthError(str(exc)) from exc
+                return _json.loads(raw.http_response.text)
+
+            try:
+                body = retry_with_backoff(
+                    _fetch_page,
+                    retryable=_retryable,
+                    max_attempts=_page_retries + 1,
+                    backoff=_LIST_PAGE_BACKOFF,
+                    jitter=0.5,
+                    label=f"list {list_id} page fetch ({sl})",
+                )
+            except _json.JSONDecodeError as exc:
+                raise ProviderError(
+                    f"Invalid JSON in list items response for {list_id}: {exc}"
+                ) from exc
             for item in body.get("result", []):
                 all_items.append(strip_api_fields(item, "list_item"))
             # Extract next cursor from result_info
             cursor = None
             result_info = body.get("result_info")
-            if result_info:
+            if isinstance(result_info, dict):
                 cursors = result_info.get("cursors")
-                if cursors:
+                if isinstance(cursors, dict):
                     cursor = cursors.get("after") or None
             if not cursor:
                 break
@@ -578,12 +513,12 @@ class CloudflareProvider:
     ) -> str:
         """Poll a bulk operation until completion.
 
-        Uses graduated backoff: 1s -> 2s -> 3s -> 5s (capped).
+        Uses graduated backoff with jitter: 1s -> 2s -> 3s -> 5s (capped),
+        plus up to 0.5s random jitter per interval.
         Returns "completed". Raises APIError on "failed", ProviderError on timeout.
         """
         sl = _fmt_scope(scope)
         log.debug("POLL bulk_operations/%s %s", operation_id, sl)
-        backoff = _POLL_BACKOFF
         start = time.monotonic()
         poll_count = 0
         while True:
@@ -612,7 +547,8 @@ class CloudflareProvider:
                 raise ProviderError(
                     f"Bulk operation {operation_id} timed out after {timeout}s (status={status})"
                 )
-            interval = backoff[min(poll_count, len(backoff) - 1)]
+            interval = _BULK_POLL_BACKOFF[min(poll_count, len(_BULK_POLL_BACKOFF) - 1)]
+            interval += random.uniform(0, 0.5)
             time.sleep(interval)
             poll_count += 1
 
@@ -647,7 +583,7 @@ class CloudflareProvider:
                 },
             )
 
-        results, _ = _fetch_parallel(
+        results, _ = fetch_parallel(
             all_meta,
             submit_fn=lambda ex, m: ex.submit(self.get_list_items, scope, m["id"]),
             key_fn=lambda m: m["name"],

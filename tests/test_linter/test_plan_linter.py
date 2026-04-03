@@ -1,7 +1,5 @@
 """Tests for plan linter (Category H)."""
 
-from __future__ import annotations
-
 from octorules.linter.engine import LintContext
 
 from octorules_cloudflare.linter.plan_linter import lint_plan_tier
