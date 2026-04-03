@@ -121,3 +121,11 @@ lists:
 ```
 
 Fix: Remove the duplicate entry.
+
+### CF476 — List exceeds maximum item count
+
+**Severity:** WARNING
+
+A list has more than 10,000 items. Cloudflare limits the number of items per list.
+
+**Fix:** Split the list into multiple lists, or remove unused entries.

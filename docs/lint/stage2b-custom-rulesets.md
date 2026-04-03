@@ -93,3 +93,11 @@ custom_rulesets:
 ```
 
 Fix: Use unique ref values across all custom rulesets for clarity.
+
+### CF026 — Custom ruleset exceeds maximum rule count
+
+**Severity:** WARNING
+
+A custom ruleset has more than 1,000 rules. Cloudflare limits the number of rules per custom ruleset.
+
+**Fix:** Split the ruleset into multiple smaller rulesets.

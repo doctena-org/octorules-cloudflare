@@ -341,9 +341,25 @@ compression_rules:
 
 Fix: Move terminal algorithms to the end of the list, or remove subsequent entries.
 
+### CF218 — Invalid execute overrides structure
+
+**Severity:** ERROR
+
+The `execute` action's `overrides.rules` list contains entries missing a non-empty `id` field. Each override must identify the rule it applies to.
+
+**Fix:** Ensure every entry in `overrides.rules` has a valid `id` string.
+
+### CF219 — Skip action references empty ruleset ID
+
+**Severity:** WARNING
+
+The `skip` action's `rulesets` list contains an empty or whitespace-only entry. Each entry should be a valid ruleset ID.
+
+**Fix:** Remove empty entries from the `rulesets` list or provide valid IDs.
+
 ---
 
-## Category D — Rate Limiting (6 rules)
+## Category D — Rate Limiting (8 rules)
 
 ### CF400 — Invalid rate limiting period
 
@@ -413,9 +429,25 @@ Triggers when `counting_expression` is a non-empty string but fails to parse as 
 
 Fix: Correct the expression syntax in `counting_expression`.
 
+### CF406 — Too many rate limit characteristics for plan tier
+
+**Severity:** ERROR
+
+The number of `characteristics` exceeds the plan tier limit (Free/Pro: 1, Business: 2, Enterprise: 4).
+
+**Fix:** Remove characteristics to fit within your plan's limit, or upgrade the plan tier.
+
+### CF407 — requests_per_period outside valid range
+
+**Severity:** ERROR
+
+`requests_per_period` must be between 1 and 10,000,000.
+
+**Fix:** Set a value within the valid range.
+
 ---
 
-## Category I — Cache Rules (4 rules)
+## Category I — Cache Rules (5 rules)
 
 ### CF410 — Invalid TTL mode value
 
@@ -463,6 +495,14 @@ Fix: Use a non-negative TTL value.
 Triggers when `cache: false` is set alongside `edge_ttl` or `browser_ttl` values. TTL settings have no effect when caching is disabled.
 
 Fix: Either remove the TTL settings or set `cache: true`.
+
+### CF414 — Cache TTL exceeds maximum
+
+**Severity:** WARNING
+
+A TTL `default` value exceeds 31,536,000 seconds (1 year).
+
+**Fix:** Use a TTL value of 31,536,000 or less.
 
 ---
 
@@ -557,6 +597,14 @@ action_parameters:
       value: "https://example.com/new-path"
     status_code: 301
 ```
+
+### CF432 — Redirect target_url is not a valid URL
+
+**Severity:** WARNING
+
+The redirect `target_url.value` does not start with `http://`, `https://`, or `/`. This likely means a malformed URL.
+
+**Fix:** Ensure the URL starts with a valid scheme or is a relative path.
 
 ---
 
@@ -673,7 +721,7 @@ Fix: Use `operation: set` instead, or move the rule to `response_header_rules` i
 
 ---
 
-## Category N — Origin Rules (1 rule)
+## Category N — Origin Rules (3 rules)
 
 ### CF450 — Port number out of range
 
@@ -684,6 +732,22 @@ Fix: Use `operation: set` instead, or move the rule to `response_header_rules` i
 Triggers when `origin.port` is outside the 1–65535 range.
 
 Fix: Use a valid port number between 1 and 65535.
+
+### CF451 — Origin weight outside valid range
+
+**Severity:** ERROR
+
+The `origin.weight` value is outside the 0.0–1.0 range.
+
+**Fix:** Use a weight between 0.0 and 1.0.
+
+### CF452 — Origin route missing required fields
+
+**Severity:** ERROR
+
+An origin route action is missing required fields. Either `origin.host` must be present, or both `sni` and `host_header` must be specified.
+
+**Fix:** Add an `origin` with a `host` field, or provide both `sni` and `host_header`.
 
 ---
 
