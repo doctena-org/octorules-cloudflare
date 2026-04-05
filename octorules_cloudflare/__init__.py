@@ -1,7 +1,7 @@
 """Cloudflare provider for octorules."""
 
 from octorules.expression import normalize_expression
-from octorules.phases import Phase, register_phases
+from octorules.phases import Phase, register_non_phase_key, register_phases
 
 from octorules_cloudflare.linter import register_cloudflare_linter
 from octorules_cloudflare.provider import CloudflareProvider
@@ -17,7 +17,10 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
     - Normalize ``counting_expression`` inside ``action_parameters``.
     - Default ``enabled`` to ``True``.
     - Inject ``phase.default_action`` when rule has no ``action``.
+
+    Returns a new dict — the original *rule* is never mutated.
     """
+    rule = rule.copy()
     rule["expression"] = normalize_expression(rule["expression"])
     ap = rule.get("action_parameters")
     if isinstance(ap, dict) and isinstance(ap.get("counting_expression"), str):
@@ -96,5 +99,39 @@ register_page_shield()
 from octorules_cloudflare.audit import register_cloudflare_audit  # noqa: E402
 
 register_cloudflare_audit()
+
+# Register bot management extension hooks.
+register_non_phase_key("cloudflare_bot_management")
+from octorules_cloudflare._bot_management import register_bot_management  # noqa: E402
+
+register_bot_management()
+
+# Register URL normalization extension hooks.
+register_non_phase_key("cloudflare_url_normalization")
+from octorules_cloudflare._url_normalization import (  # noqa: E402
+    register_url_normalization,
+)
+
+register_url_normalization()
+
+# Register zone security settings extension hooks.
+register_non_phase_key("cloudflare_zone_security")
+from octorules_cloudflare._zone_security import register_zone_security  # noqa: E402
+
+register_zone_security()
+
+# Register leaked credential check extension hooks.
+register_non_phase_key("cloudflare_leaked_credential_check")
+from octorules_cloudflare._leaked_credentials import (  # noqa: E402
+    register_leaked_credentials,
+)
+
+register_leaked_credentials()
+
+# Register content scanning extension hooks.
+register_non_phase_key("cloudflare_content_scanning")
+from octorules_cloudflare._content_scanning import register_content_scanning  # noqa: E402
+
+register_content_scanning()
 
 __all__ = ["CloudflareProvider"]

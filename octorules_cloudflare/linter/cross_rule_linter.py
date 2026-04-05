@@ -42,7 +42,6 @@ _TERMINATING_ACTIONS = frozenset(
         "js_challenge",
         "managed_challenge",
         "redirect",
-        "rewrite",
     }
 )
 
@@ -61,6 +60,20 @@ def lint_cross_rules(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
         _check_duplicate_expressions(phase_name, rules, ctx)
         _check_unreachable_after_terminating(phase_name, rules, ctx)
+
+    # Cross-rule checks inside custom_rulesets
+    custom_rulesets = rules_data.get("custom_rulesets")
+    if isinstance(custom_rulesets, list):
+        for entry in custom_rulesets:
+            if not isinstance(entry, dict):
+                continue
+            rs_rules = entry.get("rules")
+            if not isinstance(rs_rules, list) or not rs_rules:
+                continue
+            rs_name = entry.get("name", "unknown")
+            rs_phase = f"custom_rulesets/{rs_name}"
+            _check_duplicate_expressions(rs_phase, rs_rules, ctx)
+            _check_unreachable_after_terminating(rs_phase, rs_rules, ctx)
 
     # CF102: Check list references across all phases
     _check_list_references(rules_data, ctx)
@@ -151,6 +164,35 @@ def _check_unreachable_after_terminating(
             terminating_ref = ref
 
 
+def _iter_all_rules(
+    rules_data: dict[str, Any],
+) -> list[tuple[str, dict]]:
+    """Yield (phase_label, rule_dict) pairs from phases and custom_rulesets."""
+    pairs: list[tuple[str, dict]] = []
+    for phase_name, rules in rules_data.items():
+        if not isinstance(rules, list):
+            continue
+        if phase_name == "lists":
+            continue
+        if phase_name == "custom_rulesets":
+            for entry in rules:
+                if not isinstance(entry, dict):
+                    continue
+                rs_rules = entry.get("rules")
+                if not isinstance(rs_rules, list):
+                    continue
+                rs_name = entry.get("name", "unknown")
+                rs_phase = f"custom_rulesets/{rs_name}"
+                for rule in rs_rules:
+                    if isinstance(rule, dict):
+                        pairs.append((rs_phase, rule))
+        else:
+            for rule in rules:
+                if isinstance(rule, dict):
+                    pairs.append((phase_name, rule))
+    return pairs
+
+
 def _check_list_references(rules_data: dict[str, Any], ctx: LintContext) -> None:
     """CF102: Detect list references ($name) that don't exist in the lists section."""
     # Collect defined list names from the 'lists' section
@@ -164,75 +206,61 @@ def _check_list_references(rules_data: dict[str, Any], ctx: LintContext) -> None
                     defined_lists.add(name)
 
     # Scan all expressions for $name references
-    for phase_name, rules in rules_data.items():
-        if not isinstance(rules, list):
+    for phase_name, rule in _iter_all_rules(rules_data):
+        expr = rule.get("expression", "")
+        if not isinstance(expr, str):
             continue
-        if phase_name == "lists":
-            continue
-        for rule in rules:
-            if not isinstance(rule, dict):
+        ref = rule.get("ref", "")
+        for m in _LIST_REF_PATTERN.finditer(expr):
+            list_name = m.group(1)
+            # Skip managed list names (contain dots) — checked by CF103
+            if "." in list_name:
                 continue
-            expr = rule.get("expression", "")
-            if not isinstance(expr, str):
-                continue
-            ref = rule.get("ref", "")
-            for m in _LIST_REF_PATTERN.finditer(expr):
-                list_name = m.group(1)
-                # Skip managed list names (contain dots) — checked by CF103
-                if "." in list_name:
-                    continue
-                if list_name not in defined_lists:
-                    ctx.add(
-                        LintResult(
-                            rule_id="CF102",
-                            severity=Severity.WARNING,
-                            message=(f"List reference '${list_name}' not found in 'lists' section"),
-                            phase=phase_name,
-                            ref=ref,
-                            field="expression",
-                        )
+            if list_name not in defined_lists:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF102",
+                        severity=Severity.WARNING,
+                        message=(f"List reference '${list_name}' not found in 'lists' section"),
+                        phase=phase_name,
+                        ref=ref,
+                        field="expression",
                     )
+                )
 
 
 def _check_managed_lists(rules_data: dict[str, Any], ctx: LintContext) -> None:
     """CF103: Detect invalid managed list references ($cf.*)."""
-    for phase_name, rules in rules_data.items():
-        if not isinstance(rules, list):
+    for phase_name, rule in _iter_all_rules(rules_data):
+        expr = rule.get("expression", "")
+        if not isinstance(expr, str):
             continue
-        if phase_name == "lists":
-            continue
-        for rule in rules:
-            if not isinstance(rule, dict):
+        ref = rule.get("ref", "")
+        for m in _LIST_REF_PATTERN.finditer(expr):
+            list_name = m.group(1)
+            # Only check dotted names that start with cf.
+            if not list_name.startswith("cf."):
                 continue
-            expr = rule.get("expression", "")
-            if not isinstance(expr, str):
-                continue
-            ref = rule.get("ref", "")
-            for m in _LIST_REF_PATTERN.finditer(expr):
-                list_name = m.group(1)
-                # Only check dotted names that start with cf.
-                if not list_name.startswith("cf."):
-                    continue
-                managed = _get_managed_lists()
-                if list_name not in managed:
-                    ctx.add(
-                        LintResult(
-                            rule_id="CF103",
-                            severity=Severity.WARNING,
-                            message=(
-                                f"Unknown managed list '${list_name}'."
-                                " Valid managed lists:"
-                                f" {', '.join(sorted('$' + n for n in managed))}"
-                            ),
-                            phase=phase_name,
-                            ref=ref,
-                            field="expression",
-                            suggestion=(
-                                "If this is a newly added Cloudflare managed list,"
-                                " update the [managed_lists] section in overlay.toml"
-                            ),
-                        )
+            managed = _get_managed_lists()
+            if list_name not in managed:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF103",
+                        severity=Severity.WARNING,
+                        message=(
+                            f"Unknown managed list '${list_name}'."
+                            " Valid managed lists:"
+                            f" {', '.join(sorted('$' + n for n in managed))}"
+                        ),
+                        phase=phase_name,
+                        ref=ref,
+                        field="expression",
+                        suggestion=(
+                            "If this is a newly added Cloudflare managed list,"
+                            " update the [managed_lists] section in overlay.toml"
+                        ),
                     )
+                )
 
 
 # Mapping from list kind to the set of compatible field prefixes
@@ -263,39 +291,32 @@ def _check_list_type_mismatch(rules_data: dict[str, Any], ctx: LintContext) -> N
     if not list_kinds:
         return
 
-    for phase_name, rules in rules_data.items():
-        if not isinstance(rules, list):
+    for phase_name, rule in _iter_all_rules(rules_data):
+        expr = rule.get("expression", "")
+        if not isinstance(expr, str):
             continue
-        if phase_name == "lists":
-            continue
-        for rule in rules:
-            if not isinstance(rule, dict):
+        ref = rule.get("ref", "")
+        for m in _FIELD_LIST_REF_PATTERN.finditer(expr):
+            field_name = m.group(1)
+            list_name = m.group(2)
+            kind = list_kinds.get(list_name)
+            if kind is None:
+                continue  # unknown list, CF102 handles this
+            compatible_fields = _LIST_KIND_FIELD_MAP.get(kind)
+            if compatible_fields is None:
                 continue
-            expr = rule.get("expression", "")
-            if not isinstance(expr, str):
-                continue
-            ref = rule.get("ref", "")
-            for m in _FIELD_LIST_REF_PATTERN.finditer(expr):
-                field_name = m.group(1)
-                list_name = m.group(2)
-                kind = list_kinds.get(list_name)
-                if kind is None:
-                    continue  # unknown list, CF102 handles this
-                compatible_fields = _LIST_KIND_FIELD_MAP.get(kind)
-                if compatible_fields is None:
-                    continue
-                if field_name not in compatible_fields:
-                    ctx.add(
-                        LintResult(
-                            rule_id="CF104",
-                            severity=Severity.WARNING,
-                            message=(
-                                f"Field {field_name!r} used with ${list_name}"
-                                f" (kind: {kind!r}) — expected field:"
-                                f" {', '.join(sorted(compatible_fields))}"
-                            ),
-                            phase=phase_name,
-                            ref=ref,
-                            field="expression",
-                        )
+            if field_name not in compatible_fields:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF104",
+                        severity=Severity.WARNING,
+                        message=(
+                            f"Field {field_name!r} used with ${list_name}"
+                            f" (kind: {kind!r}) — expected field:"
+                            f" {', '.join(sorted(compatible_fields))}"
+                        ),
+                        phase=phase_name,
+                        ref=ref,
+                        field="expression",
                     )
+                )

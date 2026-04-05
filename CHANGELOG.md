@@ -4,6 +4,54 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-04-05
+
+### Added
+- `cloudflare_bot_management` extension — manage Bot Fight Mode settings
+  (`fight_mode`, `enable_js`, `ai_bots_protection`, `suppress_session_score`)
+  that the `bot_fight_rules` phase depends on.
+- `cloudflare_url_normalization` extension — manage URL normalization settings
+  (`scope`, `type`) that affect `http.request.uri.path` in all WAF rules.
+- `cloudflare_zone_security` extension — manage WAF-relevant zone security
+  defaults (`security_level`, `challenge_passage`, `browser_integrity_check`).
+- `cloudflare_leaked_credential_check` extension — manage Leaked Credential
+  Check feature toggle and detection rules (`cf.waf.credential_check.*`
+  fields).
+- `cloudflare_content_scanning` extension — manage Content Scanning (WAF
+  anti-malware) feature toggle and custom scan expressions
+  (`cf.waf.content_scan.*` fields).
+- `docs/permissions.md` — comprehensive API token permissions reference mapping
+  each phase and extension to its Cloudflare dashboard permission.
+
+### Fixed
+- `poll_bulk_operation` now validates status field type — rejects non-string or
+  empty status values instead of silently accepting them.
+- `_apply_page_shield` sent only changed fields on update —
+  `update_page_shield_policy` requires all fields; now stores full
+  `desired_policy` and sends all kwargs.
+- `diff_page_shield_policies` silently dropped duplicate-description policies —
+  added `log.warning` when `current_by_desc` overwrites.
+- Cross-rule lint checks (CF102, CF103, CF104) skipped rules inside
+  `custom_rulesets` entries — added `_iter_all_rules()` helper that recurses
+  into custom ruleset rules.
+- `_extract_function_call_args` failed on nested parentheses and parentheses
+  inside string literals — replaced regex with depth-tracking parser that skips
+  quoted strings.
+- `"rewrite"` incorrectly listed as a terminating action — removed from
+  `_TERMINATING_ACTIONS`, eliminating false CF101 warnings on stacked rewrite
+  rules.
+- `normalize_csp_value` failed on trailing semicolons and double semicolons —
+  split on `";"` instead of `"; "` with empty-part filtering.
+
+### Changed
+- `normalize_csp_value` now uses simple whitespace collapsing instead of
+  wirefilter's `normalize_expression`, which mangled CSP directives.
+- `_PLAN_TIERS` dict extracted from `phase_linter.py` and `ast_linter.py` into
+  shared `_constants.py`.
+- `_cf_prepare_rule` now copies the input dict instead of mutating it in place.
+- `register_cloudflare_audit` now has a `_registered` idempotence guard matching
+  other registration functions.
+
 ## [0.6.2] - 2026-04-03
 
 ### Changed

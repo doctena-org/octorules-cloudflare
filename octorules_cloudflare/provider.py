@@ -107,7 +107,10 @@ class CloudflareProvider:
             kwargs: dict = {"api_token": token, "max_retries": max_retries}
             if timeout is not None:
                 kwargs["timeout"] = timeout
-            # Scale connection pool to match concurrency
+            # Scale connection pool to match concurrency.
+            # Note (F3): pool_size is based on phases, not zone count.
+            # In practice max(100, pool_size) provides ample headroom for
+            # typical multi-zone syncs (4-8 concurrent connections).
             if max_workers > 1:
                 pool_size = max_workers * len(ALL_PROVIDER_IDS)
                 kwargs["http_client"] = DefaultHttpxClient(
@@ -525,6 +528,11 @@ class CloudflareProvider:
             result = self._client.rules.lists.bulk_operations.get(operation_id, **scope.api_kwargs)
             d = _to_dict(result)
             status = d.get("status", "")
+            if not isinstance(status, str) or not status:
+                raise ProviderError(
+                    f"Bulk operation {operation_id}: unexpected status"
+                    f" {status!r} (type={type(status).__name__})"
+                )
             if status == "completed":
                 return "completed"
             if status == "failed":
@@ -685,6 +693,259 @@ class CloudflareProvider:
         """
         policies = self.list_page_shield_policies(scope)
         return [strip_api_fields(p, "page_shield_policy") for p in policies]
+
+    # --- Bot Management API ---
+
+    @_wrap_provider_errors
+    def get_bot_management(self, scope: Scope) -> dict:
+        """Fetch and normalize bot management settings for a zone."""
+        from octorules_cloudflare._bot_management import normalize_bot_management
+
+        sl = _fmt_scope(scope)
+        log.debug("GET bot_management %s", sl)
+        result = self._client.bot_management.get(zone_id=scope.zone_id)
+        return normalize_bot_management(_to_dict(result))
+
+    @_wrap_provider_errors
+    def update_bot_management(self, scope: Scope, settings: dict) -> None:
+        """Update bot management settings for a zone."""
+        from octorules_cloudflare._bot_management import denormalize_bot_management
+
+        sl = _fmt_scope(scope)
+        log.debug("PUT bot_management %s", sl)
+        denormalized = denormalize_bot_management(settings)
+        self._client.bot_management.update(zone_id=scope.zone_id, **denormalized)
+
+    # --- URL Normalization API ---
+
+    @_wrap_provider_errors
+    def get_url_normalization(self, scope: Scope) -> dict:
+        """Fetch and normalize URL normalization settings for a zone."""
+        from octorules_cloudflare._url_normalization import normalize_url_normalization
+
+        sl = _fmt_scope(scope)
+        log.debug("GET url_normalization %s", sl)
+        result = self._client.url_normalization.get(zone_id=scope.zone_id)
+        return normalize_url_normalization(_to_dict(result))
+
+    @_wrap_provider_errors
+    def update_url_normalization(self, scope: Scope, settings: dict) -> None:
+        """Update URL normalization settings for a zone."""
+        from octorules_cloudflare._url_normalization import denormalize_url_normalization
+
+        sl = _fmt_scope(scope)
+        log.debug("PUT url_normalization %s", sl)
+        denormalized = denormalize_url_normalization(settings)
+        self._client.url_normalization.update(zone_id=scope.zone_id, **denormalized)
+
+    # --- Zone Security Settings API ---
+
+    @_wrap_provider_errors
+    def get_zone_security_settings(self, scope: Scope) -> dict:
+        """Fetch WAF-relevant zone security settings.
+
+        Fetches each setting individually via the per-setting endpoint:
+        ``client.zones.settings.get(setting_id, zone_id=...)``.
+
+        Returns a dict with keys: security_level, challenge_passage,
+        browser_integrity_check.
+        """
+        from octorules_cloudflare._zone_security import _SETTING_IDS, normalize_zone_security
+
+        sl = _fmt_scope(scope)
+        log.debug("GET zone security settings %s", sl)
+        raw: dict = {}
+        for yaml_key, setting_id in _SETTING_IDS.items():
+            try:
+                result = self._client.zones.settings.get(setting_id, zone_id=scope.zone_id)
+                d = _to_dict(result)
+                raw[yaml_key] = d.get("value")
+            except (NotFoundError, BadRequestError):
+                log.debug(
+                    "Skipping zone setting %s for %s (not available)",
+                    setting_id,
+                    sl,
+                )
+        return normalize_zone_security(raw)
+
+    @_wrap_provider_errors
+    def update_zone_security_settings(self, scope: Scope, settings: dict) -> None:
+        """Update WAF-relevant zone security settings.
+
+        Updates each changed setting individually via:
+        ``client.zones.settings.edit(setting_id, zone_id=..., value=...)``.
+        """
+        from octorules_cloudflare._zone_security import _SETTING_IDS
+
+        sl = _fmt_scope(scope)
+        log.debug("PUT zone security settings %s", sl)
+        for yaml_key, value in settings.items():
+            setting_id = _SETTING_IDS.get(yaml_key)
+            if setting_id is None:
+                log.warning("Unknown zone security setting %r, skipping", yaml_key)
+                continue
+            log.debug("  setting %s=%r %s", setting_id, value, sl)
+            self._client.zones.settings.edit(setting_id, zone_id=scope.zone_id, value=value)
+
+    # --- Leaked Credential Check API ---
+
+    @_wrap_provider_errors
+    def get_leaked_credential_check(self, scope: Scope) -> dict:
+        """Fetch leaked credential check config (enabled + detections).
+
+        Returns a normalized dict with ``enabled`` (bool) and
+        ``detections`` (list of {username, password} dicts).
+        """
+        from octorules_cloudflare._leaked_credentials import normalize_leaked_credential_config
+
+        sl = _fmt_scope(scope)
+        log.debug("GET leaked_credential_checks %s", sl)
+        status = self._client.leaked_credential_checks.get(zone_id=scope.zone_id)
+        status_d = _to_dict(status)
+        enabled = bool(status_d.get("enabled", False))
+
+        detections_raw = list(
+            self._client.leaked_credential_checks.detections.list(zone_id=scope.zone_id)
+        )
+        detections = [_to_dict(d) for d in detections_raw]
+        return normalize_leaked_credential_config(enabled, detections)
+
+    @_wrap_provider_errors
+    def update_leaked_credential_check_enabled(self, scope: Scope, enabled: bool) -> None:
+        """Enable or disable leaked credential checking."""
+        sl = _fmt_scope(scope)
+        log.debug("PUT leaked_credential_checks enabled=%s %s", enabled, sl)
+        self._client.leaked_credential_checks.create(zone_id=scope.zone_id, enabled=enabled)
+
+    @_wrap_provider_errors
+    def sync_leaked_credential_detections(
+        self, scope: Scope, current: list[dict], desired: list[dict]
+    ) -> None:
+        """Sync detection rules: delete removed, create new, update changed.
+
+        Both *current* and *desired* are normalized lists of
+        ``{username, password}`` dicts.  Detection identity is based on
+        the username expression; if the password changes for an existing
+        username, the detection is updated.
+        """
+        sl = _fmt_scope(scope)
+        log.debug("SYNC leaked_credential_check detections %s", sl)
+
+        # Build lookup of current detections (need IDs for update/delete)
+        # Re-fetch to get IDs (the normalized list doesn't have them)
+        live_detections = list(
+            self._client.leaked_credential_checks.detections.list(zone_id=scope.zone_id)
+        )
+        current_by_username: dict[str, dict] = {}
+        for det in live_detections:
+            d = _to_dict(det)
+            username = d.get("username", "")
+            if username:
+                current_by_username[username] = d
+
+        desired_usernames: set[str] = set()
+        for det in desired:
+            username = det["username"]
+            desired_usernames.add(username)
+            existing = current_by_username.get(username)
+            if existing is None:
+                # Create
+                log.debug("  CREATE detection username=%r %s", username, sl)
+                self._client.leaked_credential_checks.detections.create(
+                    zone_id=scope.zone_id,
+                    username=det["username"],
+                    password=det["password"],
+                )
+            elif existing.get("password") != det["password"]:
+                # Update
+                det_id = existing.get("id", "")
+                log.debug("  UPDATE detection %s username=%r %s", det_id, username, sl)
+                self._client.leaked_credential_checks.detections.update(
+                    det_id,
+                    zone_id=scope.zone_id,
+                    username=det["username"],
+                    password=det["password"],
+                )
+
+        # Delete detections not in desired
+        for username, existing in current_by_username.items():
+            if username not in desired_usernames:
+                det_id = existing.get("id", "")
+                log.debug("  DELETE detection %s username=%r %s", det_id, username, sl)
+                self._client.leaked_credential_checks.detections.delete(
+                    det_id, zone_id=scope.zone_id
+                )
+
+    # --- Content Scanning API ---
+
+    @_wrap_provider_errors
+    def get_content_scanning(self, scope: Scope) -> dict:
+        """Fetch content scanning config (enabled + custom expressions).
+
+        Returns a normalized dict with ``enabled`` (bool) and
+        ``custom_expressions`` (list of {payload} dicts).
+        """
+        from octorules_cloudflare._content_scanning import normalize_content_scanning_config
+
+        sl = _fmt_scope(scope)
+        log.debug("GET content_scanning %s", sl)
+        status = self._client.content_scanning.settings.get(zone_id=scope.zone_id)
+        status_d = _to_dict(status)
+        enabled = bool(status_d.get("value") == "enabled" or status_d.get("enabled", False))
+
+        payloads_raw = list(self._client.content_scanning.payloads.list(zone_id=scope.zone_id))
+        expressions = [_to_dict(p) for p in payloads_raw]
+        return normalize_content_scanning_config(enabled, expressions)
+
+    @_wrap_provider_errors
+    def update_content_scanning_enabled(self, scope: Scope, enabled: bool) -> None:
+        """Enable or disable content scanning."""
+        sl = _fmt_scope(scope)
+        log.debug("PUT content_scanning enabled=%s %s", enabled, sl)
+        if enabled:
+            self._client.content_scanning.enable(zone_id=scope.zone_id)
+        else:
+            self._client.content_scanning.disable(zone_id=scope.zone_id)
+
+    @_wrap_provider_errors
+    def sync_content_scanning_expressions(
+        self, scope: Scope, current: list[dict], desired: list[dict]
+    ) -> None:
+        """Sync custom scan expressions: delete removed, create new.
+
+        Both *current* and *desired* are normalized lists of
+        ``{payload}`` dicts.  Identity is based on the payload string.
+        """
+        sl = _fmt_scope(scope)
+        log.debug("SYNC content_scanning expressions %s", sl)
+
+        # Re-fetch to get IDs for deletion
+        live_payloads = list(self._client.content_scanning.payloads.list(zone_id=scope.zone_id))
+        current_by_payload: dict[str, dict] = {}
+        for p in live_payloads:
+            d = _to_dict(p)
+            payload_str = d.get("payload", "")
+            if payload_str:
+                current_by_payload[payload_str] = d
+
+        desired_payloads: set[str] = {e["payload"] for e in desired}
+
+        # Delete expressions not in desired
+        for payload_str, existing in current_by_payload.items():
+            if payload_str not in desired_payloads:
+                expr_id = existing.get("id", "")
+                log.debug("  DELETE expression %s payload=%r %s", expr_id, payload_str, sl)
+                self._client.content_scanning.payloads.delete(expr_id, zone_id=scope.zone_id)
+
+        # Create new expressions (those in desired but not in current)
+        current_payloads = set(current_by_payload.keys())
+        new_exprs = [e for e in desired if e["payload"] not in current_payloads]
+        if new_exprs:
+            log.debug("  CREATE %d expression(s) %s", len(new_exprs), sl)
+            self._client.content_scanning.payloads.create(
+                zone_id=scope.zone_id,
+                body=[{"payload": e["payload"]} for e in new_exprs],
+            )
 
 
 def _to_dict(obj: object) -> dict:

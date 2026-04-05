@@ -9,6 +9,7 @@ from typing import Any
 from octorules.linter.engine import LintContext, LintResult, Severity
 from octorules.phases import Phase
 
+from octorules_cloudflare.linter._constants import PLAN_TIERS as _PLAN_TIERS
 from octorules_cloudflare.linter.expression_bridge import parse_expression
 from octorules_cloudflare.linter.schemas.fields import (
     BODY_PHASES,
@@ -19,9 +20,6 @@ from octorules_cloudflare.linter.schemas.fields import (
 )
 
 RULE_IDS = frozenset({"CF019", "CF020", "CF021"})
-
-# Plan tier hierarchy for comparison
-_PLAN_TIERS = {"free": 0, "pro": 1, "business": 2, "enterprise": 3}
 
 # Request-only phases (where response fields are NOT available)
 _REQUEST_ONLY_PHASES = frozenset(

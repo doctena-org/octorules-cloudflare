@@ -541,6 +541,23 @@ class TestListMethods:
             provider.poll_bulk_operation(scope, "op-123")
         mock_sleep.assert_not_called()
 
+    def test_poll_bulk_operation_none_status_raises(self, mock_cf_client):
+        """None/missing status field raises ProviderError immediately."""
+        mock_cf_client.rules.lists.bulk_operations.get.return_value = MockRule({"id": "op-123"})
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderError, match="unexpected status"):
+            provider.poll_bulk_operation(scope, "op-123")
+
+    def test_poll_bulk_operation_int_status_raises(self, mock_cf_client):
+        """Integer status field raises ProviderError immediately."""
+        # Use a plain dict to bypass model_dump(exclude_none=True)
+        mock_cf_client.rules.lists.bulk_operations.get.return_value = {"status": 200}
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        with pytest.raises(ProviderError, match="unexpected status"):
+            provider.poll_bulk_operation(scope, "op-123")
+
     # --- get_all_lists ---
 
     def test_get_all_lists_discovers_and_fetches(self, mock_cf_client):

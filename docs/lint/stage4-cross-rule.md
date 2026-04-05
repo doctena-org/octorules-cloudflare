@@ -1,6 +1,7 @@
 # Stage 4: Cross-Rule Analysis
 
-Analyzes relationships between rules within each phase.
+Analyzes relationships between rules within each phase. Rules inside
+`custom_rulesets` entries are also included (CF102, CF103, CF104).
 
 ## Category P — Cross-Rule / Ruleset-Level (5 rules)
 
@@ -20,7 +21,7 @@ Fix: Remove the duplicate rule, or differentiate the expressions if the rules se
 |----------|----------|
 | WARNING | cross_rule |
 
-Triggers when a rule follows an always-true rule (`expression: "true"`) with a terminating action (`block`, `challenge`, `js_challenge`, `managed_challenge`, `redirect`, `rewrite`). The subsequent rule will never execute.
+Triggers when a rule follows an always-true rule (`expression: "true"`) with a terminating action (`block`, `challenge`, `js_challenge`, `managed_challenge`, `redirect`). The subsequent rule will never execute.
 
 ```yaml
 waf_custom_rules:

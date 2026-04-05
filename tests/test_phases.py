@@ -302,6 +302,40 @@ class TestRenamedPhaseAlias:
         assert phase.friendly_name == "waf_managed_rules"
 
 
+class TestCfPrepareRuleNoMutation:
+    """_cf_prepare_rule should not mutate the input dict (CF7)."""
+
+    def test_prepare_rule_does_not_mutate_input(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("redirect_rules")
+        original = {"ref": "r1", "expression": "  http.host eq  'a.com'  "}
+        original_copy = original.copy()
+        result = _cf_prepare_rule(original, phase)
+        # Original should be unchanged
+        assert original == original_copy
+        # Result should have normalized expression
+        assert "  " not in result["expression"]
+        assert result["enabled"] is True
+        assert result["action"] == "redirect"
+
+    def test_prepare_rule_does_not_mutate_action_parameters(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("rate_limiting_rules")
+        ap = {"counting_expression": "  ip.src  eq  1.2.3.4  ", "id": "abc"}
+        original = {
+            "ref": "r1",
+            "expression": "true",
+            "action": "block",
+            "action_parameters": ap,
+        }
+        original_ap_copy = ap.copy()
+        _cf_prepare_rule(original, phase)
+        # Original action_parameters should be unchanged
+        assert original["action_parameters"] == original_ap_copy
+
+
 class TestPhaseConsistency:
     """Invariant tests for the phase registry."""
 

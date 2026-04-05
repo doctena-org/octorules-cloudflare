@@ -4,7 +4,10 @@ import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME
 
-from octorules_cloudflare.linter.ast_linter import lint_expressions
+from octorules_cloudflare.linter.ast_linter import (
+    _extract_function_call_args,
+    lint_expressions,
+)
 from octorules_cloudflare.linter.expression_bridge import WIREFILTER_AVAILABLE
 
 from .conftest import assert_lint, assert_no_lint
@@ -1483,3 +1486,27 @@ class TestLargeExpressionStability:
         assert elapsed < 5.0, f"lint_expressions took {elapsed:.1f}s on 10KB+ expression"
         # Should produce results (at minimum, the expression was parsed)
         # No crash is the main assertion — the function returned normally
+
+
+class TestExtractFunctionCallArgs:
+    """Unit tests for _extract_function_call_args depth-tracking parser."""
+
+    def test_nested_function_args(self):
+        """Nested function calls like split(lower(x), ...) are parsed correctly."""
+        result = _extract_function_call_args('split(lower(http.request.uri.path), "/", 2)', "split")
+        assert result == [["lower(http.request.uri.path)", '"/"', "2"]]
+
+    def test_parens_in_string_literal(self):
+        """Parentheses inside quoted strings are skipped by the depth tracker."""
+        result = _extract_function_call_args('split(http.host, "(")', "split")
+        assert result == [["http.host", '"("']]
+
+    def test_escaped_quote_in_string_literal(self):
+        """Escaped quotes inside strings don't terminate the string early."""
+        result = _extract_function_call_args(r'split(http.host, "a\"b")', "split")
+        assert result == [["http.host", r'"a\"b"']]
+
+    def test_closing_paren_in_string_literal(self):
+        """A ) inside a quoted string does not close the argument list."""
+        result = _extract_function_call_args('split(http.host, ")")', "split")
+        assert result == [["http.host", '")"']]

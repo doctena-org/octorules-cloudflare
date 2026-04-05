@@ -1,6 +1,7 @@
 """Tests for the diff engine (planner) – page shield policies."""
 
 import logging
+from unittest.mock import MagicMock
 
 import pytest
 from octorules.config import ZoneConfig
@@ -15,9 +16,11 @@ from octorules.planner import (
     compute_checksum,
     warn_unknown_phase_keys,
 )
+from octorules.provider.base import Scope
 
 from octorules_cloudflare.page_shield import (
     PageShieldPolicyPlan,
+    _apply_page_shield,
     _make_page_shield_phase,
     diff_page_shield_policies,
     validate_page_shield_policy,
@@ -362,6 +365,98 @@ class TestDiffPageShieldPolicies:
         assert plans[1].description == "ZZZ"
 
 
+class TestNormalizeCspValue:
+    """Tests for normalize_csp_value edge cases."""
+
+    def test_trailing_semicolon(self):
+        from octorules_cloudflare.page_shield import normalize_csp_value
+
+        result = normalize_csp_value("script-src 'self' https:;")
+        assert result == "script-src 'self' https:"
+
+    def test_trailing_semicolons_and_spaces(self):
+        from octorules_cloudflare.page_shield import normalize_csp_value
+
+        result = normalize_csp_value("script-src 'self' https: ; ; ")
+        assert result == "script-src 'self' https:"
+
+    def test_double_semicolons(self):
+        from octorules_cloudflare.page_shield import normalize_csp_value
+
+        result = normalize_csp_value("script-src 'self';; style-src 'unsafe-inline'")
+        assert result == "script-src 'self'; style-src 'unsafe-inline'"
+
+    def test_normal_csp(self):
+        from octorules_cloudflare.page_shield import normalize_csp_value
+
+        result = normalize_csp_value("script-src 'self' https:; style-src 'unsafe-inline'")
+        assert result == "script-src 'self' https:; style-src 'unsafe-inline'"
+
+    def test_sources_sorted(self):
+        from octorules_cloudflare.page_shield import normalize_csp_value
+
+        result = normalize_csp_value("script-src https: 'self' cdn.example.com")
+        assert result == "script-src 'self' cdn.example.com https:"
+
+
+class TestDiffPageShieldDuplicateDescription:
+    """Tests for duplicate description warning (CF2)."""
+
+    def test_duplicate_description_logs_warning(self, caplog):
+        current_policies = [
+            {
+                "id": "pol-1",
+                "description": "CSP",
+                "action": "allow",
+                "expression": "true",
+                "enabled": True,
+                "value": "v1",
+            },
+            {
+                "id": "pol-2",
+                "description": "CSP",
+                "action": "log",
+                "expression": "true",
+                "enabled": True,
+                "value": "v2",
+            },
+        ]
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare"):
+            diff_page_shield_policies([], current_policies)
+        assert "Duplicate Page Shield policy description" in caplog.text
+
+    def test_update_plan_stores_desired_policy(self):
+        """Verify that update plans store the full desired_policy."""
+        desired = [
+            {
+                "description": "CSP",
+                "action": "log",
+                "expression": "true",
+                "enabled": True,
+                "value": "v",
+            },
+        ]
+        current = [
+            {
+                "id": "pol-1",
+                "description": "CSP",
+                "action": "allow",
+                "expression": "true",
+                "enabled": True,
+                "value": "v",
+            },
+        ]
+        plans = diff_page_shield_policies(desired, current)
+        assert len(plans) == 1
+        assert plans[0].desired_policy is not None
+        assert plans[0].desired_policy["action"] == "log"
+        assert plans[0].desired_policy["expression"] == "true"
+        assert plans[0].desired_policy["enabled"] is True
+        assert plans[0].desired_policy["value"] == "v"
+
+
 class TestZonePlanWithPageShieldPolicies:
     """Tests for ZonePlan including page shield extension plans."""
 
@@ -515,3 +610,72 @@ class TestCheckSafetyWithPageShieldPolicies:
         assert len(violations) == 1
         assert violations[0].kind == "delete"
         assert violations[0].count == 4
+
+
+class TestPageShieldSingleFieldUpdateEndToEnd:
+    """Full plan-to-apply flow for a single-field Page Shield policy update.
+
+    Verifies that changing only 'action' from allow to log produces exactly
+    one diff, and that _apply_page_shield sends ALL 5 fields (not just the
+    changed one) to the provider's update_page_shield_policy method.
+    """
+
+    def test_single_field_change_sends_all_fields_on_apply(self):
+        # -- arrange: current and desired policies differ only in action --
+        current_policy = {
+            "id": "pol-42",
+            "description": "CSP",
+            "action": "allow",
+            "expression": "true",
+            "enabled": True,
+            "value": "script-src 'self'",
+        }
+        desired_policy = {
+            "description": "CSP",
+            "action": "log",
+            "expression": "true",
+            "enabled": True,
+            "value": "script-src 'self'",
+        }
+
+        # -- act: diff --
+        plans = diff_page_shield_policies([desired_policy], [current_policy])
+
+        # -- assert: exactly 1 plan with exactly 1 change (action) --
+        assert len(plans) == 1
+        plan = plans[0]
+        assert plan.description == "CSP"
+        assert plan.policy_id == "pol-42"
+        assert not plan.create
+        assert not plan.delete
+        assert len(plan.changes) == 1
+        change = plan.changes[0]
+        assert change.ref == "action"
+        assert change.change_type == ChangeType.MODIFY
+        assert change.current == {"action": "allow"}
+        assert change.desired == {"action": "log"}
+
+        # -- act: apply with a mock provider --
+        mock_provider = MagicMock()
+        mock_provider.max_workers = 1
+        scope = Scope(zone_id="zone-1")
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": plans})
+
+        _synced, error = _apply_page_shield(zp, plans, scope, mock_provider)
+
+        # -- assert: no error, provider called with ALL 5 fields --
+        assert error is None
+        mock_provider.update_page_shield_policy.assert_called_once()
+        call_args = mock_provider.update_page_shield_policy.call_args
+
+        # Positional: scope, policy_id
+        assert call_args[0] == (scope, "pol-42")
+
+        # Keyword args must include all 5 fields (description + 4 diff fields)
+        kwargs = call_args[1]
+        assert kwargs["description"] == "CSP"
+        assert kwargs["action"] == "log"
+        assert kwargs["expression"] == "true"
+        assert kwargs["enabled"] is True
+        assert kwargs["value"] == "script-src 'self'"
+        assert len(kwargs) == 5

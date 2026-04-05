@@ -15,6 +15,7 @@ from typing import Any
 from octorules.linter.engine import LintContext, LintResult, Severity
 from octorules.phases import Phase
 
+from octorules_cloudflare.linter._constants import PLAN_TIERS as _PLAN_TIERS
 from octorules_cloudflare.linter.expression_bridge import ExpressionInfo, parse_expression
 from octorules_cloudflare.linter.schemas.fields import FIELDS
 from octorules_cloudflare.linter.schemas.functions import get_function
@@ -265,15 +266,37 @@ def _extract_function_call_args(expr: str, func_name: str) -> list[list[str]]:
     """Extract raw argument strings for each call to *func_name* in *expr*.
 
     Returns a list of call-sites, where each call-site is a list of
-    comma-separated arg strings.  Does not handle nested parentheses
-    (acceptable: CF functions we target don't nest).
+    comma-separated arg strings.  Handles nested parentheses via
+    depth tracking.
     """
     results: list[list[str]] = []
-    pattern = re.compile(rf"{re.escape(func_name)}\s*\(([^)]*)\)")
+    pattern = re.compile(rf"{re.escape(func_name)}\s*\(")
     for m in pattern.finditer(expr):
-        raw_args = m.group(1)
-        args = [a.strip() for a in raw_args.split(",")]
-        results.append(args)
+        start = m.end()  # position right after the opening '('
+        depth = 1
+        i = start
+        while i < len(expr) and depth > 0:
+            ch = expr[i]
+            if ch == '"':
+                # Skip quoted string — parens inside don't affect depth.
+                # Wirefilter uses \" for escaped quotes and \\ for
+                # escaped backslashes; no other escape produces a quote.
+                i += 1
+                while i < len(expr) and expr[i] != '"':
+                    if expr[i] == "\\" and i + 1 < len(expr):
+                        i += 1  # skip escaped char
+                    i += 1
+                # i now points at closing " (or past end); the outer
+                # i += 1 below advances past it.
+            elif ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            i += 1
+        if depth == 0:
+            raw_args = expr[start : i - 1]
+            args = [a.strip() for a in raw_args.split(",")]
+            results.append(args)
     return results
 
 
@@ -1427,7 +1450,6 @@ def _lint_function_constraints(
 
         # CF021: Function requires a higher plan tier
         if func_def.requires_plan:
-            _PLAN_TIERS = {"free": 0, "pro": 1, "business": 2, "enterprise": 3}
             current_level = _PLAN_TIERS.get(ctx.plan_tier, 3)
             required_level = _PLAN_TIERS.get(func_def.requires_plan, 0)
             if current_level < required_level:

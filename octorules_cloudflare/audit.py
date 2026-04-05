@@ -55,6 +55,16 @@ def _extract_ips(rules_data: dict, phase_name: str) -> list[RuleIPInfo]:
     return results
 
 
+_registered = False
+
+
 def register_cloudflare_audit() -> None:
-    """Register the Cloudflare audit IP extractor."""
+    """Register the Cloudflare audit IP extractor.
+
+    Safe to call multiple times — subsequent calls are no-ops.
+    """
+    global _registered
+    if _registered:
+        return
+    _registered = True
     register_audit_extension("cloudflare", _extract_ips)

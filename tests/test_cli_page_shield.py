@@ -10,6 +10,7 @@ from octorules.phases import get_phase
 from octorules.planner import ChangeType, RuleChange, ZonePlan
 from octorules.provider.base import Scope
 
+import octorules_cloudflare  # noqa: F401 — trigger extension registration
 from octorules_cloudflare.page_shield import PageShieldPolicyPlan, _apply_page_shield
 
 REDIRECT_PHASE = get_phase("redirect_rules")
@@ -77,8 +78,14 @@ class TestPageShieldPoliciesCLI:
     def test_dump_includes_page_shield_policies(self, mock_init_provs, sample_config):
         """Dump should fetch and include Page Shield policies."""
         import yaml
+        from octorules.provider.exceptions import ProviderError
 
         mock_prov = MagicMock()
+        mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
+        mock_prov.max_workers = 1
+        mock_prov.account_id = None
+        mock_prov.account_name = None
+        mock_prov.resolve_zone_id.return_value = "zone-123"
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = [
             {
@@ -89,6 +96,13 @@ class TestPageShieldPoliciesCLI:
                 "value": "script-src 'self'",
             }
         ]
+        # Return None/empty for other extension methods to avoid
+        # MagicMock objects leaking into YAML serialization.
+        mock_prov.get_bot_management.side_effect = ProviderError("skip")
+        mock_prov.get_url_normalization.side_effect = ProviderError("skip")
+        mock_prov.get_zone_security_settings.side_effect = ProviderError("skip")
+        mock_prov.get_leaked_credential_check.side_effect = ProviderError("skip")
+        mock_prov.get_content_scanning.side_effect = ProviderError("skip")
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
         result = cmd_dump(sample_config, ["example.com"], None)
@@ -102,10 +116,20 @@ class TestPageShieldPoliciesCLI:
     def test_dump_no_policies_no_section(self, mock_init_provs, sample_config):
         """Dump with no policies should not include page_shield_policies key."""
         import yaml
+        from octorules.provider.exceptions import ProviderError
 
         mock_prov = MagicMock()
+        mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
+        mock_prov.max_workers = 1
+        mock_prov.account_id = None
+        mock_prov.account_name = None
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
+        mock_prov.get_bot_management.side_effect = ProviderError("skip")
+        mock_prov.get_url_normalization.side_effect = ProviderError("skip")
+        mock_prov.get_zone_security_settings.side_effect = ProviderError("skip")
+        mock_prov.get_leaked_credential_check.side_effect = ProviderError("skip")
+        mock_prov.get_content_scanning.side_effect = ProviderError("skip")
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
         result = cmd_dump(sample_config, ["example.com"], None)
@@ -273,6 +297,50 @@ class TestApplyPageShield:
         assert error is None
         assert len(synced) == 1
         provider.update_page_shield_policy.assert_called_once()
+
+    def test_apply_page_shield_update_includes_all_fields(self):
+        """Update kwargs should include ALL required fields, not just the changed one."""
+        from octorules_cloudflare.page_shield import _make_page_shield_phase
+
+        synthetic = _make_page_shield_phase("CSP")
+        change = RuleChange(
+            ChangeType.MODIFY,
+            "action",
+            synthetic,
+            current={"action": "log"},
+            desired={"action": "allow"},
+        )
+        # desired_policy carries the full desired state
+        desired_policy = {
+            "description": "CSP",
+            "action": "allow",
+            "expression": "true",
+            "enabled": True,
+            "value": "script-src 'self'",
+        }
+        psp = PageShieldPolicyPlan(
+            description="CSP",
+            policy_id="policy-456",
+            changes=[change],
+            desired_policy=desired_policy,
+        )
+        zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
+        scope = Scope(zone_id="zone-abc", label="example.com")
+        provider = MagicMock()
+        provider.update_page_shield_policy.return_value = {"id": "policy-456"}
+        provider.max_workers = 1
+
+        synced, error = _apply_page_shield(zp, [psp], scope, provider)
+        assert error is None
+        assert len(synced) == 1
+        # Verify ALL required fields were passed, not just the changed 'action'
+        call_kwargs = provider.update_page_shield_policy.call_args
+        _, kwargs = call_kwargs
+        assert kwargs["description"] == "CSP"
+        assert kwargs["action"] == "allow"
+        assert kwargs["expression"] == "true"
+        assert kwargs["enabled"] is True
+        assert kwargs["value"] == "script-src 'self'"
 
     def test_apply_page_shield_empty(self):
         """Empty plans list should do nothing."""

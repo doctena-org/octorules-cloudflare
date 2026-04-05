@@ -4,7 +4,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
-from octorules.provider.base import PhaseRulesResult, Scope
+from octorules.provider.base import BaseProvider, PhaseRulesResult, Scope
 from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
 from octorules_cloudflare import CloudflareProvider
@@ -16,6 +16,12 @@ from .mocks import MockRule, MockRuleIterableOnly, MockRuleset, MockRuleWithToDi
 # Helper to create a zone scope for tests
 def _zs(zone_id: str = "zone-123", label: str = "") -> Scope:
     return Scope(zone_id=zone_id, label=label)
+
+
+class TestBaseProviderProtocol:
+    def test_satisfies_protocol(self, mock_cf_client):
+        instance = CloudflareProvider(token="test", client=mock_cf_client)
+        assert isinstance(instance, BaseProvider)
 
 
 class TestScope:

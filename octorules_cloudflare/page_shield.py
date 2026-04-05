@@ -50,6 +50,7 @@ class PageShieldPolicyPlan:
     create: bool = False
     delete: bool = False
     changes: list[RuleChange] = field(default_factory=list)  # field-level changes
+    desired_policy: dict | None = None  # full desired state for updates
 
     @property
     def has_changes(self) -> bool:
@@ -79,16 +80,20 @@ def normalize_csp_value(value: str) -> str:
     This prevents phantom diffs when Cloudflare returns CSP source values
     in a different order than the YAML specifies.
     """
-    # First collapse whitespace like normalize_expression does
-    value = normalize_expression(value)
+    # Collapse whitespace (plain split/join — no wirefilter brace logic)
+    value = " ".join(value.split())
 
-    directives = value.split("; ")
+    directives = value.split(";")
     normalized_parts: list[str] = []
     for directive in directives:
-        tokens = directive.rstrip(";").split(" ")
+        directive = directive.strip()
+        if not directive:
+            continue
+        tokens = directive.split(" ")
+        tokens = [t for t in tokens if t]  # filter empty from extra spaces
         if len(tokens) <= 2:
             # Directive name only, or single source — nothing to sort
-            normalized_parts.append(directive)
+            normalized_parts.append(" ".join(tokens))
             continue
         # First token is the directive name; sort the rest
         name = tokens[0]
@@ -216,6 +221,12 @@ def diff_page_shield_policies(
     for p in current_policies:
         desc = p.get("description", "")
         if desc:
+            if desc in current_by_desc:
+                log.warning(
+                    "Duplicate Page Shield policy description %r — "
+                    "only the last one will be used for diff",
+                    desc,
+                )
             current_by_desc[desc] = p
 
     desired_descs: set[str] = set()
@@ -259,6 +270,7 @@ def diff_page_shield_policies(
                     description=desc,
                     policy_id=policy_id,
                     changes=field_changes,
+                    desired_policy=entry,
                 )
                 plans.append(pp)
 
@@ -358,7 +370,10 @@ def _finalize_page_shield(
         try:
             current_policies = future.result(timeout=_PREFETCH_TIMEOUT)
         except ProviderAuthError:
-            raise
+            if "page_shield_policies" in all_desired:
+                raise  # User explicitly declared this section -- permission is needed
+            log.debug("Skipping page_shield_policies (no permission and not in desired config)")
+            return
         except ProviderError as e:
             log.warning(
                 "Failed to fetch Page Shield policies for %s: %s",
@@ -426,11 +441,19 @@ def _apply_page_shield(
         full_label = f"{zp.zone_name}/{label}"
         n_changes = len(psp.changes)
         log.info("  %s/%s: applying %d change(s)", zp.zone_name, label, n_changes)
-        kwargs = {"description": psp.description}
-        for c in psp.changes:
-            if c.normalized_desired:
-                for k, v in c.normalized_desired.items():
-                    kwargs[k] = v
+        # Build kwargs from the full desired state — the update API requires
+        # ALL fields, not just changed ones.
+        kwargs: dict = {"description": psp.description}
+        if psp.desired_policy:
+            for f in _PAGE_SHIELD_DIFF_FIELDS:
+                if f in psp.desired_policy:
+                    kwargs[f] = psp.desired_policy[f]
+        else:
+            # Fallback: reconstruct from changes (shouldn't happen in practice)
+            for c in psp.changes:
+                if c.normalized_desired:
+                    for k, v in c.normalized_desired.items():
+                        kwargs[k] = v
 
         def update_fn(_psp=psp, _kwargs=dict(kwargs), _label=label) -> None:  # noqa: B006
             provider.update_page_shield_policy(scope, _psp.policy_id, **_kwargs)
@@ -523,10 +546,10 @@ def _dump_page_shield(
     """Dump hook: fetch Page Shield policies, clean, and return as extra_sections."""
     if not provider_supports(provider, SUPPORTS_PAGE_SHIELD):
         return None
+    if not scope.zone_id:
+        return None  # Page Shield is zone-level only
     try:
         policies = provider.get_all_page_shield_policies(scope)
-    except ProviderAuthError:
-        raise
     except ProviderError as e:
         log.warning(
             "Failed to fetch Page Shield policies for %s: %s",
@@ -538,7 +561,7 @@ def _dump_page_shield(
         return None
     cleaned = _clean_page_shield_policies(policies)
     if cleaned:
-        return {"extra_sections": {"page_shield_policies": cleaned}}
+        return {"page_shield_policies": cleaned}
     return None
 
 

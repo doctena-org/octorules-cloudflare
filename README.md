@@ -51,6 +51,8 @@ is required. The token needs the following permissions:
 - **Account > Account Filter Lists > Edit** — for list management
 - **Zone > Page Shield > Edit** — for Page Shield policy management
 
+See [docs/permissions.md](docs/permissions.md) for a detailed mapping of API token permissions to octorules features.
+
 ### Provider settings
 
 All settings below go under the provider section (e.g. `providers.cloudflare`).
@@ -81,6 +83,11 @@ forwarded to the provider):
 | Zone discovery (`list_zones`) | Supported |
 | Account-level scopes | Supported |
 | Audit IP extraction (`octorules audit`) | Supported |
+| Bot Management settings (`cloudflare_bot_management`) | Supported |
+| URL normalization settings (`cloudflare_url_normalization`) | Supported |
+| Zone security defaults (`cloudflare_zone_security`) | Supported |
+| Leaked Credential Check (`cloudflare_leaked_credential_check`) | Supported |
+| Content Scanning / anti-malware (`cloudflare_content_scanning`) | Supported |
 
 ## Supported phases
 

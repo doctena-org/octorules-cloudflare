@@ -54,6 +54,11 @@ class ExpressionInfo:
 
 
 # --- Regex patterns for best-effort expression analysis ---
+#
+# Design limitation (F6): The regex fallback is inherently less precise
+# than wirefilter. It cannot validate field names against the schema,
+# check operator-field type compatibility, or detect unknown functions.
+# Install octorules-wirefilter for full semantic validation.
 
 # Known CF fields pattern (dotted names like http.request.uri.path)
 _FIELD_PATTERN = re.compile(r"\b((?:http|ip|ssl|cf|raw)\.[a-z][a-z0-9_.]*[a-z0-9])\b")

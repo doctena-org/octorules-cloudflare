@@ -296,6 +296,33 @@ class TestLinterPipeline:
         assert len(cf100) == 1
         assert cf100[0].ref == "second"
 
+    def test_cross_rule_duplicate_in_custom_rulesets(self):
+        """Stage 4 (cross-rule): duplicate expressions inside custom_rulesets."""
+        ctx = _run_lint(
+            {
+                "custom_rulesets": [
+                    {
+                        "name": "my-ruleset",
+                        "rules": [
+                            {
+                                "ref": "first",
+                                "expression": 'http.request.uri.path eq "/test"',
+                                "action": "block",
+                            },
+                            {
+                                "ref": "second",
+                                "expression": 'http.request.uri.path eq "/test"',
+                                "action": "block",
+                            },
+                        ],
+                    }
+                ]
+            }
+        )
+        cf100 = [r for r in ctx.results if r.rule_id == "CF100"]
+        assert len(cf100) == 1
+        assert "custom_rulesets/my-ruleset" in cf100[0].phase
+
     def test_list_reference_not_found(self):
         """Stage 4 (cross-rule): list reference to undefined list triggers CF102."""
         ctx = _run_lint(

@@ -388,6 +388,113 @@ class TestListTypeMismatch:
         assert "CF104" in _ids(ctx)
 
 
+class TestCustomRulesetListReferences:
+    """CF102/CF103/CF104 should also check rules inside custom_rulesets."""
+
+    def test_cf102_inside_custom_rulesets(self):
+        ctx = _lint(
+            {
+                "custom_rulesets": [
+                    {
+                        "name": "my_ruleset",
+                        "rules": [
+                            {"ref": "rule1", "expression": "ip.src in $unknown_list"},
+                        ],
+                    }
+                ],
+                "lists": [],
+            }
+        )
+        assert "CF102" in _ids(ctx)
+        findings = [r for r in ctx.results if r.rule_id == "CF102"]
+        assert len(findings) == 1
+        assert findings[0].phase == "custom_rulesets/my_ruleset"
+
+    def test_cf103_inside_custom_rulesets(self):
+        ctx = _lint(
+            {
+                "custom_rulesets": [
+                    {
+                        "name": "my_ruleset",
+                        "rules": [
+                            {"ref": "rule1", "expression": "ip.src in $cf.invalid_list"},
+                        ],
+                    }
+                ],
+            }
+        )
+        assert "CF103" in _ids(ctx)
+
+    def test_cf104_inside_custom_rulesets(self):
+        ctx = _lint(
+            {
+                "custom_rulesets": [
+                    {
+                        "name": "my_ruleset",
+                        "rules": [
+                            {"ref": "rule1", "expression": "ip.src in $my_asns"},
+                        ],
+                    }
+                ],
+                "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
+            }
+        )
+        assert "CF104" in _ids(ctx)
+
+
+class TestRewriteNotTerminating:
+    """Rewrite actions should NOT be terminating — subsequent rules still execute."""
+
+    def test_cf101_not_triggered_for_rewrite(self):
+        ctx = _lint(
+            {
+                "url_rewrite_rules": [
+                    {"ref": "rewriter", "expression": "true", "action": "rewrite"},
+                    {"ref": "after", "expression": 'http.host eq "a.com"', "action": "rewrite"},
+                ]
+            }
+        )
+        assert "CF101" not in _ids(ctx)
+
+    def test_cf101_stacked_rewrite_rules_all_true_no_warning(self):
+        """Multiple rewrite rules with always-true expressions must NOT produce CF101.
+
+        Rewrite is not a terminating action — Cloudflare continues evaluating
+        subsequent rules even after a rewrite match.
+        """
+        ctx = _lint(
+            {
+                "url_rewrite_rules": [
+                    {"ref": "rw1", "expression": "true", "action": "rewrite"},
+                    {"ref": "rw2", "expression": "true", "action": "rewrite"},
+                    {"ref": "rw3", "expression": "true", "action": "rewrite"},
+                ]
+            }
+        )
+        assert "CF101" not in _ids(ctx)
+
+    def test_cf101_stacked_block_rules_all_true_produces_warnings(self):
+        """Contrast: stacked block rules with always-true expressions DO produce CF101.
+
+        Block IS a terminating action, so rules after the first are unreachable.
+        This validates that the rewrite test above is meaningful.
+        """
+        ctx = _lint(
+            {
+                "waf_custom_rules": [
+                    {"ref": "blk1", "expression": "true", "action": "block"},
+                    {"ref": "blk2", "expression": "true", "action": "block"},
+                    {"ref": "blk3", "expression": "true", "action": "block"},
+                ]
+            }
+        )
+        cf101s = [r for r in ctx.results if r.rule_id == "CF101"]
+        # blk2 and blk3 are unreachable after blk1
+        assert len(cf101s) == 2
+        refs = {r.ref for r in cf101s}
+        assert refs == {"blk2", "blk3"}
+
+
 class TestPhaseFilter:
     def test_filter_skips_unmatched_phase(self):
         ctx = _lint(
