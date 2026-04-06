@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.1] - 2026-04-06
+
+### Added
+- CF220 lint rule — validates `sensitivity_level` values in execute overrides
+- CF221 lint rule — validates `content_type` values in serve_error responses
+- CF222 lint rule — validates `ruleset` value in skip actions must be `"current"`
+- `raw_response_fields` and `transformed_request_fields` added to valid `log_custom_field` action parameters
+- `score`, `ddos_dynamic`, `force_connection_close` action types with phase mappings
+- `bypass_by_default` browser TTL mode (replaces incorrect `bypass`)
+- `webp` polish value, `default` compression algorithm
+- `additional_cacheable_ports` and `read_timeout` cache settings keys
+- `crawler_protection` and `auto_update_model` in bot management extension
+- `remove_query_args` in transform function suppression
+
+### Fixed
+- Browser TTL mode `bypass` corrected to `bypass_by_default` per SDK
+- `score` action `increment` parameter is optional (was incorrectly required)
+
+### Removed
+- Stale `disable_railgun`, `h2_prioritization`, `cache_deception_armor` from set_config parameters
+- `version` from execute action parameters (it's a rule-level field, not action parameter)
+
 ## [0.7.0] - 2026-04-05
 
 ### Added

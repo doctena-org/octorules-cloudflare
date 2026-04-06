@@ -41,6 +41,8 @@ SET_CACHE_SETTINGS_SCHEMA = ActionSchema(
             "origin_error_page_passthru",
             "cache_reserve",
             "origin_cache_control",
+            "additional_cacheable_ports",
+            "read_timeout",
         }
     ),
 )
@@ -56,7 +58,6 @@ SET_CONFIG_SCHEMA = ActionSchema(
             "disable_rum",
             "disable_zaraz",
             "email_obfuscation",
-            "disable_railgun",
             "fonts",
             "hotlink_protection",
             "mirage",
@@ -67,8 +68,6 @@ SET_CONFIG_SCHEMA = ActionSchema(
             "server_side_excludes",
             "ssl",
             "sxg",
-            "h2_prioritization",
-            "cache_deception_armor",
         }
     ),
 )
@@ -107,6 +106,8 @@ LOG_CUSTOM_FIELD_SCHEMA = ActionSchema(
             "request_fields",
             "response_fields",
             "cookie_fields",
+            "raw_response_fields",
+            "transformed_request_fields",
         }
     ),
 )
@@ -139,10 +140,18 @@ EXECUTE_SCHEMA = ActionSchema(
             "id",
             "matched_data",
             "overrides",
-            "version",
         }
     ),
 )
+
+SCORE_SCHEMA = ActionSchema(
+    requires_parameters=True,
+    allowed_parameter_keys=frozenset({"increment"}),
+)
+
+DDOS_DYNAMIC_SCHEMA = ActionSchema(requires_parameters=False)
+
+FORCE_CONNECTION_CLOSE_SCHEMA = ActionSchema(requires_parameters=False)
 
 RATE_LIMIT_SCHEMA = ActionSchema(
     requires_parameters=True,
@@ -194,6 +203,7 @@ VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
         "skip",
         "log",
         "execute",
+        "score",
     },
     "waf_managed_rules": {"execute", "skip", "block", "log"},
     "rate_limiting_rules": {
@@ -206,7 +216,7 @@ VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
     },
     "bot_fight_rules": {"block", "challenge", "js_challenge", "managed_challenge"},
     "sensitive_data_detection": {"log"},
-    "http_ddos_rules": {"block", "challenge", "log"},
+    "http_ddos_rules": {"block", "challenge", "log", "ddos_dynamic", "force_connection_close"},
     "bulk_redirect_rules": {"redirect"},
     "log_custom_fields": {"log_custom_field"},
     "url_normalization": {"none"},
@@ -233,6 +243,9 @@ ACTION_SCHEMAS: dict[str, ActionSchema] = {
     "skip": SKIP_SCHEMA,
     "execute": EXECUTE_SCHEMA,
     "log": LOG_SCHEMA,
+    "score": SCORE_SCHEMA,
+    "ddos_dynamic": DDOS_DYNAMIC_SCHEMA,
+    "force_connection_close": FORCE_CONNECTION_CLOSE_SCHEMA,
     "none": ActionSchema(requires_parameters=False),
 }
 
@@ -264,6 +277,7 @@ VALID_POLISH_VALUES = frozenset(
         "off",
         "lossless",
         "lossy",
+        "webp",
     }
 )
 
@@ -281,7 +295,7 @@ VALID_BROWSER_TTL_MODES = frozenset(
     {
         "respect_origin",
         "override_origin",
-        "bypass",
+        "bypass_by_default",
     }
 )
 
@@ -303,7 +317,7 @@ MAX_CHARACTERISTICS: dict[str, int] = {
 
 # --- Compression algorithms ---
 
-VALID_COMPRESSION_ALGORITHMS = frozenset({"gzip", "brotli", "zstd", "none", "auto"})
+VALID_COMPRESSION_ALGORITHMS = frozenset({"gzip", "brotli", "zstd", "none", "auto", "default"})
 
 # --- Skip action valid values ---
 
@@ -336,6 +350,20 @@ VALID_SKIP_PRODUCTS = frozenset(
         "zoneLockdown",
     }
 )
+
+# --- Execute override sensitivity levels ---
+
+VALID_SENSITIVITY_LEVELS = frozenset({"default", "medium", "low", "eoff"})
+
+# --- Serve error content types ---
+
+VALID_SERVE_ERROR_CONTENT_TYPES = frozenset(
+    {"application/json", "text/xml", "text/plain", "text/html"}
+)
+
+# --- Skip action ruleset values ---
+
+VALID_SKIP_RULESET_VALUES = frozenset({"current"})
 
 # --- Block action response status codes (400-499) ---
 

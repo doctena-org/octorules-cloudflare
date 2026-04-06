@@ -28,8 +28,11 @@ from octorules_cloudflare.linter.schemas.actions import (
     VALID_RATE_LIMIT_PERIODS,
     VALID_REDIRECT_STATUS_CODES,
     VALID_SECURITY_LEVELS,
+    VALID_SENSITIVITY_LEVELS,
+    VALID_SERVE_ERROR_CONTENT_TYPES,
     VALID_SKIP_PHASES,
     VALID_SKIP_PRODUCTS,
+    VALID_SKIP_RULESET_VALUES,
     VALID_SSL_VALUES,
 )
 
@@ -85,6 +88,9 @@ RULE_IDS = frozenset(
         "CF452",
         "CF218",
         "CF219",
+        "CF220",
+        "CF221",
+        "CF222",
     }
 )
 
@@ -944,7 +950,7 @@ def _lint_transform_expression(
         # lower, upper, starts_with, ends_with, etc.) that wirefilter rejects.
         _TRANSFORM_FUNCTIONS = (
             r"\b(?:regex_replace|wildcard_replace|concat|lower|upper|"
-            r"to_string|substring|remove_bytes|url_decode|len|"
+            r"to_string|substring|remove_bytes|remove_query_args|url_decode|len|"
             r"starts_with|ends_with|contains|sha256|sha512|hmac|"
             r"encode_base64|decode_base64|uuidv4|split|join|"
             r"http\.request\.uri\.path|http\.request\.uri)\s*\("
@@ -979,6 +985,20 @@ def _lint_serve_error_params(params: dict, phase_name: str, ref: str, ctx: LintC
                     field="action_parameters.status_code",
                 )
             )
+
+    # CF221: serve_error content_type validation
+    content_type = params.get("content_type")
+    if isinstance(content_type, str):
+        _check_enum(
+            content_type,
+            VALID_SERVE_ERROR_CONTENT_TYPES,
+            rule_id="CF221",
+            label="serve_error content_type",
+            field_path="action_parameters.content_type",
+            phase_name=phase_name,
+            ref=ref,
+            ctx=ctx,
+        )
 
     # CF209: content size limit (~10KB)
     content = params.get("content")
@@ -1035,8 +1055,23 @@ def _lint_execute_params(params: dict, phase_name: str, ref: str, ctx: LintConte
         )
 
     # CF218: Validate overrides.rules structure
+    # CF220: Validate sensitivity_level in overrides
     overrides = params.get("overrides")
     if isinstance(overrides, dict):
+        # CF220: top-level sensitivity_level in overrides
+        sl = overrides.get("sensitivity_level")
+        if isinstance(sl, str):
+            _check_enum(
+                sl,
+                VALID_SENSITIVITY_LEVELS,
+                rule_id="CF220",
+                label="sensitivity_level",
+                field_path="action_parameters.overrides.sensitivity_level",
+                phase_name=phase_name,
+                ref=ref,
+                ctx=ctx,
+            )
+
         rules = overrides.get("rules")
         if isinstance(rules, list):
             for i, entry in enumerate(rules):
@@ -1057,10 +1092,37 @@ def _lint_execute_params(params: dict, phase_name: str, ref: str, ctx: LintConte
                             field=f"action_parameters.overrides.rules[{i}].id",
                         )
                     )
+                # CF220: per-rule sensitivity_level in overrides
+                rule_sl = entry.get("sensitivity_level")
+                if isinstance(rule_sl, str):
+                    _check_enum(
+                        rule_sl,
+                        VALID_SENSITIVITY_LEVELS,
+                        rule_id="CF220",
+                        label="sensitivity_level",
+                        field_path=f"action_parameters.overrides.rules[{i}].sensitivity_level",
+                        phase_name=phase_name,
+                        ref=ref,
+                        ctx=ctx,
+                    )
 
 
 def _lint_skip_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate skip action_parameters (CF210, CF211)."""
+    """Validate skip action_parameters (CF210, CF211, CF222)."""
+    # CF222: validate ruleset value
+    ruleset = params.get("ruleset")
+    if isinstance(ruleset, str):
+        _check_enum(
+            ruleset,
+            VALID_SKIP_RULESET_VALUES,
+            rule_id="CF222",
+            label="skip ruleset value",
+            field_path="action_parameters.ruleset",
+            phase_name=phase_name,
+            ref=ref,
+            ctx=ctx,
+        )
+
     # CF210: validate phases values
     phases = params.get("phases")
     if isinstance(phases, list):

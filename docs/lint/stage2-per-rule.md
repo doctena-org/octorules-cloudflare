@@ -36,7 +36,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (18 rules)
+## Category C — Action Validation (21 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -356,6 +356,62 @@ The `execute` action's `overrides.rules` list contains entries missing a non-emp
 The `skip` action's `rulesets` list contains an empty or whitespace-only entry. Each entry should be a valid ruleset ID.
 
 **Fix:** Remove empty entries from the `rulesets` list or provide valid IDs.
+
+### CF220 — Invalid sensitivity_level in execute overrides
+
+**Severity:** ERROR
+
+The `execute` action's `overrides` contain a `sensitivity_level` value that is not one of the recognized levels (`default`, `medium`, `low`, `eoff`). Each override entry's sensitivity must be a valid Cloudflare WAF sensitivity level.
+
+```yaml
+waf_managed_rules:
+  - ref: deploy-owasp
+    expression: 'true'
+    action: execute
+    action_parameters:
+      id: abc12345def67890abc12345def67890
+      overrides:
+        rules:
+          - id: rule123
+            sensitivity_level: extreme   # not a valid value
+```
+
+**Fix:** Use one of the valid sensitivity levels: `default`, `medium`, `low`, or `eoff`.
+
+### CF221 — Invalid content_type in serve_error response
+
+**Severity:** ERROR
+
+The `serve_error` action's `content_type` value is not one of the recognized MIME types for custom error responses. Cloudflare only supports specific content types for error pages.
+
+```yaml
+custom_error_rules:
+  - ref: custom-error
+    expression: 'true'
+    action: serve_error
+    action_parameters:
+      content: "<h1>Error</h1>"
+      content_type: application/pdf   # not a valid serve_error content type
+```
+
+**Fix:** Use a valid content type for serve_error responses (e.g., `text/html`, `text/xml`, `application/json`, `text/plain`).
+
+### CF222 — Skip ruleset value must be "current"
+
+**Severity:** ERROR
+
+The `skip` action's `ruleset` parameter must be the string `"current"`. Any other value is rejected by the Cloudflare API — the only supported skip scope for rulesets is the current ruleset.
+
+```yaml
+waf_custom_rules:
+  - ref: skip-waf
+    expression: '(ip.src eq 10.0.0.1)'
+    action: skip
+    action_parameters:
+      ruleset: all   # must be "current"
+```
+
+**Fix:** Set `ruleset` to `"current"`.
 
 ---
 

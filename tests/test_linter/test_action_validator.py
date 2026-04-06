@@ -39,6 +39,35 @@ class TestActionValidity:
         ctx = _lint_rule({"ref": "t", "expression": "true", "action": "redirect"}, "redirect_rules")
         assert "CF200" not in _ids(ctx)
 
+    def test_cf200_score_valid_in_waf_custom_rules(self):
+        """'score' action is valid for waf_custom_rules (no false positive)."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "score",
+                "action_parameters": {"increment": 5},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF200" not in _ids(ctx)
+
+    def test_cf200_ddos_dynamic_valid_in_http_ddos_rules(self):
+        """'ddos_dynamic' action is valid for http_ddos_rules (no false positive)."""
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "true", "action": "ddos_dynamic"},
+            "http_ddos_rules",
+        )
+        assert "CF200" not in _ids(ctx)
+
+    def test_cf200_force_connection_close_valid_in_http_ddos_rules(self):
+        """'force_connection_close' action is valid for http_ddos_rules (no false positive)."""
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "true", "action": "force_connection_close"},
+            "http_ddos_rules",
+        )
+        assert "CF200" not in _ids(ctx)
+
     def test_cf201_missing_action_no_default(self):
         ctx = _lint_rule({"ref": "t", "expression": "true"}, "waf_custom_rules")
         assert "CF201" in _ids(ctx)
@@ -80,6 +109,22 @@ class TestActionValidity:
         )
         assert "CF203" in _ids(ctx)
 
+    def test_cf203_cache_additional_cacheable_ports_and_read_timeout(self):
+        """additional_cacheable_ports and read_timeout are valid cache params."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {
+                    "additional_cacheable_ports": [8080],
+                    "read_timeout": 300,
+                },
+            },
+            "cache_rules",
+        )
+        assert "CF203" not in _ids(ctx)
+
 
 class TestDefaultActionParamValidation:
     def test_cf203_fires_on_default_action_with_unknown_param(self):
@@ -105,7 +150,8 @@ class TestDefaultActionParamValidation:
         )
         assert "CF203" not in _ids(ctx)
 
-    def test_default_action_disable_railgun_accepted(self):
+    def test_default_action_disable_railgun_rejected(self):
+        """disable_railgun was removed from the SDK — should trigger CF203."""
         ctx = _lint_rule(
             {
                 "ref": "t",
@@ -114,7 +160,7 @@ class TestDefaultActionParamValidation:
             },
             "config_rules",
         )
-        assert "CF203" not in _ids(ctx)
+        assert "CF203" in _ids(ctx)
 
 
 class TestPhaseParameterOverrides:
@@ -486,6 +532,21 @@ class TestBrowserTtl:
         errors = [r for r in ctx.results if r.severity == Severity.ERROR]
         assert len(errors) == 0
 
+    def test_cf410_bypass_by_default_valid(self):
+        """browser_ttl mode 'bypass_by_default' should not trigger CF410."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {
+                    "browser_ttl": {"mode": "bypass_by_default"},
+                },
+            },
+            "cache_rules",
+        )
+        assert "CF410" not in _ids(ctx)
+
 
 class TestServeErrorParams:
     def test_cf205_serve_error_status_code_out_of_range(self):
@@ -565,6 +626,19 @@ class TestConfigParams:
         )
         assert "CF422" in _ids(ctx)
 
+    def test_cf422_polish_webp_valid(self):
+        """polish value 'webp' should not trigger CF422."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_config",
+                "action_parameters": {"polish": "webp"},
+            },
+            "config_rules",
+        )
+        assert "CF422" not in _ids(ctx)
+
     def test_cf423_security_off_warning(self):
         ctx = _lint_rule(
             {
@@ -621,7 +695,6 @@ class TestRateLimitParams:
                 "action": "execute",
                 "action_parameters": {
                     "id": "00000000000000000000000000000001",
-                    "version": "latest",
                 },
                 "enabled": True,
             },
@@ -1107,6 +1180,27 @@ class TestL006TransformExpressionLinting:
         )
         assert "CF444" not in _ids(ctx)
 
+    def test_cf444_suppressed_for_remove_query_args(self):
+        """Expressions using remove_query_args() should not trigger CF444."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {
+                    "uri": {
+                        "query": {
+                            "expression": (
+                                'remove_query_args(http.request.uri.query, "utm_source")'
+                            ),
+                        }
+                    },
+                },
+            },
+            "url_rewrite_rules",
+        )
+        assert "CF444" not in _ids(ctx)
+
 
 class TestC010ServeErrorContentSize:
     def test_cf209_content_exceeds_limit(self):
@@ -1262,6 +1356,21 @@ class TestC013CompressResponseAlgorithms:
                         {"name": "none"},
                         {"name": "auto"},
                     ],
+                },
+            },
+            "compression_rules",
+        )
+        assert "CF212" not in _ids(ctx)
+
+    def test_cf212_default_algorithm_valid(self):
+        """compression algorithm 'default' should not trigger CF212."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "compress_response",
+                "action_parameters": {
+                    "algorithms": [{"name": "default"}],
                 },
             },
             "compression_rules",
@@ -2006,3 +2115,314 @@ class TestCF452OriginRouteRequiredFields:
             "origin_rules",
         )
         assert "CF452" not in _ids(ctx)
+
+
+class TestCF220SensitivityLevel:
+    """CF220: sensitivity_level validation in execute overrides."""
+
+    def test_cf220_invalid_top_level_sensitivity_level(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "00000000000000000000000000000001",
+                    "overrides": {"sensitivity_level": "bogus"},
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert_lint(ctx, "CF220", count=1, severity=Severity.ERROR)
+
+    def test_cf220_valid_top_level_sensitivity_levels(self):
+        for level in ("default", "medium", "low", "eoff"):
+            ctx = _lint_rule(
+                {
+                    "ref": "t",
+                    "expression": "true",
+                    "action": "execute",
+                    "action_parameters": {
+                        "id": "00000000000000000000000000000001",
+                        "overrides": {"sensitivity_level": level},
+                    },
+                },
+                "waf_managed_rules",
+            )
+            assert "CF220" not in _ids(ctx)
+
+    def test_cf220_invalid_per_rule_sensitivity_level(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "00000000000000000000000000000001",
+                    "overrides": {
+                        "rules": [
+                            {"id": "abc123", "sensitivity_level": "high"},
+                        ]
+                    },
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert_lint(ctx, "CF220", count=1, severity=Severity.ERROR)
+
+    def test_cf220_valid_per_rule_sensitivity_level(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "00000000000000000000000000000001",
+                    "overrides": {
+                        "rules": [
+                            {"id": "abc123", "sensitivity_level": "low"},
+                        ]
+                    },
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert "CF220" not in _ids(ctx)
+
+    def test_cf220_no_sensitivity_level_no_error(self):
+        """No sensitivity_level at all should not trigger CF220."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "00000000000000000000000000000001",
+                    "overrides": {"rules": [{"id": "abc123"}]},
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert "CF220" not in _ids(ctx)
+
+
+class TestCF221ServeErrorContentType:
+    """CF221: serve_error content_type validation."""
+
+    def test_cf221_invalid_content_type(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "serve_error",
+                "action_parameters": {
+                    "content": "error",
+                    "content_type": "text/css",
+                    "status_code": 503,
+                },
+            },
+            "custom_error_rules",
+        )
+        assert_lint(ctx, "CF221", count=1, severity=Severity.ERROR)
+
+    def test_cf221_valid_content_types(self):
+        for ct in ("application/json", "text/xml", "text/plain", "text/html"):
+            ctx = _lint_rule(
+                {
+                    "ref": "t",
+                    "expression": "true",
+                    "action": "serve_error",
+                    "action_parameters": {
+                        "content": "error",
+                        "content_type": ct,
+                        "status_code": 503,
+                    },
+                },
+                "custom_error_rules",
+            )
+            assert "CF221" not in _ids(ctx)
+
+    def test_cf221_no_content_type_no_error(self):
+        """Missing content_type should not trigger CF221."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "serve_error",
+                "action_parameters": {
+                    "content": "error",
+                    "status_code": 503,
+                },
+            },
+            "custom_error_rules",
+        )
+        assert "CF221" not in _ids(ctx)
+
+
+class TestCF222SkipRulesetValue:
+    """CF222: skip action ruleset value validation."""
+
+    def test_cf222_invalid_ruleset_value(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "skip",
+                "action_parameters": {"ruleset": "all"},
+            },
+            "waf_custom_rules",
+        )
+        assert_lint(ctx, "CF222", count=1, severity=Severity.ERROR)
+
+    def test_cf222_valid_ruleset_value(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF222" not in _ids(ctx)
+
+    def test_cf222_no_ruleset_no_error(self):
+        """Missing ruleset should not trigger CF222."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "skip",
+                "action_parameters": {"phases": ["http_request_firewall_custom"]},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF222" not in _ids(ctx)
+
+
+class TestLogCustomFieldKeys:
+    """Ensure log_custom_field accepts the full set of parameter keys."""
+
+    def test_all_log_custom_field_keys_accepted(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "log_custom_field",
+                "action_parameters": {
+                    "request_fields": [{"name": "foo"}],
+                    "response_fields": [{"name": "bar"}],
+                    "cookie_fields": [{"name": "baz"}],
+                    "raw_response_fields": [{"name": "qux"}],
+                    "transformed_request_fields": [{"name": "quux"}],
+                },
+            },
+            "log_custom_fields",
+        )
+        assert "CF203" not in _ids(ctx)
+
+    def test_raw_response_fields_accepted(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "log_custom_field",
+                "action_parameters": {
+                    "raw_response_fields": [{"name": "x"}],
+                },
+            },
+            "log_custom_fields",
+        )
+        assert "CF203" not in _ids(ctx)
+
+    def test_transformed_request_fields_accepted(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "log_custom_field",
+                "action_parameters": {
+                    "transformed_request_fields": [{"name": "x"}],
+                },
+            },
+            "log_custom_fields",
+        )
+        assert "CF203" not in _ids(ctx)
+
+
+class TestSetConfigStaleKeys:
+    """Removed set_config keys should trigger CF203."""
+
+    def test_h2_prioritization_rejected(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_config",
+                "action_parameters": {"h2_prioritization": True},
+            },
+            "config_rules",
+        )
+        assert "CF203" in _ids(ctx)
+
+    def test_cache_deception_armor_rejected(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_config",
+                "action_parameters": {"cache_deception_armor": True},
+            },
+            "config_rules",
+        )
+        assert "CF203" in _ids(ctx)
+
+
+class TestExecuteVersionRemoved:
+    """'version' is not an action parameter — should trigger CF203."""
+
+    def test_version_key_rejected(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "execute",
+                "action_parameters": {
+                    "id": "00000000000000000000000000000001",
+                    "version": "latest",
+                },
+            },
+            "waf_managed_rules",
+        )
+        assert "CF203" in _ids(ctx)
+
+
+class TestScoreIncrementOptional:
+    """score.increment is optional — no error when omitted."""
+
+    def test_score_without_increment_ok(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "score",
+                "action_parameters": {},
+            },
+            "waf_custom_rules",
+        )
+        # No CF205 or other error about missing required keys
+        ids = _ids(ctx)
+        assert "CF205" not in ids
+        assert "CF208" not in ids
+
+    def test_score_with_increment_ok(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "score",
+                "action_parameters": {"increment": 5},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF203" not in _ids(ctx)

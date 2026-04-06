@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **137 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **140 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 ### Suppressing rules
 
@@ -65,7 +65,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
 | 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF018 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 96 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 99 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF476 | 7 | [stage2d-lists.md](stage2d-lists.md) |
@@ -81,7 +81,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF104 | Cross-rule | 5 |
-| CF200–CF219 | Action validation | 20 |
+| CF200–CF222 | Action validation | 23 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
 | CF400–CF407 | Rate limiting | 8 |
@@ -248,6 +248,9 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF215](stage2-per-rule.md#cf215--missing-id-in-execute-action_parameters) | Missing id in execute action_parameters | ERROR |
 | [CF216](stage2-per-rule.md#cf216--invalid-execute-id-format) | Invalid execute id format | WARNING |
 | [CF217](stage2-per-rule.md#cf217--compression-terminal-algorithm-must-be-last) | Compression terminal algorithm must be last | WARNING |
+| [CF220](stage2-per-rule.md#cf220--invalid-sensitivity_level-in-execute-overrides) | Invalid sensitivity_level in execute overrides | ERROR |
+| [CF221](stage2-per-rule.md#cf221--invalid-content_type-in-serve_error-response) | Invalid content_type in serve_error response | ERROR |
+| [CF222](stage2-per-rule.md#cf222--skip-ruleset-value-must-be-current) | Skip ruleset value must be "current" | ERROR |
 | [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |

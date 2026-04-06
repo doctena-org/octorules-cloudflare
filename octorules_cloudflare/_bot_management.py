@@ -61,6 +61,8 @@ _NORMALIZE_FIELDS: dict[str, type] = {
     "ai_bots_protection": str,
     "suppress_session_score": bool,
     "using_latest_model": bool,
+    "crawler_protection": str,
+    "auto_update_model": bool,
 }
 
 
@@ -98,7 +100,14 @@ def denormalize_bot_management(settings: dict) -> dict:
         return {}
 
     result: dict = {}
-    for key in ("fight_mode", "enable_js", "ai_bots_protection", "suppress_session_score"):
+    for key in (
+        "fight_mode",
+        "enable_js",
+        "ai_bots_protection",
+        "suppress_session_score",
+        "crawler_protection",
+        "auto_update_model",
+    ):
         if key in settings:
             result[key] = settings[key]
     return result

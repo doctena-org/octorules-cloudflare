@@ -57,6 +57,16 @@ class TestNormalizeBotManagement:
         assert result == {"fight_mode": True, "ai_bots_protection": "disabled"}
         assert "enable_js" not in result
 
+    def test_crawler_protection_preserved(self):
+        raw = {"crawler_protection": "enabled", "fight_mode": True}
+        result = normalize_bot_management(raw)
+        assert result["crawler_protection"] == "enabled"
+
+    def test_auto_update_model_preserved(self):
+        raw = {"auto_update_model": True, "fight_mode": False}
+        result = normalize_bot_management(raw)
+        assert result["auto_update_model"] is True
+
 
 # ---------------------------------------------------------------------------
 # Denormalization
@@ -88,6 +98,16 @@ class TestDenormalizeBotManagement:
         }
         result = denormalize_bot_management(settings)
         assert result == settings
+
+    def test_crawler_protection_preserved(self):
+        settings = {"crawler_protection": "enabled"}
+        result = denormalize_bot_management(settings)
+        assert result["crawler_protection"] == "enabled"
+
+    def test_auto_update_model_preserved(self):
+        settings = {"auto_update_model": True}
+        result = denormalize_bot_management(settings)
+        assert result["auto_update_model"] is True
 
     def test_empty(self):
         assert denormalize_bot_management({}) == {}
@@ -122,6 +142,20 @@ class TestRoundTrip:
         assert "using_latest_model" in normalized
         denormalized = denormalize_bot_management(normalized)
         assert "using_latest_model" not in denormalized
+
+    def test_round_trip_crawler_protection_and_auto_update_model(self):
+        """crawler_protection and auto_update_model survive normalize/denormalize."""
+        raw = {
+            "fight_mode": True,
+            "crawler_protection": "enabled",
+            "auto_update_model": False,
+        }
+        normalized = normalize_bot_management(raw)
+        assert normalized["crawler_protection"] == "enabled"
+        assert normalized["auto_update_model"] is False
+        denormalized = denormalize_bot_management(normalized)
+        assert denormalized["crawler_protection"] == "enabled"
+        assert denormalized["auto_update_model"] is False
 
 
 # ---------------------------------------------------------------------------

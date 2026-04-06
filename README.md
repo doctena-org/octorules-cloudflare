@@ -262,13 +262,13 @@ Each policy entry requires:
 
 ## Linting
 
-137 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+140 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|
 | CF001–CF026 | Structure & parse | 26 |
 | CF100–CF104 | Cross-rule ordering | 5 |
-| CF200–CF219 | Action validation | 20 |
+| CF200–CF222 | Action validation | 23 |
 | CF300–CF309 | Expression, function & type | 10 |
 | CF400–CF476 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 41 |
 | CF500–CF545 | Plan limits, style & value constraints | 35 |
