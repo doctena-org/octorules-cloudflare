@@ -9,11 +9,52 @@ from octorules.config import Config, ProviderConfig, ZoneConfig
 from octorules.phases import get_phase
 from octorules.planner import ChangeType, RuleChange, ZonePlan
 from octorules.provider.base import Scope
+from octorules.provider.exceptions import ProviderError
 
 import octorules_cloudflare  # noqa: F401 — trigger extension registration
 from octorules_cloudflare.page_shield import PageShieldPolicyPlan, _apply_page_shield
 
 REDIRECT_PHASE = get_phase("redirect_rules")
+
+
+def _make_dump_mock(**overrides):
+    """Build a MagicMock provider that won't leak MagicMock objects into YAML.
+
+    Any method not explicitly configured raises ProviderError, preventing
+    auto-created MagicMock return values from reaching the YAML serializer
+    (which can't represent them). This isolates Page Shield dump tests from
+    extension hooks registered by other installed providers.
+    """
+    mock_prov = MagicMock()
+    mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
+    mock_prov.max_workers = 1
+    mock_prov.account_id = None
+    mock_prov.account_name = None
+    # Default: any unrecognized get_* call raises ProviderError
+    mock_prov.configure_mock(
+        **{
+            f"get_{name}.side_effect": ProviderError("not configured")
+            for name in (
+                "bot_management",
+                "url_normalization",
+                "zone_security_settings",
+                "leaked_credential_check",
+                "content_scanning",
+                # AWS/Google/Azure/Bunny extensions that may be installed
+                "acl_settings",
+                "policy_settings",
+                "managed_exclusions",
+                "pullzone_security",
+                "shield_zone_config",
+                "bot_detection_config",
+            )
+        }
+    )
+    for k, v in overrides.items():
+        setattr(mock_prov, k, v) if not callable(v) else setattr(
+            getattr(mock_prov, k), "return_value", v
+        )
+    return mock_prov
 
 
 @pytest.fixture
@@ -78,14 +119,8 @@ class TestPageShieldPoliciesCLI:
     def test_dump_includes_page_shield_policies(self, mock_init_provs, sample_config):
         """Dump should fetch and include Page Shield policies."""
         import yaml
-        from octorules.provider.exceptions import ProviderError
 
-        mock_prov = MagicMock()
-        mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
-        mock_prov.max_workers = 1
-        mock_prov.account_id = None
-        mock_prov.account_name = None
-        mock_prov.resolve_zone_id.return_value = "zone-123"
+        mock_prov = _make_dump_mock()
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = [
             {
@@ -96,13 +131,6 @@ class TestPageShieldPoliciesCLI:
                 "value": "script-src 'self'",
             }
         ]
-        # Return None/empty for other extension methods to avoid
-        # MagicMock objects leaking into YAML serialization.
-        mock_prov.get_bot_management.side_effect = ProviderError("skip")
-        mock_prov.get_url_normalization.side_effect = ProviderError("skip")
-        mock_prov.get_zone_security_settings.side_effect = ProviderError("skip")
-        mock_prov.get_leaked_credential_check.side_effect = ProviderError("skip")
-        mock_prov.get_content_scanning.side_effect = ProviderError("skip")
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
         result = cmd_dump(sample_config, ["example.com"], None)
@@ -116,20 +144,10 @@ class TestPageShieldPoliciesCLI:
     def test_dump_no_policies_no_section(self, mock_init_provs, sample_config):
         """Dump with no policies should not include page_shield_policies key."""
         import yaml
-        from octorules.provider.exceptions import ProviderError
 
-        mock_prov = MagicMock()
-        mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
-        mock_prov.max_workers = 1
-        mock_prov.account_id = None
-        mock_prov.account_name = None
+        mock_prov = _make_dump_mock()
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
-        mock_prov.get_bot_management.side_effect = ProviderError("skip")
-        mock_prov.get_url_normalization.side_effect = ProviderError("skip")
-        mock_prov.get_zone_security_settings.side_effect = ProviderError("skip")
-        mock_prov.get_leaked_credential_check.side_effect = ProviderError("skip")
-        mock_prov.get_content_scanning.side_effect = ProviderError("skip")
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
         result = cmd_dump(sample_config, ["example.com"], None)

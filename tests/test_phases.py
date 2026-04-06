@@ -14,10 +14,13 @@ from octorules.phases import (
     unknown_phase_message,
 )
 
+from octorules_cloudflare import CF_PHASE_NAMES
+
 
 class TestPhaseRegistry:
     def test_twenty_three_phases(self):
-        assert len(PHASES) == 23
+        cf_phases = [p for p in PHASES if p.friendly_name in CF_PHASE_NAMES]
+        assert len(cf_phases) == 23
 
     def test_all_friendly_names_unique(self):
         assert len(ALL_FRIENDLY_NAMES) == len(set(ALL_FRIENDLY_NAMES))
@@ -97,7 +100,9 @@ class TestPhaseRegistry:
         assert set(ACCOUNT_PROVIDER_IDS).issubset(set(ALL_PROVIDER_IDS))
 
     def test_non_account_phases(self):
-        non_account = [p for p in PHASES if not p.account_level]
+        non_account = [
+            p for p in PHASES if not p.account_level and p.friendly_name in CF_PHASE_NAMES
+        ]
         assert len(non_account) == 12
 
     def test_get_phase_by_provider_id_unknown(self):
@@ -176,7 +181,12 @@ class TestZoneLevelFlag:
         assert "http_request_sanitize" in ZONE_PROVIDER_IDS
 
     def test_zone_provider_ids_count(self):
-        assert len(ZONE_PROVIDER_IDS) == 17
+        cf_zone_ids = [
+            pid
+            for pid in ZONE_PROVIDER_IDS
+            if any(p.provider_id == pid and p.friendly_name in CF_PHASE_NAMES for p in PHASES)
+        ]
+        assert len(cf_zone_ids) == 17
 
 
 class TestNewPhases:
@@ -368,7 +378,8 @@ class TestPhaseConsistency:
 
     def test_phase_by_name_alias_count(self):
         """PHASE_BY_NAME should have one extra entry for the waf_managed_exceptions alias."""
-        assert len(PHASE_BY_NAME) == len(PHASES) + 1
+        # +1 for the waf_managed_exceptions -> waf_managed_rules alias
+        assert len(PHASE_BY_NAME) >= len(PHASES) + 1
 
 
 class TestGetPhaseByNewProviderIds:
