@@ -36,6 +36,7 @@ def register_cloudflare_linter() -> None:
 
     # Register Cloudflare-specific API fields to strip
     register_api_fields("rule", {"id", "version", "last_updated", "categories", "logging"})
+    register_api_fields("action_parameters", {"version", "disable_railgun"})
     register_api_fields("list_item", {"id", "created_on", "modified_on"})
     register_api_fields("page_shield_policy", {"id", "last_updated"})
 

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] - 2026-04-07
+
+### Added
+- `version` and `disable_railgun` registered as API-only `action_parameters`
+  fields — stripped during dump and plan normalization so they no longer appear
+  in YAML or trigger CF203 warnings.
+- Regression test: linter action schemas are cross-checked against the
+  Cloudflare SDK models. If the SDK adds a new field, the test fails until it
+  is explicitly added to the schema or registered as an API field to strip.
+
 ## [0.7.2] - 2026-04-07
 
 ### Added
