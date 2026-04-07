@@ -69,6 +69,11 @@ CF216 = RuleMeta("CF216", "action", "Invalid execute ruleset id format", Severit
 CF217 = RuleMeta("CF217", "action", "Terminal compression algorithm must be last", Severity.WARNING)
 CF218 = RuleMeta("CF218", "action", "Invalid execute overrides structure", Severity.ERROR)
 CF219 = RuleMeta("CF219", "action", "Skip action references empty ruleset ID", Severity.WARNING)
+CF220 = RuleMeta(
+    "CF220", "action", "Invalid sensitivity_level in execute overrides", Severity.ERROR
+)
+CF221 = RuleMeta("CF221", "action", "Invalid serve_error content_type", Severity.ERROR)
+CF222 = RuleMeta("CF222", "action", "Invalid skip ruleset value", Severity.ERROR)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)

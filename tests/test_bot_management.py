@@ -386,6 +386,28 @@ class TestValidateExtension:
         _validate_bot_management(desired, "zone", errors, [])
         assert len(errors) == 3
 
+    def test_validate_invalid_crawler_protection(self):
+        desired = {"cloudflare_bot_management": {"crawler_protection": "bogus"}}
+        errors: list[str] = []
+        _validate_bot_management(desired, "zone", errors, [])
+        assert len(errors) == 1
+        assert "crawler_protection" in errors[0]
+        assert "'bogus'" in errors[0]
+
+    def test_validate_valid_crawler_protection(self):
+        desired = {"cloudflare_bot_management": {"crawler_protection": "enabled"}}
+        errors: list[str] = []
+        _validate_bot_management(desired, "zone", errors, [])
+        assert errors == []
+
+    def test_validate_invalid_auto_update_model(self):
+        desired = {"cloudflare_bot_management": {"auto_update_model": "yes"}}
+        errors: list[str] = []
+        _validate_bot_management(desired, "zone", errors, [])
+        assert len(errors) == 1
+        assert "auto_update_model" in errors[0]
+        assert "boolean" in errors[0]
+
     def test_read_only_field_rejected(self):
         desired = {"cloudflare_bot_management": {"using_latest_model": True}}
         errors: list[str] = []

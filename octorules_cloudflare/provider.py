@@ -94,7 +94,7 @@ class CloudflareProvider:
         *,
         token: str = "",
         max_retries: int = 2,
-        timeout: float | None = 30.0,
+        timeout: float | None = None,
         max_workers: int = 1,
         client: cloudflare.Cloudflare | None = None,
         **_extra: object,
@@ -105,8 +105,8 @@ class CloudflareProvider:
             self._client = client
         else:
             kwargs: dict = {"api_token": token, "max_retries": max_retries}
-            if timeout is not None:
-                kwargs["timeout"] = timeout
+            effective_timeout = timeout if timeout is not None else 30.0
+            kwargs["timeout"] = effective_timeout
             # Scale connection pool to match concurrency.
             # Note (F3): pool_size is based on phases, not zone count.
             # In practice max(100, pool_size) provides ample headroom for

@@ -8,7 +8,7 @@ _registered = False
 
 
 def register_cloudflare_linter() -> None:
-    """Register the Cloudflare lint plugin, rule definitions, and non-phase keys.
+    """Register the Cloudflare lint plugin and rule definitions.
 
     Safe to call multiple times — subsequent calls are no-ops.
     """
@@ -18,7 +18,7 @@ def register_cloudflare_linter() -> None:
 
     from octorules.linter.plugin import LintPlugin, register_linter
     from octorules.linter.rules.registry import register_rules
-    from octorules.phases import register_api_fields, register_non_phase_key, register_phase_alias
+    from octorules.phases import register_api_fields, register_phase_alias
 
     from octorules_cloudflare.linter._plugin import CF_RULE_IDS, cloudflare_lint
     from octorules_cloudflare.linter._rules import CF_RULE_METAS
@@ -33,8 +33,6 @@ def register_cloudflare_linter() -> None:
 
     register_linter(LintPlugin(name="cloudflare", lint_fn=cloudflare_lint, rule_ids=CF_RULE_IDS))
     register_rules(CF_RULE_METAS)
-    for key in ("custom_rulesets", "lists", "page_shield_policies"):
-        register_non_phase_key(key)
 
     # Register Cloudflare-specific API fields to strip
     register_api_fields("rule", {"id", "version", "last_updated", "categories", "logging"})

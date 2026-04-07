@@ -254,9 +254,10 @@ class TestCloudflareProvider:
         mock_cf_cls.assert_called_once_with(api_token="token", max_retries=2, timeout=30.0)
 
     @patch("octorules_cloudflare.provider.cloudflare.Cloudflare")
-    def test_timeout_none_not_passed(self, mock_cf_cls):
+    def test_timeout_none_uses_default(self, mock_cf_cls):
+        """timeout=None means 'use 30s default', not 'omit timeout'."""
         CloudflareProvider(token="token", timeout=None)
-        mock_cf_cls.assert_called_once_with(api_token="token", max_retries=2)
+        mock_cf_cls.assert_called_once_with(api_token="token", max_retries=2, timeout=30.0)
 
     def test_get_phase_rules_logs_debug(self, mock_cf_client, caplog):
         from cloudflare import NotFoundError

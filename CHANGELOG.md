@@ -2,20 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.7.1] - 2026-04-06
+## [0.7.2] - 2026-04-07
 
 ### Added
 - CF220 lint rule — validates `sensitivity_level` values in execute overrides
 - CF221 lint rule — validates `content_type` values in serve_error responses
 - CF222 lint rule — validates `ruleset` value in skip actions must be `"current"`
+- `crawler_protection` enum validation and `auto_update_model` boolean
+  type-check in bot management extension
+
+### Changed
+- `timeout` parameter default harmonised: signature now uses `None` (was
+  `30.0`), body applies `30.0` when `None`. Matches all other providers.
+
+## [0.7.1] - 2026-04-06
+
+### Added
 - `raw_response_fields` and `transformed_request_fields` added to valid `log_custom_field` action parameters
 - `score`, `ddos_dynamic`, `force_connection_close` action types with phase mappings
 - `bypass_by_default` browser TTL mode (replaces incorrect `bypass`)
 - `webp` polish value, `default` compression algorithm
 - `additional_cacheable_ports` and `read_timeout` cache settings keys
-- `crawler_protection` and `auto_update_model` in bot management extension
 - `remove_query_args` in transform function suppression
 
 ### Fixed

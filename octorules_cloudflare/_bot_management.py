@@ -50,6 +50,7 @@ class BotManagementPlan:
 # Valid enum values
 # ---------------------------------------------------------------------------
 _VALID_AI_BOTS_PROTECTION = frozenset({"block", "disabled"})
+_VALID_CRAWLER_PROTECTION = frozenset({"enabled", "disabled"})
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +199,15 @@ def _validate_bot_management(desired, zone_name, errors, lines):
             f" (must be one of {sorted(_VALID_AI_BOTS_PROTECTION)})"
         )
 
-    for key in ("fight_mode", "enable_js", "suppress_session_score"):
+    crawler = settings.get("crawler_protection")
+    if crawler is not None and crawler not in _VALID_CRAWLER_PROTECTION:
+        errors.append(
+            f"  {zone_name}/cloudflare_bot_management: invalid"
+            f" crawler_protection {crawler!r}"
+            f" (must be one of {sorted(_VALID_CRAWLER_PROTECTION)})"
+        )
+
+    for key in ("fight_mode", "enable_js", "suppress_session_score", "auto_update_model"):
         val = settings.get(key)
         if val is not None and not isinstance(val, bool):
             errors.append(

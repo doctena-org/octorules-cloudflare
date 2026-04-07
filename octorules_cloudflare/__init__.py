@@ -87,6 +87,10 @@ CF_PHASE_NAMES: frozenset[str] = frozenset(p.friendly_name for p in _CF_PHASES)
 # Register phases first (lint plugin and other registrations may depend on them).
 register_phases(_CF_PHASES)
 
+# Register non-phase keys (config sections that aren't phase-based rulesets).
+for _key in ("custom_rulesets", "lists", "page_shield_policies"):
+    register_non_phase_key(_key)
+
 # Auto-register CF-specific lint rules and the lint plugin.
 register_cloudflare_linter()
 
