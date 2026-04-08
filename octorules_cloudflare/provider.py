@@ -100,7 +100,10 @@ class CloudflareProvider:
         **_extra: object,
     ) -> None:
         if not token and client is None:
-            raise ConfigError("Cloudflare provider requires a 'token'")
+            raise ConfigError(
+                "Cloudflare provider requires a 'token'"
+                " (set 'token' in provider config or CLOUDFLARE_API_TOKEN env var)"
+            )
         if client is not None:
             self._client = client
         else:

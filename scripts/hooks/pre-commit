@@ -6,8 +6,8 @@
 set -euo pipefail
 
 .venv/bin/pip install -e ".[dev,wirefilter]" -q
-.venv/bin/ruff check
-.venv/bin/ruff format --check
+.venv/bin/ruff check octorules_cloudflare/ tests/
+.venv/bin/ruff format --check octorules_cloudflare/ tests/
 
 # Regenerate schemas.json when overlay.toml or pyproject.toml changes
 if git diff --cached --name-only | grep -qE '(overlay\.toml|pyproject\.toml)'; then
