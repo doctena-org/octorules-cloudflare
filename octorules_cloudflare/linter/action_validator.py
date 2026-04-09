@@ -64,6 +64,7 @@ RULE_IDS = frozenset(
         "CF405",
         "CF406",
         "CF407",
+        "CF408",
         "CF410",
         "CF411",
         "CF412",
@@ -311,6 +312,18 @@ def _lint_ttl(
 ) -> None:
     """Validate a TTL dict (shared for edge_ttl and browser_ttl)."""
     mode = ttl.get("mode")
+    if mode is not None and not isinstance(mode, str):
+        ctx.add(
+            LintResult(
+                rule_id="CF410",
+                severity=Severity.ERROR,
+                message=(f"{ttl_name} mode must be a string, got {type(mode).__name__}"),
+                phase=phase_name,
+                ref=ref,
+                field=f"action_parameters.{ttl_name}.mode",
+            )
+        )
+        return
     if isinstance(mode, str) and mode not in valid_modes:
         ctx.add(
             LintResult(
@@ -627,6 +640,21 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                     phase=phase_name,
                     ref=ref,
                     field="action_parameters.requests_per_period",
+                )
+            )
+
+    # CF408: score_per_period range (1-10,000,000)
+    spp = params.get("score_per_period")
+    if isinstance(spp, int) and not isinstance(spp, bool):
+        if spp < 1 or spp > 10_000_000:
+            ctx.add(
+                LintResult(
+                    rule_id="CF408",
+                    severity=Severity.ERROR,
+                    message=(f"score_per_period ({spp}) is outside the valid range (1-10,000,000)"),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action_parameters.score_per_period",
                 )
             )
 

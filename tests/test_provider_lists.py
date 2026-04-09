@@ -485,7 +485,7 @@ class TestListMethods:
         )
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        with pytest.raises(ProviderError, match="Bulk operation op-123 timed out after 0.01s"):
+        with pytest.raises(ProviderError, match="Bulk operation op-123 timed out"):
             provider.poll_bulk_operation(scope, "op-123", timeout=0.01)
 
     @patch("octorules_cloudflare.provider.time.sleep")

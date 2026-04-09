@@ -86,6 +86,7 @@ CF406 = RuleMeta(
     "CF406", "rate_limit", "Too many rate limit characteristics for plan tier", Severity.ERROR
 )
 CF407 = RuleMeta("CF407", "rate_limit", "requests_per_period outside valid range", Severity.ERROR)
+CF408 = RuleMeta("CF408", "rate_limit", "score_per_period outside valid range", Severity.ERROR)
 
 # Category I — Cache Rule Specific
 CF410 = RuleMeta("CF410", "cache", "Invalid TTL mode value", Severity.ERROR)

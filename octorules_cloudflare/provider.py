@@ -57,6 +57,7 @@ _KNOWN_PLANS = {"free", "pro", "business", "enterprise"}
 _LIST_ITEMS_PER_PAGE = 500
 _LIST_PAGE_BACKOFF = (1.0, 2.0, 3.0, 5.0)
 _BULK_POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
+_BULK_POLL_MAX_ATTEMPTS = 30
 
 
 def _normalize_plan_name(raw: str) -> str:
@@ -521,7 +522,8 @@ class CloudflareProvider:
 
         Uses graduated backoff with jitter: 1s -> 2s -> 3s -> 5s (capped),
         plus up to 0.5s random jitter per interval.
-        Returns "completed". Raises APIError on "failed", ProviderError on timeout.
+        Returns "completed". Raises APIError on "failed", ProviderError on
+        timeout or after ``_BULK_POLL_MAX_ATTEMPTS`` polls.
         """
         sl = _fmt_scope(scope)
         log.debug("POLL bulk_operations/%s %s", operation_id, sl)
@@ -554,9 +556,10 @@ class CloudflareProvider:
                 poll_count,
                 sl,
             )
-            if elapsed >= timeout:
+            if elapsed >= timeout or poll_count >= _BULK_POLL_MAX_ATTEMPTS:
+                reason = f"after {timeout}s" if elapsed >= timeout else f"after {poll_count} polls"
                 raise ProviderError(
-                    f"Bulk operation {operation_id} timed out after {timeout}s (status={status})"
+                    f"Bulk operation {operation_id} timed out {reason} (status={status})"
                 )
             interval = _BULK_POLL_BACKOFF[min(poll_count, len(_BULK_POLL_BACKOFF) - 1)]
             interval += random.uniform(0, 0.5)

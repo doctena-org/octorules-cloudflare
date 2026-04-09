@@ -107,6 +107,37 @@ class TestRegexOperatorExtraction:
         info = _parse_with_regex("cf.waf.score bitwise_and 0x01 eq 0x01")
         assert "bitwise_and" in info.operators_used
 
+    def test_no_false_positive_eq_in_request(self):
+        """'eq' must not be detected from substring 'request'."""
+        info = _parse_with_regex('http.request.uri contains "/test"')
+        assert "eq" not in info.operators_used
+
+    def test_no_false_positive_ne_in_none(self):
+        """'ne' must not be detected from substring 'none'."""
+        info = _parse_with_regex('http.host eq "none.example.com"')
+        assert "ne" not in info.operators_used
+
+    def test_no_false_positive_le_in_file(self):
+        """'le' must not be detected from substring 'file'."""
+        info = _parse_with_regex('http.request.uri.path matches "^/file/.*"')
+        assert "le" not in info.operators_used
+
+    def test_no_false_positive_in_from_contains(self):
+        """'in' must not be detected from substring 'contains'."""
+        info = _parse_with_regex('http.request.uri contains "/test"')
+        assert "in" not in info.operators_used
+        assert "contains" in info.operators_used
+
+    def test_symbolic_operators_still_detected(self):
+        """Symbolic operators (==, !=, ~) should still work via substring match."""
+        info = _parse_with_regex('http.host == "example.com"')
+        assert "==" in info.operators_used
+
+    def test_real_eq_operator_detected(self):
+        """Real 'eq' operator should still be detected."""
+        info = _parse_with_regex('http.host eq "example.com"')
+        assert "eq" in info.operators_used
+
 
 class TestRawStringExtraction:
     """Test raw string (r"...", r#"..."#) handling in regex fallback."""

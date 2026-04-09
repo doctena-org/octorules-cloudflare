@@ -277,7 +277,13 @@ def _parse_with_regex(expr: str) -> ExpressionInfo:
         elif op in ("and", "or", "not", "xor") or op in _OPERATOR_FUNCTIONS:
             if re.search(rf"\b{op}\b", expr):
                 operators_used.append(op)
+        elif op.isalpha():
+            # Word operators (eq, ne, lt, etc.) need word-boundary matching
+            # to avoid false positives from substrings (e.g. "eq" in "request").
+            if re.search(rf"\b{op}\b", expr):
+                operators_used.append(op)
         elif op in expr:
+            # Symbolic operators (==, !=, ~) are safe with substring matching.
             operators_used.append(op)
 
     # Extract regex literals (regular and raw string formats)

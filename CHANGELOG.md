@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.5] - 2026-04-09
+
+### Added
+- CF408 lint rule — validates `score_per_period` range (1–10,000,000),
+  matching the existing CF407 check for `requests_per_period`.
+- Bulk operation polling now enforces a maximum of 30 poll attempts
+  in addition to the existing timeout, preventing indefinite retries on
+  persistently malformed API responses.
+- Pre-commit hook now runs `yamllint` on workflow files.
+
+### Fixed
+- Regex fallback operator detection no longer produces false positives
+  when short operator names (`eq`, `ne`, `le`, etc.) appear as substrings
+  of field names or string literals (e.g. `"eq"` inside `"request"`).
+  Now uses word-boundary matching for all alphabetic operators.
+- CF410 now rejects non-string `mode` values in TTL parameters
+  (`edge_ttl`, `browser_ttl`).  Previously, `mode: 123` or `mode: true`
+  silently passed validation.
+
 ## [0.7.4] - 2026-04-08
 
 ### Changed

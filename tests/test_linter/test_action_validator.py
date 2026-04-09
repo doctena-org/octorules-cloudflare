@@ -1839,6 +1839,113 @@ class TestCF407RequestsPerPeriodRange:
         assert "CF407" not in _ids(ctx)
 
 
+class TestCF408ScorePerPeriod:
+    def test_cf408_negative_score(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "score_per_period": -1,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF408" in _ids(ctx)
+
+    def test_cf408_zero_score(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "score_per_period": 0,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF408" in _ids(ctx)
+
+    def test_cf408_too_high(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "score_per_period": 20_000_000,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF408" in _ids(ctx)
+
+    def test_cf408_in_range(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "action_parameters": {
+                    "period": 60,
+                    "score_per_period": 100,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF408" not in _ids(ctx)
+
+
+class TestCF410TTLModeType:
+    def test_cf410_integer_mode(self):
+        """Non-string mode (integer) should be rejected."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {"edge_ttl": {"mode": 123}},
+            },
+            "cache_rules",
+        )
+        assert "CF410" in _ids(ctx)
+
+    def test_cf410_bool_mode(self):
+        """Non-string mode (bool) should be rejected."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {"edge_ttl": {"mode": True}},
+            },
+            "cache_rules",
+        )
+        assert "CF410" in _ids(ctx)
+
+    def test_cf410_null_mode_no_error(self):
+        """Null/missing mode should not trigger CF410 (mode is optional)."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {"edge_ttl": {"default": 300}},
+            },
+            "cache_rules",
+        )
+        assert "CF410" not in _ids(ctx)
+
+
 class TestCF414CacheTTLUpperBound:
     def test_cf414_over_limit(self):
         ctx = _lint_rule(
