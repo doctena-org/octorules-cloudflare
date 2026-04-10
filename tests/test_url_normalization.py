@@ -362,35 +362,6 @@ class TestDumpExtension:
 
 
 # ---------------------------------------------------------------------------
-# Format extension -- format_plan and count_changes
-# ---------------------------------------------------------------------------
-class TestFormatPlanAndCount:
-    def test_format_plan(self):
-        fmt = UrlNormalizationFormatter()
-        plan = UrlNormalizationPlan(changes=[UrlNormalizationChange("scope", "incoming", "both")])
-        lines = fmt.format_plan([plan], "my-zone")
-        assert len(lines) == 1
-        assert "my-zone" in lines[0]
-        assert "incoming" in lines[0]
-        assert "both" in lines[0]
-
-    def test_count_changes(self):
-        fmt = UrlNormalizationFormatter()
-        plan = UrlNormalizationPlan(
-            changes=[
-                UrlNormalizationChange("scope", "incoming", "both"),
-                UrlNormalizationChange("type", "cloudflare", "cloudflare"),  # no change
-            ]
-        )
-        assert fmt.count_changes([plan]) == 1
-
-    def test_empty(self):
-        fmt = UrlNormalizationFormatter()
-        assert fmt.format_plan([], "z") == []
-        assert fmt.count_changes([]) == 0
-
-
-# ---------------------------------------------------------------------------
 # Format extension -- format_text
 # ---------------------------------------------------------------------------
 class TestFormatText:

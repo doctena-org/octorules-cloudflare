@@ -235,6 +235,34 @@ class TestCreateCustomRuleset:
             kind="custom",
             phase="http_request_firewall_custom",
             rules=[],
+            description="",
+        )
+
+    def test_create_with_description(self, mock_cf_client):
+        """create_custom_ruleset passes description to the SDK."""
+        mock_result = MagicMock()
+        mock_result.id = "new-rs-id"
+        mock_result.name = "Described Ruleset"
+        mock_cf_client.rulesets.create.return_value = mock_result
+
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(account_id="acct-123")
+        result = provider.create_custom_ruleset(
+            scope,
+            name="Described Ruleset",
+            phase="http_request_firewall_custom",
+            capacity=100,
+            description="Block known attackers",
+        )
+
+        assert result == {"id": "new-rs-id", "name": "Described Ruleset"}
+        mock_cf_client.rulesets.create.assert_called_once_with(
+            account_id="acct-123",
+            name="Described Ruleset",
+            kind="custom",
+            phase="http_request_firewall_custom",
+            rules=[],
+            description="Block known attackers",
         )
 
     def test_create_zone_scope(self, mock_cf_client):
@@ -257,6 +285,7 @@ class TestCreateCustomRuleset:
             kind="custom",
             phase="http_request_firewall_custom",
             rules=[],
+            description="",
         )
 
     def test_create_auth_error(self, mock_cf_client):

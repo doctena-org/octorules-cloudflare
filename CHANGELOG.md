@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.6] - 2026-04-10
+
+### Fixed
+- `create_custom_ruleset` now passes the `description` parameter to the Cloudflare API (was silently dropped).
+- `_cf_prepare_rule` raises a clear `ValueError` with rule ref and phase context when a rule is missing the required `expression` field (was a bare `KeyError`).
+
+### Changed
+- Linter rule registration is now thread-safe (`threading.Lock`).
+
+### Removed
+- Unused `format_plan` and `count_changes` methods from `BotManagementFormatter` and `UrlNormalizationFormatter`.
+
 ## [0.7.5] - 2026-04-09
 
 ### Added

@@ -21,6 +21,11 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
     Returns a new dict — the original *rule* is never mutated.
     """
     rule = rule.copy()
+    if "expression" not in rule:
+        raise ValueError(
+            f"Rule {rule.get('ref', '?')!r} in phase {phase.friendly_name!r}"
+            f" is missing required 'expression' field"
+        )
     rule["expression"] = normalize_expression(rule["expression"])
     ap = rule.get("action_parameters")
     if isinstance(ap, dict) and isinstance(ap.get("counting_expression"), str):

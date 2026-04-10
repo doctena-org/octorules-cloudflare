@@ -466,36 +466,6 @@ class TestDumpExtension:
 
 
 # ---------------------------------------------------------------------------
-# Format extension -- format_plan and count_changes
-# ---------------------------------------------------------------------------
-class TestFormatPlanAndCount:
-    def test_format_plan(self):
-        fmt = BotManagementFormatter()
-        plan = BotManagementPlan(changes=[BotManagementChange("fight_mode", False, True)])
-        lines = fmt.format_plan([plan], "my-zone")
-        assert len(lines) == 1
-        assert "my-zone" in lines[0]
-        assert "False" in lines[0]
-        assert "True" in lines[0]
-
-    def test_count_changes(self):
-        fmt = BotManagementFormatter()
-        plan = BotManagementPlan(
-            changes=[
-                BotManagementChange("fight_mode", False, True),
-                BotManagementChange("enable_js", True, True),  # no change
-                BotManagementChange("ai_bots_protection", "disabled", "block"),
-            ]
-        )
-        assert fmt.count_changes([plan]) == 2
-
-    def test_empty(self):
-        fmt = BotManagementFormatter()
-        assert fmt.format_plan([], "z") == []
-        assert fmt.count_changes([]) == 0
-
-
-# ---------------------------------------------------------------------------
 # Format extension -- format_text
 # ---------------------------------------------------------------------------
 class TestFormatText:

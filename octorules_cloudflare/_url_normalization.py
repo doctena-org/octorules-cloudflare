@@ -207,27 +207,6 @@ def _dump_url_normalization(scope, provider, out_dir):
 class UrlNormalizationFormatter:
     """Formats URL normalization diffs for plan output."""
 
-    def format_plan(self, plans: list, zone_name: str) -> list[str]:
-        lines: list[str] = []
-        for plan in plans:
-            if not isinstance(plan, UrlNormalizationPlan) or not plan.has_changes:
-                continue
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                lines.append(
-                    f"  {zone_name}/url_normalization.{change.field}:"
-                    f" {change.current!r} -> {change.desired!r}"
-                )
-        return lines
-
-    def count_changes(self, plans: list) -> int:
-        count = 0
-        for plan in plans:
-            if isinstance(plan, UrlNormalizationPlan):
-                count += sum(1 for c in plan.changes if c.has_changes)
-        return count
-
     def format_text(self, plans: list, use_color: bool) -> list[str]:
         from octorules._color import Pen
 

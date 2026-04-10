@@ -343,7 +343,12 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("CREATE ruleset %s %s phase=%s", name, sl, phase)
         result = self._client.rulesets.create(
-            **scope.api_kwargs, name=name, kind="custom", phase=phase, rules=[]
+            **scope.api_kwargs,
+            name=name,
+            kind="custom",
+            phase=phase,
+            rules=[],
+            description=description,
         )
         return {"id": result.id, "name": result.name}
 

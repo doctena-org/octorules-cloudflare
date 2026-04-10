@@ -329,6 +329,22 @@ class TestCfPrepareRuleNoMutation:
         assert result["enabled"] is True
         assert result["action"] == "redirect"
 
+    def test_prepare_rule_missing_expression(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("redirect_rules")
+        rule = {"ref": "no-expr"}
+        with pytest.raises(ValueError, match="missing required 'expression' field"):
+            _cf_prepare_rule(rule, phase)
+
+    def test_prepare_rule_missing_expression_includes_ref_and_phase(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("waf_custom_rules")
+        rule = {"ref": "my-rule-id"}
+        with pytest.raises(ValueError, match=r"'my-rule-id'.*'waf_custom_rules'"):
+            _cf_prepare_rule(rule, phase)
+
     def test_prepare_rule_does_not_mutate_action_parameters(self):
         from octorules_cloudflare import _cf_prepare_rule
 
