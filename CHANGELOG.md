@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.8] - 2026-04-13
+
+### Fixed
+- CF478 (IP overlap detection in lists): Replace O(n²) brute-force with
+  sweep-line algorithm (O(n log n)). Fixes severe performance regression on
+  large IP lists (e.g. 10,000-item Ahrefs list caused 26s+ lint time;
+  now < 1s).
+
 ## [0.7.7] - 2026-04-13
 
 ### Added

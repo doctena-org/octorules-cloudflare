@@ -308,30 +308,46 @@ def _lint_ip_overlaps(
     name_label: str,
     ctx: LintContext,
 ) -> None:
-    """CF478: Detect overlapping IP/CIDR entries in an IP list."""
-    reported: set[tuple[str, str]] = set()
-    for i, (val_a, net_a) in enumerate(networks):
-        for j, (val_b, net_b) in enumerate(networks):
-            if j <= i:
-                continue
-            if net_a.version != net_b.version:
-                continue
-            # Skip exact duplicates — handled by CF475.
-            if val_a == val_b:
-                continue
-            if net_a.overlaps(net_b):
-                key = (val_a, val_b)
-                if key not in reported:
-                    reported.add(key)
+    """CF478: Detect overlapping IP/CIDR entries in an IP list.
+
+    Uses a sweep-line algorithm (O(n log n)) instead of brute-force
+    pairwise comparison (O(n²)) to handle large lists efficiently.
+    """
+
+    def _sweep(
+        items: list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]],
+    ) -> None:
+        # Sort by network address ascending, then prefix length ascending
+        # (broadest first when addresses are equal).
+        sorted_items = sorted(items, key=lambda x: (int(x[1].network_address), x[1].prefixlen))
+        # Stack of active (broader) networks.  Each new entry is checked
+        # against the stack; if it falls within an active network, overlap.
+        active: list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]] = []
+        for val, net in sorted_items:
+            # Pop networks whose range we've passed.
+            while active and int(active[-1][1].broadcast_address) < int(net.network_address):
+                active.pop()
+            # Check against current stack top for containment.
+            if active:
+                parent_val, _parent_net = active[-1]
+                # Skip exact duplicates (CF475 handles those).
+                if val != parent_val:
                     ctx.add(
                         LintResult(
                             rule_id="CF478",
                             severity=Severity.WARNING,
                             message=(
                                 f"Overlapping IPs in list {name_label!r}:"
-                                f" {val_a!r} overlaps with {val_b!r}"
+                                f" {val!r} overlaps with {parent_val!r}"
                             ),
                             phase="lists",
                             ref=name_label,
                         )
                     )
+            active.append((val, net))
+
+    # Split by address family and sweep each independently.
+    v4 = [(v, n) for v, n in networks if n.version == 4]
+    v6 = [(v, n) for v, n in networks if n.version == 6]
+    _sweep(v4)
+    _sweep(v6)
