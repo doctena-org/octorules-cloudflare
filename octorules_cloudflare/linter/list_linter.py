@@ -9,7 +9,9 @@ from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity
 
-RULE_IDS = frozenset({"CF470", "CF471", "CF472", "CF473", "CF474", "CF475", "CF476"})
+RULE_IDS = frozenset(
+    {"CF470", "CF471", "CF472", "CF473", "CF474", "CF475", "CF476", "CF477", "CF478"}
+)
 
 _VALID_KINDS = frozenset({"ip", "asn", "hostname", "redirect"})
 
@@ -112,9 +114,10 @@ def lint_lists(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
 
 def _lint_list_items(items: list[Any], kind: str, name_label: str, ctx: LintContext) -> None:
-    """Validate individual list items (CF472-CF475)."""
+    """Validate individual list items (CF472-CF478)."""
     required_field = _ITEM_FIELD_BY_KIND.get(kind, "")
     seen_values: set[str] = set()
+    valid_networks: list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]] = []
 
     for i, item in enumerate(items):
         if not isinstance(item, dict):
@@ -139,7 +142,7 @@ def _lint_list_items(items: list[Any], kind: str, name_label: str, ctx: LintCont
 
         # Kind-specific validation
         if kind == "ip":
-            _lint_ip_item(item_val, i, name_label, seen_values, ctx)
+            _lint_ip_item(item_val, i, name_label, seen_values, ctx, valid_networks)
         elif kind == "asn":
             _lint_asn_item(item_val, i, name_label, seen_values, ctx)
         elif kind == "hostname":
@@ -147,24 +150,56 @@ def _lint_list_items(items: list[Any], kind: str, name_label: str, ctx: LintCont
         elif kind == "redirect":
             _lint_redirect_item(item_val, i, name_label, seen_values, ctx)
 
+    # CF478: Cross-item overlap check for IP lists.
+    if kind == "ip" and len(valid_networks) > 1:
+        _lint_ip_overlaps(valid_networks, name_label, ctx)
 
-def _lint_ip_item(val: Any, index: int, name_label: str, seen: set[str], ctx: LintContext) -> None:
-    """CF473: Invalid IP, CF475: Duplicate."""
+
+def _lint_ip_item(
+    val: Any,
+    index: int,
+    name_label: str,
+    seen: set[str],
+    ctx: LintContext,
+    valid_networks: list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]],
+) -> None:
+    """CF473: Invalid IP, CF475: Duplicate, CF477: Host bits set."""
     if not isinstance(val, str):
         return
+
+    # CF477: Check for host bits set by trying strict=True first.
     try:
-        ipaddress.ip_network(val, strict=False)
+        net = ipaddress.ip_network(val, strict=True)
     except ValueError:
+        # Could be host bits set (parseable with strict=False) or truly invalid.
+        try:
+            net = ipaddress.ip_network(val, strict=False)
+        except ValueError:
+            ctx.add(
+                LintResult(
+                    rule_id="CF473",
+                    severity=Severity.ERROR,
+                    message=f"Invalid IP address {val!r} at index {index} in list {name_label!r}",
+                    phase="lists",
+                    ref=name_label,
+                )
+            )
+            return
+        # Parseable but host bits were set.
         ctx.add(
             LintResult(
-                rule_id="CF473",
-                severity=Severity.ERROR,
-                message=f"Invalid IP address {val!r} at index {index} in list {name_label!r}",
+                rule_id="CF477",
+                severity=Severity.WARNING,
+                message=(
+                    f"IP {val!r} at index {index} in list {name_label!r}"
+                    f" has host bits set (did you mean {str(net)!r}?)"
+                ),
                 phase="lists",
                 ref=name_label,
             )
         )
-        return
+
+    valid_networks.append((val, net))
 
     if val in seen:
         ctx.add(
@@ -266,3 +301,37 @@ def _lint_redirect_item(
             )
         )
     seen.add(source)
+
+
+def _lint_ip_overlaps(
+    networks: list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]],
+    name_label: str,
+    ctx: LintContext,
+) -> None:
+    """CF478: Detect overlapping IP/CIDR entries in an IP list."""
+    reported: set[tuple[str, str]] = set()
+    for i, (val_a, net_a) in enumerate(networks):
+        for j, (val_b, net_b) in enumerate(networks):
+            if j <= i:
+                continue
+            if net_a.version != net_b.version:
+                continue
+            # Skip exact duplicates — handled by CF475.
+            if val_a == val_b:
+                continue
+            if net_a.overlaps(net_b):
+                key = (val_a, val_b)
+                if key not in reported:
+                    reported.add(key)
+                    ctx.add(
+                        LintResult(
+                            rule_id="CF478",
+                            severity=Severity.WARNING,
+                            message=(
+                                f"Overlapping IPs in list {name_label!r}:"
+                                f" {val_a!r} overlaps with {val_b!r}"
+                            ),
+                            phase="lists",
+                            ref=name_label,
+                        )
+                    )

@@ -2,7 +2,7 @@
 
 Validates the `lists` section for structural correctness and item validity. Checks list metadata (name, kind) and validates individual items based on the list kind (IP, ASN, hostname, redirect).
 
-## Category Q — List Validation (6 rules)
+## Category Q — List Validation (9 rules)
 
 ### CF470 — Missing or duplicate list name
 
@@ -129,3 +129,40 @@ Fix: Remove the duplicate entry.
 A list has more than 10,000 items. Cloudflare limits the number of items per list.
 
 **Fix:** Split the list into multiple lists, or remove unused entries.
+
+### CF477 — IP address has host bits set
+
+| Severity | Category |
+|----------|----------|
+| WARNING | list |
+
+Triggers when an IP list item has host bits set. For example, `10.0.0.1/24` should be `10.0.0.0/24`.
+
+```yaml
+lists:
+  - name: blocked
+    kind: ip
+    items:
+      - ip: "10.0.0.1/24"       # host bits set — did you mean 10.0.0.0/24?
+```
+
+Fix: Use the network address with host bits zeroed.
+
+### CF478 — Overlapping IP/CIDR entries in list
+
+| Severity | Category |
+|----------|----------|
+| WARNING | list |
+
+Triggers when an IP list contains overlapping CIDR ranges where one is a subnet of the other.
+
+```yaml
+lists:
+  - name: blocked
+    kind: ip
+    items:
+      - ip: "10.0.0.0/8"
+      - ip: "10.1.0.0/16"       # redundant — already covered by 10.0.0.0/8
+```
+
+Fix: Remove the narrower entry (it's already covered by the broader one) or consolidate into a single range.

@@ -210,6 +210,171 @@ class TestCF476ListItemCount:
         assert "CF476" not in _ids(ctx)
 
 
+class TestCF477HostBitsSet:
+    """CF477: CIDR with host bits set in IP list."""
+
+    def test_cf477_host_bits_set(self):
+        """10.0.0.1/24 has host bits set — should trigger CF477."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "10.0.0.1/24"}],
+                    }
+                ]
+            }
+        )
+        assert "CF477" in _ids(ctx)
+        cf477 = [r for r in ctx.results if r.rule_id == "CF477"]
+        assert "host bits" in cf477[0].message
+        assert "10.0.0.0/24" in cf477[0].message  # suggestion
+
+    def test_cf477_no_host_bits(self):
+        """10.0.0.0/24 has no host bits — should NOT trigger CF477."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "10.0.0.0/24"}],
+                    }
+                ]
+            }
+        )
+        assert "CF477" not in _ids(ctx)
+
+    def test_cf477_single_host(self):
+        """/32 single host should never trigger CF477."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "10.0.0.1/32"}],
+                    }
+                ]
+            }
+        )
+        assert "CF477" not in _ids(ctx)
+
+    def test_cf477_ipv6_host_bits(self):
+        """IPv6 with host bits set should trigger CF477."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "2001:db8::1/32"}],
+                    }
+                ]
+            }
+        )
+        assert "CF477" in _ids(ctx)
+
+
+class TestCF478IPOverlap:
+    """CF478: Overlapping IPs/CIDRs in an IP list."""
+
+    def test_cf478_overlap_detected(self):
+        """10.0.0.0/24 is a subnet of 10.0.0.0/16 — should trigger CF478."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "10.0.0.0/24"}, {"ip": "10.0.0.0/16"}],
+                    }
+                ]
+            }
+        )
+        assert "CF478" in _ids(ctx)
+
+    def test_cf478_no_overlap(self):
+        """10.0.0.0/24 and 10.0.1.0/24 don't overlap — should NOT trigger CF478."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "10.0.0.0/24"}, {"ip": "10.0.1.0/24"}],
+                    }
+                ]
+            }
+        )
+        assert "CF478" not in _ids(ctx)
+
+    def test_cf478_exact_duplicate_not_cf478(self):
+        """Exact duplicates are CF475, not CF478."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "10.0.0.0/24"}, {"ip": "10.0.0.0/24"}],
+                    }
+                ]
+            }
+        )
+        assert "CF475" in _ids(ctx)
+        assert "CF478" not in _ids(ctx)
+
+    def test_cf478_host_in_network(self):
+        """A /32 host inside a broader network should trigger CF478."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "1.2.3.4"}, {"ip": "1.2.3.0/24"}],
+                    }
+                ]
+            }
+        )
+        assert "CF478" in _ids(ctx)
+
+    def test_cf478_ipv6_overlap(self):
+        """IPv6 overlap should also be detected."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [
+                            {"ip": "2001:db8::/32"},
+                            {"ip": "2001:db8:1::/48"},
+                        ],
+                    }
+                ]
+            }
+        )
+        assert "CF478" in _ids(ctx)
+
+    def test_cf478_ipv4_ipv6_no_cross(self):
+        """IPv4 and IPv6 should not be compared for overlap."""
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "myips",
+                        "kind": "ip",
+                        "items": [{"ip": "0.0.0.0/0"}, {"ip": "::/0"}],
+                    }
+                ]
+            }
+        )
+        assert "CF478" not in _ids(ctx)
+
+
 class TestNoListsSection:
     def test_no_lists_no_errors(self):
         ctx = _lint({"waf_custom_rules": []})

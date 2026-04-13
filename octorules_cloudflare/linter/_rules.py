@@ -122,6 +122,12 @@ CF444 = RuleMeta(
 CF445 = RuleMeta(
     "CF445", "transform", "Request header transforms do not support 'add' operation", Severity.ERROR
 )
+CF446 = RuleMeta(
+    "CF446",
+    "transform",
+    "Header 'remove' operation should not include value or expression",
+    Severity.WARNING,
+)
 
 # Category N — Origin Rule Specific
 CF450 = RuleMeta("CF450", "origin", "Port number out of range (1-65535)", Severity.ERROR)
@@ -246,6 +252,8 @@ CF473 = RuleMeta("CF473", "list", "Invalid IP address in list", Severity.ERROR)
 CF474 = RuleMeta("CF474", "list", "Invalid ASN value in list", Severity.ERROR)
 CF475 = RuleMeta("CF475", "list", "Duplicate item in list", Severity.WARNING)
 CF476 = RuleMeta("CF476", "list", "List exceeds maximum item count (10,000)", Severity.WARNING)
+CF477 = RuleMeta("CF477", "list", "IP address has host bits set", Severity.WARNING)
+CF478 = RuleMeta("CF478", "list", "Overlapping IP/CIDR entries in list", Severity.WARNING)
 
 # Collect all rule metas for registration
 CF_RULE_METAS: list[RuleMeta] = [obj for obj in globals().values() if isinstance(obj, RuleMeta)]

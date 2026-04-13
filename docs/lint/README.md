@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **141 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **144 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 ### Suppressing rules
 
@@ -68,7 +68,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 101 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
-| 2d. List validation | List structure, item validity, duplicates, count | CF470–CF476 | 7 | [stage2d-lists.md](stage2d-lists.md) |
+| 2d. List validation | List structure, item validity, duplicates, count | CF470–CF478 | 9 | [stage2d-lists.md](stage2d-lists.md) |
 | 3. Plan-tier limits | Regex availability, rule count limits | CF500–CF502 | 3 | [stage3-plan-tier.md](stage3-plan-tier.md) |
 | 4. Cross-rule analysis | Duplicates, unreachable rules, list references | CF100–CF104 | 5 | [stage4-cross-rule.md](stage4-cross-rule.md) |
 
@@ -88,10 +88,10 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF410–CF414 | Cache rules | 5 |
 | CF420–CF424 | Config rules | 5 |
 | CF430–CF432 | Redirect rules | 3 |
-| CF440–CF445 | Transform rules | 6 |
+| CF440–CF446 | Transform rules | 7 |
 | CF450–CF452 | Origin rules | 3 |
 | CF460–CF463 | Page Shield structure | 4 |
-| CF470–CF476 | List validation | 7 |
+| CF470–CF478 | List validation | 9 |
 | CF500–CF502 | Plan/entitlement | 3 |
 | CF510–CF515 | Best practice / style | 6 |
 | CF520–CF545 | Value constraints | 26 |
@@ -286,6 +286,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF443](stage2-per-rule.md#cf443--header-setadd-missing-value-or-expression) | Header set/add missing value or expression | ERROR |
 | [CF444](stage2-per-rule.md#cf444--expression-parse-error-in-transform-action_parameters) | Expression parse error in transform action_parameters | WARNING |
 | [CF445](stage2-per-rule.md#cf445--request-headers-do-not-support-add-operation) | Request headers do not support add operation | ERROR |
+| [CF446](stage2-per-rule.md#cf446--header-remove-operation-should-not-include-value-or-expression) | Header 'remove' operation should not include value or expression | WARNING |
 | [CF450](stage2-per-rule.md#cf450--port-number-out-of-range) | Port number out of range (1-65535) | ERROR |
 | [CF451](stage2-per-rule.md#cf451--origin-weight-outside-valid-range) | Origin weight outside valid range (0.0-1.0) | ERROR |
 | [CF452](stage2-per-rule.md#cf452--origin-route-missing-required-fields) | Origin route missing required fields | ERROR |
@@ -353,6 +354,8 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF474](stage2d-lists.md#cf474--invalid-asn-value-in-asn-list) | Invalid ASN value in ASN list | ERROR |
 | [CF475](stage2d-lists.md#cf475--duplicate-items-within-list) | Duplicate items within list | WARNING |
 | [CF476](stage2d-lists.md#cf476--list-exceeds-maximum-item-count-10000) | List exceeds maximum item count (10,000) | WARNING |
+| [CF477](stage2d-lists.md#cf477--ip-address-has-host-bits-set) | IP address has host bits set | WARNING |
+| [CF478](stage2d-lists.md#cf478--overlapping-ipcidr-entries-in-list) | Overlapping IP/CIDR entries in list | WARNING |
 | [CF022](stage2b-custom-rulesets.md#cf022--missing-required-field) | Missing required custom ruleset field | ERROR |
 | [CF023](stage2b-custom-rulesets.md#cf023--invalid-id-format) | Invalid custom ruleset id format | WARNING |
 | [CF024](stage2b-custom-rulesets.md#cf024--duplicate-ref-within-custom-ruleset) | Duplicate ref within custom ruleset | ERROR |

@@ -783,6 +783,28 @@ request_header_rules:
 
 Fix: Use `operation: set` instead, or move the rule to `response_header_rules` if you need `add`.
 
+### CF446 — Header 'remove' operation should not include value or expression
+
+| Severity | Category |
+|----------|----------|
+| WARNING | transform |
+
+Triggers when a header transform with `operation: remove` includes a `value` or `expression` field. The Cloudflare API ignores these fields on remove operations — their presence is misleading.
+
+```yaml
+request_header_rules:
+  - ref: cleanup
+    expression: (true)
+    action: rewrite
+    action_parameters:
+      headers:
+        X-Debug:
+          operation: remove
+          value: "ignored"      # CF API ignores this
+```
+
+Fix: Remove the `value` or `expression` field — only specify the header name and `operation: remove`.
+
 ---
 
 ## Category N — Origin Rules (3 rules)

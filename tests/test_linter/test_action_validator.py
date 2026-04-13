@@ -1059,6 +1059,50 @@ class TestL005HeaderMissingValue:
         assert "CF443" not in _ids(ctx)
 
 
+class TestL005HeaderRemoveSpuriousValue:
+    def test_cf446_remove_with_value(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {
+                    "headers": {"x-custom": {"operation": "remove", "value": "x"}},
+                },
+            },
+            "request_header_rules",
+        )
+        assert "CF446" in _ids(ctx)
+
+    def test_cf446_remove_with_expression(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {
+                    "headers": {"x-custom": {"operation": "remove", "expression": "x"}},
+                },
+            },
+            "request_header_rules",
+        )
+        assert "CF446" in _ids(ctx)
+
+    def test_cf446_remove_without_value_ok(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {
+                    "headers": {"x-custom": {"operation": "remove"}},
+                },
+            },
+            "request_header_rules",
+        )
+        assert "CF446" not in _ids(ctx)
+
+
 class TestL006TransformExpressionLinting:
     @_needs_wirefilter
     def test_cf444_invalid_uri_path_expression(self):

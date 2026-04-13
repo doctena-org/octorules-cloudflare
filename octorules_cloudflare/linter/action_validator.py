@@ -84,6 +84,7 @@ RULE_IDS = frozenset(
         "CF443",
         "CF444",
         "CF445",
+        "CF446",
         "CF450",
         "CF451",
         "CF452",
@@ -329,13 +330,11 @@ def _lint_ttl(
             LintResult(
                 rule_id="CF410",
                 severity=Severity.ERROR,
-                message=(
-                    f"Invalid {ttl_name} mode {mode!r}."
-                    f" Must be one of: {', '.join(sorted(valid_modes))}"
-                ),
+                message=f"Invalid {ttl_name} mode {mode!r}",
                 phase=phase_name,
                 ref=ref,
                 field=f"action_parameters.{ttl_name}.mode",
+                suggestion=f"Valid: {sorted(valid_modes)}",
             )
         )
     # CF411: override_origin requires default TTL
@@ -689,6 +688,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                         phase=phase_name,
                         ref=ref,
                         field="action_parameters.characteristics",
+                        suggestion=f"Valid: {sorted(VALID_RATE_LIMIT_CHARACTERISTICS)}",
                     )
                 )
 
@@ -888,13 +888,12 @@ def _lint_transform_params(params: dict, phase_name: str, ref: str, ctx: LintCon
                                 severity=Severity.ERROR,
                                 message=(
                                     f"Invalid header transform operation {op!r}"
-                                    f" for header {header_name!r}."
-                                    " Must be one of:"
-                                    f" {', '.join(sorted(_VALID_HEADER_OPERATIONS))}"
+                                    f" for header {header_name!r}"
                                 ),
                                 phase=phase_name,
                                 ref=ref,
                                 field=f"action_parameters.headers.{header_name}.operation",
+                                suggestion=f"Valid: {sorted(_VALID_HEADER_OPERATIONS)}",
                             )
                         )
                     # CF445: request headers don't support 'add' operation
@@ -914,6 +913,23 @@ def _lint_transform_params(params: dict, phase_name: str, ref: str, ctx: LintCon
                                 field=f"action_parameters.headers.{header_name}.operation",
                             )
                         )
+                    # CF446: remove should not have value or expression
+                    elif isinstance(op, str) and op == "remove":
+                        if "value" in header_val or "expression" in header_val:
+                            ctx.add(
+                                LintResult(
+                                    rule_id="CF446",
+                                    severity=Severity.WARNING,
+                                    message=(
+                                        f"Header {header_name!r} operation 'remove'"
+                                        f" ignores 'value'/'expression' (remove only"
+                                        f" needs the header name)"
+                                    ),
+                                    phase=phase_name,
+                                    ref=ref,
+                                    field=f"action_parameters.headers.{header_name}",
+                                )
+                            )
                     # CF443: set/add missing value or expression
                     elif isinstance(op, str) and op in ("set", "add"):
                         if "value" not in header_val and "expression" not in header_val:
@@ -1164,6 +1180,7 @@ def _lint_skip_params(params: dict, phase_name: str, ref: str, ctx: LintContext)
                         phase=phase_name,
                         ref=ref,
                         field="action_parameters.phases",
+                        suggestion=f"Valid: {sorted(VALID_SKIP_PHASES)}",
                     )
                 )
 
@@ -1196,6 +1213,7 @@ def _lint_skip_params(params: dict, phase_name: str, ref: str, ctx: LintContext)
                         phase=phase_name,
                         ref=ref,
                         field="action_parameters.products",
+                        suggestion=f"Valid: {sorted(VALID_SKIP_PRODUCTS)}",
                     )
                 )
 
