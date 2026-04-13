@@ -36,7 +36,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (21 rules)
+## Category C — Action Validation (23 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -180,7 +180,7 @@ Fix: Reduce the content size to under 10KB. Consider linking to external assets 
 
 | Severity | Category |
 |----------|----------|
-| ERROR | action |
+| WARNING | action |
 
 Triggers when a `skip` action's `phases` list contains an unrecognized Cloudflare phase identifier.
 
@@ -200,7 +200,7 @@ Fix: Use valid Cloudflare phase identifiers (e.g. `http_request_firewall_custom`
 
 | Severity | Category |
 |----------|----------|
-| ERROR | action |
+| WARNING | action |
 
 Triggers when a `skip` action's `products` list contains an unrecognized product name.
 
@@ -240,7 +240,7 @@ Fix: Use valid algorithms: `gzip`, `brotli`, `zstd`, `none`, `auto`.
 
 | Severity | Category |
 |----------|----------|
-| ERROR | action |
+| WARNING | action |
 
 Triggers when a rate limiting rule's `characteristics` list contains an unrecognized value.
 
@@ -415,7 +415,7 @@ waf_custom_rules:
 
 ---
 
-## Category D — Rate Limiting (8 rules)
+## Category D — Rate Limiting (9 rules)
 
 ### CF400 — Invalid rate limiting period
 
@@ -498,6 +498,14 @@ The number of `characteristics` exceeds the plan tier limit (Free/Pro: 1, Busine
 **Severity:** ERROR
 
 `requests_per_period` must be between 1 and 10,000,000.
+
+**Fix:** Set a value within the valid range.
+
+### CF408 — score_per_period outside valid range
+
+**Severity:** ERROR
+
+`score_per_period` must be between 1 and 10,000,000.
 
 **Fix:** Set a value within the valid range.
 
@@ -624,7 +632,7 @@ Fix: Confirm this is intentional. If not, use `flexible`, `full`, `strict`, or `
 
 ---
 
-## Category K — Redirect Rules (2 rules)
+## Category K — Redirect Rules (3 rules)
 
 ### CF430 — Invalid redirect status code
 
@@ -807,7 +815,7 @@ An origin route action is missing required fields. Either `origin.host` must be 
 
 ---
 
-## Category E — Function Constraints (6 rules)
+## Category E — Function Constraints (7 rules)
 
 ### CF300 — Unknown function in expression
 

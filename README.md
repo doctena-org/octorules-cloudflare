@@ -262,7 +262,7 @@ Each policy entry requires:
 
 ## Linting
 
-140 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+141 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|
@@ -270,7 +270,7 @@ Each policy entry requires:
 | CF100–CF104 | Cross-rule ordering | 5 |
 | CF200–CF222 | Action validation | 23 |
 | CF300–CF309 | Expression, function & type | 10 |
-| CF400–CF476 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 41 |
+| CF400–CF476 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 42 |
 | CF500–CF545 | Plan limits, style & value constraints | 35 |
 
 See [docs/lint/README.md](docs/lint/README.md) for the full rule reference.
@@ -293,4 +293,4 @@ architecture.
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+octorules-cloudflare is licensed under the [Apache License 2.0](LICENSE).

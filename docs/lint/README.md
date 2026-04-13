@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **140 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **141 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 ### Suppressing rules
 
@@ -65,7 +65,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
 | 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF018 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 99 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 101 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF476 | 7 | [stage2d-lists.md](stage2d-lists.md) |
@@ -84,7 +84,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF200–CF222 | Action validation | 23 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
-| CF400–CF407 | Rate limiting | 8 |
+| CF400–CF408 | Rate limiting | 9 |
 | CF410–CF414 | Cache rules | 5 |
 | CF420–CF424 | Config rules | 5 |
 | CF430–CF432 | Redirect rules | 3 |
@@ -156,16 +156,21 @@ Network packet arrives
 | 6 | `origin_rules` | `http_request_origin` | `route` | `route` | Zone |
 | 7 | `config_rules` | `http_config_settings` | `set_config` | `set_config` | Zone |
 | 8 | `cache_rules` | `http_request_cache_settings` | `set_cache_settings` | `set_cache_settings` | Zone |
-| 9 | `waf_custom_rules` | `http_request_firewall_custom` | *(must specify)* | `block`, `challenge`, `js_challenge`, `managed_challenge`, `skip`, `log`, `execute` | Zone + Account |
+| 9 | `waf_custom_rules` | `http_request_firewall_custom` | *(must specify)* | `block`, `challenge`, `js_challenge`, `managed_challenge`, `skip`, `log`, `execute`, `score` | Zone + Account |
 | 10 | `waf_managed_rules` | `http_request_firewall_managed` | *(must specify)* | `execute`, `skip`, `block`, `log` | Zone + Account |
 | 11 | `rate_limiting_rules` | `http_ratelimit` | *(must specify)* | `block`, `challenge`, `js_challenge`, `managed_challenge`, `log`, `execute` | Zone + Account |
 | 12 | `bot_fight_rules` | `http_request_sbfm` | *(must specify)* | `block`, `challenge`, `js_challenge`, `managed_challenge` | Zone |
-| 13 | `http_ddos_rules` | `ddos_l7` | *(must specify)* | `block`, `challenge`, `log` | Zone + Account |
+| 13 | `http_ddos_rules` | `ddos_l7` | *(must specify)* | `block`, `challenge`, `log`, `ddos_dynamic`, `force_connection_close` | Zone + Account |
 | 14 | `custom_error_rules` | `http_custom_errors` | `serve_error` | `serve_error` | Zone + Account |
 | 15 | `response_header_rules` | `http_response_headers_transform` | `rewrite` | `rewrite` | Zone |
 | 16 | `compression_rules` | `http_response_compression` | `compress_response` | `compress_response` | Zone |
 | 17 | `sensitive_data_detection` | `http_response_firewall_managed` | *(must specify)* | `log` | Zone |
 | 18 | `log_custom_fields` | `http_log_custom_fields` | `log_custom_field` | `log_custom_field` | Zone |
+| — | `network_ddos_rules` | `ddos_l4` | *(must specify)* | `block`, `log` | Account |
+| — | `network_firewall_rules` | `magic_transit` | *(must specify)* | `block`, `log` | Account |
+| — | `network_firewall_managed` | `magic_transit_managed` | *(must specify)* | `block`, `log` | Account |
+| — | `network_firewall_ratelimit` | `magic_transit_ratelimit` | *(must specify)* | `block`, `log` | Account |
+| — | `network_firewall_ids` | `magic_transit_ids_managed` | *(must specify)* | `block`, `log` | Account |
 
 ### Field availability by phase
 
@@ -240,14 +245,16 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF207](stage2-per-rule.md#cf207--conflicting-static-value-and-dynamic-expression) | Conflicting static value and dynamic expression | ERROR |
 | [CF208](stage2-per-rule.md#cf208--unnecessary-action_parameters) | Unnecessary action_parameters | WARNING |
 | [CF209](stage2-per-rule.md#cf209--serve_error-content-exceeds-10kb-limit) | serve_error content exceeds 10KB limit | ERROR |
-| [CF210](stage2-per-rule.md#cf210--invalid-skip-phases-value) | Invalid skip phases value | ERROR |
-| [CF211](stage2-per-rule.md#cf211--invalid-skip-products-value) | Invalid skip products value | ERROR |
+| [CF210](stage2-per-rule.md#cf210--invalid-skip-phases-value) | Invalid skip phases value | WARNING |
+| [CF211](stage2-per-rule.md#cf211--invalid-skip-products-value) | Invalid skip products value | WARNING |
 | [CF212](stage2-per-rule.md#cf212--invalid-compress_response-algorithm) | Invalid compress_response algorithm | ERROR |
-| [CF213](stage2-per-rule.md#cf213--invalid-rate-limit-characteristic) | Invalid rate limit characteristic | ERROR |
+| [CF213](stage2-per-rule.md#cf213--invalid-rate-limit-characteristic) | Invalid rate limit characteristic | WARNING |
 | [CF214](stage2-per-rule.md#cf214--invalid-block-response-parameter) | Invalid block response parameter | ERROR |
 | [CF215](stage2-per-rule.md#cf215--missing-id-in-execute-action_parameters) | Missing id in execute action_parameters | ERROR |
 | [CF216](stage2-per-rule.md#cf216--invalid-execute-id-format) | Invalid execute id format | WARNING |
 | [CF217](stage2-per-rule.md#cf217--compression-terminal-algorithm-must-be-last) | Compression terminal algorithm must be last | WARNING |
+| [CF218](stage2-per-rule.md#cf218--invalid-execute-overrides-structure) | Invalid execute overrides structure | ERROR |
+| [CF219](stage2-per-rule.md#cf219--skip-action-references-empty-ruleset-id) | Skip action references empty ruleset ID | WARNING |
 | [CF220](stage2-per-rule.md#cf220--invalid-sensitivity_level-in-execute-overrides) | Invalid sensitivity_level in execute overrides | ERROR |
 | [CF221](stage2-per-rule.md#cf221--invalid-content_type-in-serve_error-response) | Invalid content_type in serve_error response | ERROR |
 | [CF222](stage2-per-rule.md#cf222--skip-ruleset-value-must-be-current) | Skip ruleset value must be "current" | ERROR |
@@ -257,10 +264,14 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF403](stage2-per-rule.md#cf403--mitigation-timeout-exceeds-period) | Mitigation timeout exceeds period | WARNING |
 | [CF404](stage2-per-rule.md#cf404--invalid-counting_expression) | Invalid counting_expression | ERROR |
 | [CF405](stage2-per-rule.md#cf405--invalid-counting_expression-content) | Invalid counting_expression content | WARNING |
+| [CF406](stage2-per-rule.md#cf406--too-many-rate-limit-characteristics-for-plan-tier) | Too many rate limit characteristics for plan tier | ERROR |
+| [CF407](stage2-per-rule.md#cf407--requests_per_period-outside-valid-range) | requests_per_period outside valid range | ERROR |
+| [CF408](stage2-per-rule.md#cf408--score_per_period-outside-valid-range) | score_per_period outside valid range | ERROR |
 | [CF410](stage2-per-rule.md#cf410--invalid-ttl-mode-value) | Invalid TTL mode value | ERROR |
 | [CF411](stage2-per-rule.md#cf411--missing-ttl-with-override-mode) | Missing TTL with override mode | ERROR |
 | [CF412](stage2-per-rule.md#cf412--negative-ttl-value) | Negative TTL value | ERROR |
 | [CF413](stage2-per-rule.md#cf413--conflicting-bypass-and-eligible-settings) | Conflicting bypass and eligible settings | WARNING |
+| [CF414](stage2-per-rule.md#cf414--cache-ttl-exceeds-maximum) | Cache TTL exceeds maximum (1 year) | WARNING |
 | [CF420](stage2-per-rule.md#cf420--invalid-security_level-value) | Invalid security_level value | ERROR |
 | [CF421](stage2-per-rule.md#cf421--invalid-ssl-value) | Invalid ssl value | ERROR |
 | [CF422](stage2-per-rule.md#cf422--invalid-polish-value) | Invalid polish value | ERROR |
@@ -268,6 +279,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF424](stage2-per-rule.md#cf424--security-warning-ssl-set-to-off) | Security warning: ssl set to off | WARNING |
 | [CF430](stage2-per-rule.md#cf430--invalid-redirect-status-code) | Invalid redirect status code | ERROR |
 | [CF431](stage2-per-rule.md#cf431--missing-target_url-in-redirect) | Missing target_url in redirect | ERROR |
+| [CF432](stage2-per-rule.md#cf432--redirect-target_url-is-not-a-valid-url) | Redirect target_url is not a valid URL | WARNING |
 | [CF440](stage2-per-rule.md#cf440--empty-header-name-in-transform) | Empty header name in transform | ERROR |
 | [CF441](stage2-per-rule.md#cf441--missing-operation-in-header-transform) | Missing operation in header transform | ERROR |
 | [CF442](stage2-per-rule.md#cf442--invalid-header-transform-operation) | Invalid header transform operation | ERROR |
@@ -275,6 +287,8 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF444](stage2-per-rule.md#cf444--expression-parse-error-in-transform-action_parameters) | Expression parse error in transform action_parameters | WARNING |
 | [CF445](stage2-per-rule.md#cf445--request-headers-do-not-support-add-operation) | Request headers do not support add operation | ERROR |
 | [CF450](stage2-per-rule.md#cf450--port-number-out-of-range) | Port number out of range (1-65535) | ERROR |
+| [CF451](stage2-per-rule.md#cf451--origin-weight-outside-valid-range) | Origin weight outside valid range (0.0-1.0) | ERROR |
+| [CF452](stage2-per-rule.md#cf452--origin-route-missing-required-fields) | Origin route missing required fields | ERROR |
 | [CF019](stage2-per-rule.md#cf019--response-field-used-in-request-phase) | Response field used in request phase | WARNING |
 | [CF020](stage2-per-rule.md#cf020--request-body-field-in-phase-without-body-access) | Request body field in phase without body access | WARNING |
 | [CF021](stage2-per-rule.md#cf021--fieldfunction-requires-higher-plan-tier) | Field/function requires higher plan tier | WARNING |
@@ -338,7 +352,9 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF473](stage2d-lists.md#cf473--invalid-ip-address-in-ip-list) | Invalid IP address in IP list | ERROR |
 | [CF474](stage2d-lists.md#cf474--invalid-asn-value-in-asn-list) | Invalid ASN value in ASN list | ERROR |
 | [CF475](stage2d-lists.md#cf475--duplicate-items-within-list) | Duplicate items within list | WARNING |
+| [CF476](stage2d-lists.md#cf476--list-exceeds-maximum-item-count-10000) | List exceeds maximum item count (10,000) | WARNING |
 | [CF022](stage2b-custom-rulesets.md#cf022--missing-required-field) | Missing required custom ruleset field | ERROR |
 | [CF023](stage2b-custom-rulesets.md#cf023--invalid-id-format) | Invalid custom ruleset id format | WARNING |
 | [CF024](stage2b-custom-rulesets.md#cf024--duplicate-ref-within-custom-ruleset) | Duplicate ref within custom ruleset | ERROR |
 | [CF025](stage2b-custom-rulesets.md#cf025--duplicate-ref-across-custom-rulesets) | Duplicate ref across custom rulesets | WARNING |
+| [CF026](stage2b-custom-rulesets.md#cf026--custom-ruleset-exceeds-maximum-rule-count-1000) | Custom ruleset exceeds maximum rule count (1,000) | WARNING |

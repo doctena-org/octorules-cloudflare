@@ -223,6 +223,9 @@ VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
     # Network-level phases
     "network_ddos_rules": {"block", "log"},
     "network_firewall_rules": {"block", "log"},
+    "network_firewall_managed": {"block", "log"},
+    "network_firewall_ratelimit": {"block", "log"},
+    "network_firewall_ids": {"block", "log"},
 }
 
 # --- Action → schema mapping ---
