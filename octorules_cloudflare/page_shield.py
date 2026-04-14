@@ -375,6 +375,9 @@ def _finalize_page_shield(
             log.debug("Skipping page_shield_policies (no permission and not in desired config)")
             return
         except ProviderError as e:
+            if "not been enabled" in str(e) or "not enabled" in str(e):
+                log.debug("page_shield_policies: product not enabled on this zone")
+                return
             log.warning(
                 "Failed to fetch Page Shield policies for %s: %s",
                 zp.zone_name,
@@ -550,12 +553,14 @@ def _dump_page_shield(
         return None  # Page Shield is zone-level only
     try:
         policies = provider.get_all_page_shield_policies(scope)
+    except ProviderAuthError:
+        log.info("page_shield_policies: skipped (insufficient permissions)")
+        return None
     except ProviderError as e:
-        log.warning(
-            "Failed to fetch Page Shield policies for %s: %s",
-            scope.label,
-            _format_api_error(e),
-        )
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("page_shield_policies: product not enabled on this zone")
+        else:
+            log.debug("page_shield_policies: %s", e)
         return None
     if not policies:
         return None

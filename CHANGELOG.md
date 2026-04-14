@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.9] - 2026-04-14
+
+### Changed
+- Extension dump and prefetch functions now log informative messages instead
+  of silently swallowing errors: `log.info` for insufficient permissions,
+  `log.debug` for products not enabled on the zone.
+
 ## [0.7.8] - 2026-04-13
 
 ### Fixed

@@ -126,7 +126,10 @@ def _prefetch_content_scanning(all_desired, scope, provider):
             raise  # User explicitly declared this section -- permission is needed
         log.debug("Skipping cloudflare_content_scanning (no permission and not in desired config)")
         return None
-    except ProviderError:
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_content_scanning: product not enabled on this zone")
+            return None
         log.warning("Failed to fetch content scanning config for %s", scope.label)
         current = {}
 
@@ -207,11 +210,18 @@ def _dump_content_scanning(scope, provider, out_dir):
     """Export current content scanning config to dump output."""
     if not scope.zone_id:
         return None
-    from octorules.provider.exceptions import ProviderError
+    from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
     try:
         config = provider.get_content_scanning(scope)
-    except ProviderError:
+    except ProviderAuthError:
+        log.info("cloudflare_content_scanning: skipped (insufficient permissions)")
+        return None
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_content_scanning: product not enabled on this zone")
+        else:
+            log.debug("cloudflare_content_scanning: %s", e)
         return None
 
     if config:

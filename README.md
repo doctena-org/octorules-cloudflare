@@ -44,15 +44,7 @@ as keyword arguments (octodns-style passthrough).
 ### Authentication
 
 A [Cloudflare API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
-is required. The token needs the following permissions:
-
-- **Zone > Firewall Services > Edit** — for ruleset phase operations
-- **Zone > Sanitize > Edit** — for URL normalization rules
-- **Account > Account Rulesets > Edit** — for account-level rules and custom rulesets
-- **Account > Account Filter Lists > Edit** — for list management
-- **Zone > Page Shield > Edit** — for Page Shield policy management
-
-See [docs/permissions.md](docs/permissions.md) for a detailed mapping of API token permissions to octorules features.
+is required. See [docs/permissions.md](docs/permissions.md) for the full list of required permissions per phase and extension.
 
 ### Provider settings
 

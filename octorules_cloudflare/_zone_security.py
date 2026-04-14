@@ -129,7 +129,10 @@ def _prefetch_zone_security(all_desired, scope, provider):
             raise  # User explicitly declared this section -- permission is needed
         log.debug("Skipping cloudflare_zone_security (no permission and not in desired config)")
         return None
-    except ProviderError:
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_zone_security: product not enabled on this zone")
+            return None
         log.warning("Failed to fetch zone security settings for %s", scope.label)
         current = {}
 
@@ -202,11 +205,18 @@ def _dump_zone_security(scope, provider, out_dir):
     """Export current zone security settings to dump output."""
     if not scope.zone_id:
         return None
-    from octorules.provider.exceptions import ProviderError
+    from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
     try:
         settings = provider.get_zone_security_settings(scope)
-    except ProviderError:
+    except ProviderAuthError:
+        log.info("cloudflare_zone_security: skipped (insufficient permissions)")
+        return None
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_zone_security: product not enabled on this zone")
+        else:
+            log.debug("cloudflare_zone_security: %s", e)
         return None
 
     if settings:

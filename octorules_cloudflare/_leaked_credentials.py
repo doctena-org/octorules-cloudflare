@@ -130,7 +130,10 @@ def _prefetch_leaked_credentials(all_desired, scope, provider):
             "Skipping cloudflare_leaked_credential_check (no permission and not in desired config)"
         )
         return None
-    except ProviderError:
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_leaked_credential_check: product not enabled on this zone")
+            return None
         log.warning("Failed to fetch leaked credential check config for %s", scope.label)
         current = {}
 
@@ -212,11 +215,18 @@ def _dump_leaked_credentials(scope, provider, out_dir):
     """Export current leaked credential check config to dump output."""
     if not scope.zone_id:
         return None
-    from octorules.provider.exceptions import ProviderError
+    from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
     try:
         config = provider.get_leaked_credential_check(scope)
-    except ProviderError:
+    except ProviderAuthError:
+        log.info("cloudflare_leaked_credential_check: skipped (insufficient permissions)")
+        return None
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_leaked_credential_check: product not enabled on this zone")
+        else:
+            log.debug("cloudflare_leaked_credential_check: %s", e)
         return None
 
     if config:

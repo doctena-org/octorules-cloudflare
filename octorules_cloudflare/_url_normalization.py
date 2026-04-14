@@ -130,7 +130,10 @@ def _prefetch_url_normalization(all_desired, scope, provider):
             raise  # User explicitly declared this section -- permission is needed
         log.debug("Skipping cloudflare_url_normalization (no permission and not in desired config)")
         return None
-    except ProviderError:
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_url_normalization: product not enabled on this zone")
+            return None
         log.warning("Failed to fetch URL normalization settings for %s", scope.label)
         current = {}
 
@@ -189,11 +192,18 @@ def _dump_url_normalization(scope, provider, out_dir):
     """Export current URL normalization settings to dump output."""
     if not scope.zone_id:
         return None
-    from octorules.provider.exceptions import ProviderError
+    from octorules.provider.exceptions import ProviderAuthError, ProviderError
 
     try:
         settings = provider.get_url_normalization(scope)
-    except ProviderError:
+    except ProviderAuthError:
+        log.info("cloudflare_url_normalization: skipped (insufficient permissions)")
+        return None
+    except ProviderError as e:
+        if "not been enabled" in str(e) or "not enabled" in str(e):
+            log.debug("cloudflare_url_normalization: product not enabled on this zone")
+        else:
+            log.debug("cloudflare_url_normalization: %s", e)
         return None
 
     if settings:
