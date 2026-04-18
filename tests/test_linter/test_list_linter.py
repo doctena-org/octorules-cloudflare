@@ -374,6 +374,31 @@ class TestCF478IPOverlap:
         )
         assert "CF478" not in _ids(ctx)
 
+    def test_cf478_sweep_line_fast_on_large_input(self):
+        """CF478 uses O(n log n) sweep-line (v0.7.8 rewrite). 1,000 disjoint
+        /32s must lint well under a second; the pre-v0.7.8 O(n²) pairwise
+        check would need hundreds of thousands of comparisons at this size.
+        """
+        import time
+
+        items = [{"ip": f"203.0.{i // 256}.{i % 256}/32"} for i in range(1000)]
+        start = time.monotonic()
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "big",
+                        "kind": "ip",
+                        "items": items,
+                    }
+                ]
+            }
+        )
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.0, f"CF478 sweep-line too slow: {elapsed:.2f}s for 1000 items"
+        # Disjoint /32s → zero CF478 findings.
+        assert "CF478" not in _ids(ctx)
+
 
 class TestNoListsSection:
     def test_no_lists_no_errors(self):
