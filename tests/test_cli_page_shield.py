@@ -14,6 +14,7 @@ from octorules.provider.exceptions import ProviderError
 
 import octorules_cloudflare  # noqa: F401 — trigger extension registration
 from octorules_cloudflare.page_shield import PageShieldPolicyPlan, _apply_page_shield
+from octorules_cloudflare.provider import CloudflareProvider
 
 REDIRECT_PHASE = get_phase("redirect_rules")
 
@@ -26,6 +27,9 @@ def _make_dump_mock(**overrides):
     (which can't represent them). This isolates Page Shield dump tests from
     extension hooks registered by other installed providers.
     """
+    # Un-specced: cmd_dump iterates all registered dump extensions (including
+    # AWS's get_acl_settings). spec=CloudflareProvider would block those
+    # cross-provider attribute accesses in tests that install >1 provider.
     mock_prov = MagicMock()
     mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
     mock_prov.max_workers = 1
@@ -92,7 +96,7 @@ class TestPageShieldPoliciesCLI:
             "    enabled: true\n"
             "    value: \"script-src 'self'\"\n"
         )
-        mock_prov = MagicMock()
+        mock_prov = MagicMock(spec=CloudflareProvider)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
         mock_init_provs.return_value = {"cloudflare": mock_prov}
@@ -107,7 +111,7 @@ class TestPageShieldPoliciesCLI:
         """When page_shield_policies key is absent, skip policy planning."""
         rules_file = sample_config.rules_dir / "example.com.yaml"
         rules_file.write_text("redirect_rules:\n  - ref: r1\n    expression: 'true'\n")
-        mock_prov = MagicMock()
+        mock_prov = MagicMock(spec=CloudflareProvider)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
@@ -216,7 +220,7 @@ class TestPageShieldPoliciesCLI:
             "    enabled: true\n"
             "    value: \"script-src 'self'\"\n"
         )
-        mock_prov = MagicMock()
+        mock_prov = MagicMock(spec=CloudflareProvider)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
         mock_prov.create_page_shield_policy.return_value = {"id": "new-policy-id"}
@@ -233,7 +237,7 @@ class TestPageShieldPoliciesCLI:
         """Sync should delete policies in CF but not in YAML."""
         rules_file = sample_config.rules_dir / "example.com.yaml"
         rules_file.write_text("page_shield_policies: []\n")
-        mock_prov = MagicMock()
+        mock_prov = MagicMock(spec=CloudflareProvider)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = [
             {
@@ -274,7 +278,7 @@ class TestApplyPageShield:
         psp = PageShieldPolicyPlan(description="CSP on all", create=True, changes=[change])
         zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.create_page_shield_policy.return_value = {"id": "new-id"}
         provider.max_workers = 1
 
@@ -288,7 +292,7 @@ class TestApplyPageShield:
         psp = PageShieldPolicyPlan(description="Old CSP", policy_id="policy-123", delete=True)
         zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.max_workers = 1
 
         synced, error = _apply_page_shield(zp, [psp], scope, provider)
@@ -308,7 +312,7 @@ class TestApplyPageShield:
         psp = PageShieldPolicyPlan(description="CSP", policy_id="policy-456", changes=[change])
         zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.update_page_shield_policy.return_value = {"id": "policy-456"}
         provider.max_workers = 1
 
@@ -345,7 +349,7 @@ class TestApplyPageShield:
         )
         zp = ZonePlan(zone_name="example.com", extension_plans={"page_shield": [psp]})
         scope = Scope(zone_id="zone-abc", label="example.com")
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.update_page_shield_policy.return_value = {"id": "policy-456"}
         provider.max_workers = 1
 
@@ -365,7 +369,7 @@ class TestApplyPageShield:
         """Empty plans list should do nothing."""
         zp = ZonePlan(zone_name="example.com")
         scope = Scope(zone_id="zone-abc", label="example.com")
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.max_workers = 1
 
         synced, error = _apply_page_shield(zp, [], scope, provider)

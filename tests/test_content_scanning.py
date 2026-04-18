@@ -218,7 +218,7 @@ class TestPrefetchHook:
         assert result is None
 
     def test_fetches_config(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.return_value = {
             "enabled": True,
             "custom_expressions": [{"payload": "test"}],
@@ -231,7 +231,7 @@ class TestPrefetchHook:
         assert desired["enabled"] is True
 
     def test_api_failure_handled_gracefully(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderError("API down")
         all_desired = {"cloudflare_content_scanning": {"enabled": True}}
         result = _prefetch_content_scanning(all_desired, _zs(), provider)
@@ -239,7 +239,7 @@ class TestPrefetchHook:
         assert current == {}
 
     def test_auth_error_propagates(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderAuthError("forbidden")
         all_desired = {"cloudflare_content_scanning": {"enabled": True}}
         with pytest.raises(ProviderAuthError):
@@ -284,7 +284,7 @@ class TestFinalizeHook:
 # ---------------------------------------------------------------------------
 class TestApplyHook:
     def test_apply_enabled_change(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         plan = ContentScanningPlan(changes=[ContentScanningChange("enabled", False, True)])
         synced, error = _apply_content_scanning(zp, [plan], _zs(), provider)
@@ -293,7 +293,7 @@ class TestApplyHook:
         provider.update_content_scanning_enabled.assert_called_once_with(_zs(), True)
 
     def test_apply_expressions_change(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         cur_exprs = [{"payload": "old"}]
         des_exprs = [{"payload": "new"}]
@@ -306,7 +306,7 @@ class TestApplyHook:
         provider.sync_content_scanning_expressions.assert_called_once()
 
     def test_no_changes_skipped(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         plan = ContentScanningPlan(changes=[ContentScanningChange("enabled", True, True)])
         synced, error = _apply_content_scanning(zp, [plan], _zs(), provider)
@@ -391,7 +391,7 @@ class TestValidateExtension:
 # ---------------------------------------------------------------------------
 class TestDumpExtension:
     def test_dump_returns_config(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.return_value = {
             "enabled": True,
             "custom_expressions": [{"payload": "test"}],
@@ -400,20 +400,20 @@ class TestDumpExtension:
         assert "cloudflare_content_scanning" in result
 
     def test_dump_api_failure(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderError("down")
         result = _dump_content_scanning(_zs(), provider, None)
         assert result is None
 
     def test_dump_empty_config(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.return_value = {}
         result = _dump_content_scanning(_zs(), provider, None)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
         """ProviderAuthError in dump degrades gracefully (returns None)."""
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderAuthError("forbidden")
         result = _dump_content_scanning(_zs(), provider, None)
         assert result is None

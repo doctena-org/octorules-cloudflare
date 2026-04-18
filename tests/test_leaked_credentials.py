@@ -219,7 +219,7 @@ class TestPrefetchHook:
         assert result is None
 
     def test_fetches_config(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.return_value = {
             "enabled": True,
             "detections": [{"username": "u1", "password": "p1"}],
@@ -232,7 +232,7 @@ class TestPrefetchHook:
         assert desired["enabled"] is True
 
     def test_api_failure_handled_gracefully(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderError("API down")
         all_desired = {"cloudflare_leaked_credential_check": {"enabled": True}}
         result = _prefetch_leaked_credentials(all_desired, _zs(), provider)
@@ -240,7 +240,7 @@ class TestPrefetchHook:
         assert current == {}
 
     def test_auth_error_propagates(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderAuthError("forbidden")
         all_desired = {"cloudflare_leaked_credential_check": {"enabled": True}}
         with pytest.raises(ProviderAuthError):
@@ -285,7 +285,7 @@ class TestFinalizeHook:
 # ---------------------------------------------------------------------------
 class TestApplyHook:
     def test_apply_enabled_change(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         plan = LeakedCredentialPlan(changes=[LeakedCredentialChange("enabled", False, True)])
         synced, error = _apply_leaked_credentials(zp, [plan], _zs(), provider)
@@ -294,7 +294,7 @@ class TestApplyHook:
         provider.update_leaked_credential_check_enabled.assert_called_once_with(_zs(), True)
 
     def test_apply_detections_change(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         cur_dets = [{"username": "u1", "password": "old"}]
         des_dets = [{"username": "u1", "password": "new"}]
@@ -307,7 +307,7 @@ class TestApplyHook:
         provider.sync_leaked_credential_detections.assert_called_once()
 
     def test_no_changes_skipped(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         plan = LeakedCredentialPlan(changes=[LeakedCredentialChange("enabled", True, True)])
         synced, error = _apply_leaked_credentials(zp, [plan], _zs(), provider)
@@ -397,7 +397,7 @@ class TestValidateExtension:
 # ---------------------------------------------------------------------------
 class TestDumpExtension:
     def test_dump_returns_config(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.return_value = {
             "enabled": True,
             "detections": [{"username": "u1", "password": "p1"}],
@@ -406,20 +406,20 @@ class TestDumpExtension:
         assert "cloudflare_leaked_credential_check" in result
 
     def test_dump_api_failure(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderError("down")
         result = _dump_leaked_credentials(_zs(), provider, None)
         assert result is None
 
     def test_dump_empty_config(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.return_value = {}
         result = _dump_leaked_credentials(_zs(), provider, None)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
         """ProviderAuthError in dump degrades gracefully (returns None)."""
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderAuthError("forbidden")
         result = _dump_leaked_credentials(_zs(), provider, None)
         assert result is None

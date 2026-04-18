@@ -2,8 +2,10 @@
 
 from unittest.mock import MagicMock
 
+from cloudflare import Cloudflare
 from octorules.provider.base import Scope
 
+from octorules_cloudflare import CloudflareProvider
 from octorules_cloudflare._url_normalization import (
     UrlNormalizationChange,
     UrlNormalizationFormatter,
@@ -161,7 +163,7 @@ class TestPrefetchHook:
         assert result is None
 
     def test_fetches_settings(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.return_value = {
             "scope": "incoming",
             "type": "cloudflare",
@@ -176,7 +178,7 @@ class TestPrefetchHook:
     def test_api_failure_handled_gracefully(self):
         from octorules.provider.exceptions import ProviderError
 
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderError("API down")
         all_desired = {"cloudflare_url_normalization": {"scope": "both"}}
         result = _prefetch_url_normalization(all_desired, _scope(), provider)
@@ -187,7 +189,7 @@ class TestPrefetchHook:
         import pytest
         from octorules.provider.exceptions import ProviderAuthError
 
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderAuthError("forbidden")
         all_desired = {"cloudflare_url_normalization": {"scope": "both"}}
         with pytest.raises(ProviderAuthError):
@@ -234,7 +236,7 @@ class TestFinalizeHook:
 # ---------------------------------------------------------------------------
 class TestApplyHook:
     def test_apply_changes(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         plan = UrlNormalizationPlan(
             changes=[
@@ -252,7 +254,7 @@ class TestApplyHook:
         assert payload["type"] == "rfc3986"
 
     def test_no_changes_skipped(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         zp = MagicMock()
         plan = UrlNormalizationPlan(
             changes=[UrlNormalizationChange("scope", "incoming", "incoming")]
@@ -328,7 +330,7 @@ class TestValidateExtension:
 # ---------------------------------------------------------------------------
 class TestDumpExtension:
     def test_dump_returns_settings(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.return_value = {
             "scope": "incoming",
             "type": "cloudflare",
@@ -340,13 +342,13 @@ class TestDumpExtension:
     def test_dump_api_failure(self):
         from octorules.provider.exceptions import ProviderError
 
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderError("down")
         result = _dump_url_normalization(_scope(), provider, None)
         assert result is None
 
     def test_dump_empty_settings(self):
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.return_value = {}
         result = _dump_url_normalization(_scope(), provider, None)
         assert result is None
@@ -355,7 +357,7 @@ class TestDumpExtension:
         """ProviderAuthError in dump degrades gracefully (returns None)."""
         from octorules.provider.exceptions import ProviderAuthError
 
-        provider = MagicMock()
+        provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderAuthError("forbidden")
         result = _dump_url_normalization(_scope(), provider, None)
         assert result is None
@@ -560,7 +562,7 @@ class TestProviderGetUrlNormalization:
     def test_get_url_normalization(self):
         from octorules_cloudflare.provider import CloudflareProvider
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=Cloudflare)
         mock_result = MagicMock()
         mock_result.model_dump.return_value = {
             "scope": "incoming",
@@ -579,7 +581,7 @@ class TestProviderUpdateUrlNormalization:
     def test_update_url_normalization(self):
         from octorules_cloudflare.provider import CloudflareProvider
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=Cloudflare)
         provider = CloudflareProvider(client=mock_client)
         scope = _scope()
         provider.update_url_normalization(scope, {"scope": "both", "type": "rfc3986"})
