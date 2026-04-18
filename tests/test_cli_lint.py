@@ -6,6 +6,12 @@ import pytest
 from octorules.cli import build_parser, cmd_lint, main
 from octorules.config import Config
 
+# Importing the provider module triggers register_cloudflare_linter() at
+# module load time, which is what cmd_lint depends on.  cmd_lint itself
+# does NOT call _discover_provider_modules(), so the plugin must be
+# registered before the first test runs.
+import octorules_cloudflare  # noqa: F401
+
 
 @pytest.fixture
 def lint_config(tmp_path):

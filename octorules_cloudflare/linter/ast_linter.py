@@ -14,6 +14,7 @@ from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity
 from octorules.phases import Phase
+from octorules.reserved_ips import is_reserved
 
 from octorules_cloudflare.linter._constants import PLAN_TIERS as _PLAN_TIERS
 from octorules_cloudflare.linter.expression_bridge import ExpressionInfo, parse_expression
@@ -81,53 +82,8 @@ _DEPRECATED_FIELDS: dict[str, str] = {
     "ip.geoip.is_in_european_union": "ip.src.is_in_european_union",
 }
 
-# Reserved/bogon networks (RFC 1918, loopback, link-local, etc.)
-_RESERVED_NETWORKS: list[tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, str]] = [
-    # IPv4
-    (ipaddress.IPv4Network("10.0.0.0/8"), "RFC 1918 private"),
-    (ipaddress.IPv4Network("172.16.0.0/12"), "RFC 1918 private"),
-    (ipaddress.IPv4Network("192.168.0.0/16"), "RFC 1918 private"),
-    (ipaddress.IPv4Network("127.0.0.0/8"), "loopback"),
-    (ipaddress.IPv4Network("169.254.0.0/16"), "link-local"),
-    (ipaddress.IPv4Network("100.64.0.0/10"), "CGNAT (RFC 6598)"),
-    (ipaddress.IPv4Network("0.0.0.0/8"), "this network"),
-    (ipaddress.IPv4Network("192.0.2.0/24"), "documentation (RFC 5737)"),
-    (ipaddress.IPv4Network("198.51.100.0/24"), "documentation (RFC 5737)"),
-    (ipaddress.IPv4Network("203.0.113.0/24"), "documentation (RFC 5737)"),
-    (ipaddress.IPv4Network("192.0.0.0/24"), "IANA special purpose"),
-    (ipaddress.IPv4Network("192.88.99.0/24"), "6to4 relay anycast"),
-    (ipaddress.IPv4Network("198.18.0.0/15"), "benchmark testing (RFC 2544)"),
-    (ipaddress.IPv4Network("224.0.0.0/4"), "multicast"),
-    (ipaddress.IPv4Network("240.0.0.0/4"), "reserved for future use"),
-    # IPv6
-    (ipaddress.IPv6Network("::/128"), "unspecified"),
-    (ipaddress.IPv6Network("::1/128"), "loopback"),
-    (ipaddress.IPv6Network("::ffff:0:0/96"), "IPv4-mapped"),
-    (ipaddress.IPv6Network("64:ff9b::/96"), "NAT64 (RFC 6052)"),
-    (ipaddress.IPv6Network("100::/64"), "discard (RFC 6666)"),
-    (ipaddress.IPv6Network("2001:db8::/32"), "documentation (RFC 3849)"),
-    (ipaddress.IPv6Network("2001::/23"), "IANA special purpose"),
-    (ipaddress.IPv6Network("2001::/32"), "Teredo"),
-    (ipaddress.IPv6Network("2002::/16"), "6to4"),
-    (ipaddress.IPv6Network("fc00::/7"), "unique local"),
-    (ipaddress.IPv6Network("fe80::/10"), "link-local"),
-    (ipaddress.IPv6Network("ff00::/8"), "multicast"),
-    (ipaddress.IPv6Network("::ffff:0:0:0/96"), "IPv4-translated"),
-]
-
-
-def _check_ip_reserved(ip_str: str) -> str | None:
-    """Return a description if *ip_str* falls within a reserved/bogon range, else None."""
-    try:
-        net = ipaddress.ip_network(ip_str, strict=False)
-    except ValueError:
-        return None
-    for reserved, description in _RESERVED_NETWORKS:
-        if net.version != reserved.version:
-            continue
-        if net.subnet_of(reserved):
-            return description
-    return None
+# Reserved/bogon network detection is provided by octorules.reserved_ips
+# (single source of truth across providers; see core v0.26.0).
 
 
 def _find_overlapping_ips(ip_strings: list[str]) -> list[tuple[str, str]]:
@@ -431,7 +387,7 @@ def _check_ip_values(info: ExpressionInfo, phase_name: str, ref: str, ctx: LintC
     """CF530: Reserved/bogon IP address.  CF531: Overlapping IP ranges."""
     # CF530: Reserved/bogon IP address
     for ip_str in info.ip_literals:
-        reserved_desc = _check_ip_reserved(ip_str)
+        reserved_desc = is_reserved(ip_str)
         if reserved_desc:
             ctx.add(
                 LintResult(

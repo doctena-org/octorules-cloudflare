@@ -12,6 +12,8 @@ settings in ``octorules_azure/_policy_settings.py``.
 import logging
 from dataclasses import dataclass, field
 
+from octorules.registration import idempotent_registration
+
 log = logging.getLogger(__name__)
 
 
@@ -363,16 +365,9 @@ class BotManagementFormatter:
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
-_registered = False
-
-
+@idempotent_registration
 def register_bot_management() -> None:
     """Register all bot management hooks with the core extension system."""
-    global _registered
-    if _registered:
-        return
-    _registered = True
-
     from octorules.extensions import (
         register_apply_extension,
         register_dump_extension,

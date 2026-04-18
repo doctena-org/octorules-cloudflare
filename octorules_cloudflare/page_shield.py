@@ -36,6 +36,7 @@ from octorules.provider.base import (
 )
 from octorules.provider.exceptions import ProviderAuthError, ProviderError
 from octorules.provider.utils import format_api_error as _format_api_error
+from octorules.registration import idempotent_registration
 
 log = logging.getLogger(__name__)
 
@@ -709,15 +710,10 @@ class PageShieldFormatter:
 # Registration entry point
 # ---------------------------------------------------------------------------
 
-_registered = False
 
-
+@idempotent_registration
 def register_page_shield() -> None:
     """Register all Page Shield hooks with the core extension system."""
-    global _registered
-    if _registered:
-        return
-    _registered = True
     register_plan_zone_hook(_prefetch_page_shield, _finalize_page_shield)
     register_apply_extension("page_shield", _apply_page_shield)
     register_format_extension("page_shield", PageShieldFormatter())

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.10] - 2026-04-18
+
+### Fixed
+- Thread-safety on first concurrent initialization of six extension
+  modules — Page Shield, Bot Management, Content Scanning, Zone
+  Security, Leaked Credentials, and URL Normalization. Previously
+  these used a flag-only registration pattern without a lock, leaving
+  a narrow race on the very first concurrent call where multiple
+  threads could enter the body simultaneously.
+
+### Changed
+- Minimum ``octorules`` dependency: ``>=0.26.0`` (was ``>=0.24.0``).
+
 ## [0.7.9] - 2026-04-14
 
 ### Changed

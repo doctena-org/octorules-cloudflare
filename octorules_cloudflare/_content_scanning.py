@@ -20,6 +20,8 @@ validate_extension, and dump_extension.
 import logging
 from dataclasses import dataclass, field
 
+from octorules.registration import idempotent_registration
+
 log = logging.getLogger(__name__)
 
 
@@ -343,16 +345,9 @@ class ContentScanningFormatter:
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
-_registered = False
-
-
+@idempotent_registration
 def register_content_scanning() -> None:
     """Register all content scanning hooks with the core extension system."""
-    global _registered
-    if _registered:
-        return
-    _registered = True
-
     from octorules.extensions import (
         register_apply_extension,
         register_dump_extension,
