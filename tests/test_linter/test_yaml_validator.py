@@ -1,10 +1,9 @@
 """Tests for YAML structure validation (Category M)."""
 
 from octorules.linter.engine import LintContext, Severity
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.yaml_validator import lint_yaml_structure
-
-from .conftest import assert_lint, assert_no_lint
 
 
 def _lint(rules_data, **kwargs):

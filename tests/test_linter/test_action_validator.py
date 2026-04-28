@@ -3,11 +3,10 @@
 import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME
+from octorules.testing.lint import assert_lint
 
 from octorules_cloudflare.linter.action_validator import lint_actions
 from octorules_cloudflare.linter.expression_bridge import WIREFILTER_AVAILABLE
-
-from .conftest import assert_lint
 
 _needs_wirefilter = pytest.mark.skipif(
     not WIREFILTER_AVAILABLE,

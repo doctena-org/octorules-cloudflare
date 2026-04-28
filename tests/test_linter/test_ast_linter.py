@@ -3,14 +3,13 @@
 import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.ast_linter import (
     _extract_function_call_args,
     lint_expressions,
 )
 from octorules_cloudflare.linter.expression_bridge import WIREFILTER_AVAILABLE
-
-from .conftest import assert_lint, assert_no_lint
 
 
 def _lint(expression, phase_name="waf_custom_rules", ref="test"):

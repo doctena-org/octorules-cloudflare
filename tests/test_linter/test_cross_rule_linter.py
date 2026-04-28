@@ -1,6 +1,7 @@
 """Tests for cross-rule linter (Category P)."""
 
 from octorules.linter.engine import LintContext, Severity
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.cross_rule_linter import lint_cross_rules
 
@@ -9,10 +10,6 @@ def _lint(rules_data, **kwargs):
     ctx = LintContext(**kwargs)
     lint_cross_rules(rules_data, ctx)
     return ctx
-
-
-def _ids(ctx):
-    return [r.rule_id for r in ctx.results]
 
 
 class TestDuplicateExpressions:
@@ -25,7 +22,7 @@ class TestDuplicateExpressions:
                 ]
             }
         )
-        assert "CF100" in _ids(ctx)
+        assert_lint(ctx, "CF100")
         p001 = [r for r in ctx.results if r.rule_id == "CF100"]
         assert len(p001) == 1
         assert p001[0].severity == Severity.WARNING
@@ -39,7 +36,7 @@ class TestDuplicateExpressions:
                 ]
             }
         )
-        assert "CF100" in _ids(ctx)
+        assert_lint(ctx, "CF100")
 
     def test_cf100_different_expressions_ok(self):
         ctx = _lint(
@@ -50,7 +47,7 @@ class TestDuplicateExpressions:
                 ]
             }
         )
-        assert "CF100" not in _ids(ctx)
+        assert_no_lint(ctx, "CF100")
 
     def test_cf100_same_expr_different_action_params_id_ok(self):
         # Managed ruleset deployments with same expression but different IDs
@@ -73,7 +70,7 @@ class TestDuplicateExpressions:
                 ]
             }
         )
-        assert "CF100" not in _ids(ctx)
+        assert_no_lint(ctx, "CF100")
 
     def test_cf100_same_expr_same_action_params_id_flagged(self):
         ctx = _lint(
@@ -94,7 +91,7 @@ class TestDuplicateExpressions:
                 ]
             }
         )
-        assert "CF100" in _ids(ctx)
+        assert_lint(ctx, "CF100")
 
     def test_cf100_across_phases_not_flagged(self):
         ctx = _lint(
@@ -107,7 +104,7 @@ class TestDuplicateExpressions:
                 ],
             }
         )
-        assert "CF100" not in _ids(ctx)
+        assert_no_lint(ctx, "CF100")
 
 
 class TestUnreachableRules:
@@ -120,7 +117,7 @@ class TestUnreachableRules:
                 ]
             }
         )
-        assert "CF101" in _ids(ctx)
+        assert_lint(ctx, "CF101")
 
     def test_cf101_not_triggered_with_non_true(self):
         ctx = _lint(
@@ -131,7 +128,7 @@ class TestUnreachableRules:
                 ]
             }
         )
-        assert "CF101" not in _ids(ctx)
+        assert_no_lint(ctx, "CF101")
 
     def test_cf101_not_triggered_with_non_terminating(self):
         ctx = _lint(
@@ -142,7 +139,7 @@ class TestUnreachableRules:
                 ]
             }
         )
-        assert "CF101" not in _ids(ctx)
+        assert_no_lint(ctx, "CF101")
 
     def test_cf101_disabled_rule_ignored(self):
         ctx = _lint(
@@ -153,7 +150,7 @@ class TestUnreachableRules:
                 ]
             }
         )
-        assert "CF101" not in _ids(ctx)
+        assert_no_lint(ctx, "CF101")
 
     def test_cf101_parenthesized_true(self):
         ctx = _lint(
@@ -164,7 +161,7 @@ class TestUnreachableRules:
                 ]
             }
         )
-        assert "CF101" in _ids(ctx)
+        assert_lint(ctx, "CF101")
 
 
 class TestListReferences:
@@ -177,7 +174,7 @@ class TestListReferences:
                 "lists": [],
             }
         )
-        assert "CF102" in _ids(ctx)
+        assert_lint(ctx, "CF102")
         p003 = [r for r in ctx.results if r.rule_id == "CF102"]
         assert "unknown_list" in p003[0].message
 
@@ -190,7 +187,7 @@ class TestListReferences:
                 "lists": [{"name": "my_ips"}],
             }
         )
-        assert "CF102" not in _ids(ctx)
+        assert_no_lint(ctx, "CF102")
 
     def test_cf102_no_list_refs_no_findings(self):
         ctx = _lint(
@@ -200,7 +197,7 @@ class TestListReferences:
                 ],
             }
         )
-        assert "CF102" not in _ids(ctx)
+        assert_no_lint(ctx, "CF102")
 
     def test_cf102_multiple_refs_partial_resolution(self):
         ctx = _lint(
@@ -226,7 +223,7 @@ class TestManagedLists:
                 ],
             }
         )
-        assert "CF103" in _ids(ctx)
+        assert_lint(ctx, "CF103")
 
     def test_cf103_valid_managed_list(self):
         ctx = _lint(
@@ -236,7 +233,7 @@ class TestManagedLists:
                 ],
             }
         )
-        assert "CF103" not in _ids(ctx)
+        assert_no_lint(ctx, "CF103")
 
     def test_cf103_user_list_not_flagged(self):
         ctx = _lint(
@@ -247,7 +244,7 @@ class TestManagedLists:
                 "lists": [{"name": "my_custom_list"}],
             }
         )
-        assert "CF103" not in _ids(ctx)
+        assert_no_lint(ctx, "CF103")
 
     def test_cf102_doesnt_flag_managed_list(self):
         # Managed list names (with dots) should not trigger CF102
@@ -259,7 +256,7 @@ class TestManagedLists:
                 "lists": [],
             }
         )
-        assert "CF102" not in _ids(ctx)
+        assert_no_lint(ctx, "CF102")
 
 
 class TestListTypeMismatch:
@@ -272,7 +269,7 @@ class TestListTypeMismatch:
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
 
     def test_cf104_asn_field_with_ip_list(self):
         ctx = _lint(
@@ -283,7 +280,7 @@ class TestListTypeMismatch:
                 "lists": [{"name": "my_ips", "kind": "ip", "items": []}],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
 
     def test_cf104_correct_ip_field_with_ip_list(self):
         ctx = _lint(
@@ -294,7 +291,7 @@ class TestListTypeMismatch:
                 "lists": [{"name": "my_ips", "kind": "ip", "items": []}],
             }
         )
-        assert "CF104" not in _ids(ctx)
+        assert_no_lint(ctx, "CF104")
 
     def test_cf104_correct_asn_field_with_asn_list(self):
         ctx = _lint(
@@ -305,7 +302,7 @@ class TestListTypeMismatch:
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
             }
         )
-        assert "CF104" not in _ids(ctx)
+        assert_no_lint(ctx, "CF104")
 
     def test_cf104_not_in_also_detected(self):
         ctx = _lint(
@@ -316,7 +313,7 @@ class TestListTypeMismatch:
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
 
     def test_cf104_no_lists_section(self):
         ctx = _lint(
@@ -326,7 +323,7 @@ class TestListTypeMismatch:
                 ],
             }
         )
-        assert "CF104" not in _ids(ctx)
+        assert_no_lint(ctx, "CF104")
 
     def test_cf104_unknown_list_no_error(self):
         """Unknown list reference is handled by CF102, not CF104."""
@@ -338,7 +335,7 @@ class TestListTypeMismatch:
                 "lists": [{"name": "my_ips", "kind": "ip", "items": []}],
             }
         )
-        assert "CF104" not in _ids(ctx)
+        assert_no_lint(ctx, "CF104")
 
     def test_cf104_managed_list_wrong_field(self):
         """CF104 detects type mismatch for $cf.* managed lists (all are ip kind)."""
@@ -349,7 +346,7 @@ class TestListTypeMismatch:
                 ],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
         p005 = [r for r in ctx.results if r.rule_id == "CF104"]
         assert len(p005) == 1
         assert "cf.anonymizer" in p005[0].message
@@ -363,7 +360,7 @@ class TestListTypeMismatch:
                 ],
             }
         )
-        assert "CF104" not in _ids(ctx)
+        assert_no_lint(ctx, "CF104")
 
     def test_cf104_managed_list_not_in(self):
         """CF104 detects managed list type mismatch with 'not in' operator."""
@@ -374,7 +371,7 @@ class TestListTypeMismatch:
                 ],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
 
     def test_cf104_managed_list_no_lists_section(self):
         """CF104 fires for managed lists even without a 'lists' section."""
@@ -385,7 +382,7 @@ class TestListTypeMismatch:
                 ],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
 
 
 class TestCustomRulesetListReferences:
@@ -405,7 +402,7 @@ class TestCustomRulesetListReferences:
                 "lists": [],
             }
         )
-        assert "CF102" in _ids(ctx)
+        assert_lint(ctx, "CF102")
         findings = [r for r in ctx.results if r.rule_id == "CF102"]
         assert len(findings) == 1
         assert findings[0].phase == "custom_rulesets/my_ruleset"
@@ -423,7 +420,7 @@ class TestCustomRulesetListReferences:
                 ],
             }
         )
-        assert "CF103" in _ids(ctx)
+        assert_lint(ctx, "CF103")
 
     def test_cf104_inside_custom_rulesets(self):
         ctx = _lint(
@@ -439,7 +436,7 @@ class TestCustomRulesetListReferences:
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
             }
         )
-        assert "CF104" in _ids(ctx)
+        assert_lint(ctx, "CF104")
 
 
 class TestRewriteNotTerminating:
@@ -454,7 +451,7 @@ class TestRewriteNotTerminating:
                 ]
             }
         )
-        assert "CF101" not in _ids(ctx)
+        assert_no_lint(ctx, "CF101")
 
     def test_cf101_stacked_rewrite_rules_all_true_no_warning(self):
         """Multiple rewrite rules with always-true expressions must NOT produce CF101.
@@ -471,7 +468,7 @@ class TestRewriteNotTerminating:
                 ]
             }
         )
-        assert "CF101" not in _ids(ctx)
+        assert_no_lint(ctx, "CF101")
 
     def test_cf101_stacked_block_rules_all_true_produces_warnings(self):
         """Contrast: stacked block rules with always-true expressions DO produce CF101.
@@ -506,4 +503,4 @@ class TestPhaseFilter:
             },
             phase_filter=["redirect_rules"],
         )
-        assert "CF100" not in _ids(ctx)
+        assert_no_lint(ctx, "CF100")

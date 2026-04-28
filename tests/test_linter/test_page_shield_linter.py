@@ -1,6 +1,7 @@
 """Tests for Page Shield policy linter — Category S rules + expression analysis."""
 
 from octorules.linter.engine import LintContext, lint_zone_file
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.page_shield_linter import lint_page_shield_policies
 
@@ -26,45 +27,41 @@ def _lint(policies, **ctx_kwargs):
     return ctx
 
 
-def _ids(ctx):
-    return [r.rule_id for r in ctx.results]
-
-
 # ── CF460: Missing required fields ───────────────────────────────────────────
 class TestS001MissingFields:
     def test_missing_description(self):
         policy = _valid_policy()
         del policy["description"]
         ctx = _lint([policy])
-        assert "CF460" in _ids(ctx)
+        assert_lint(ctx, "CF460")
         assert any("description" in r.message for r in ctx.results if r.rule_id == "CF460")
 
     def test_missing_action(self):
         policy = _valid_policy()
         del policy["action"]
         ctx = _lint([policy])
-        assert "CF460" in _ids(ctx)
+        assert_lint(ctx, "CF460")
         assert any("action" in r.message for r in ctx.results if r.rule_id == "CF460")
 
     def test_missing_expression(self):
         policy = _valid_policy()
         del policy["expression"]
         ctx = _lint([policy])
-        assert "CF460" in _ids(ctx)
+        assert_lint(ctx, "CF460")
         assert any("expression" in r.message for r in ctx.results if r.rule_id == "CF460")
 
     def test_missing_enabled(self):
         policy = _valid_policy()
         del policy["enabled"]
         ctx = _lint([policy])
-        assert "CF460" in _ids(ctx)
+        assert_lint(ctx, "CF460")
         assert any("enabled" in r.message for r in ctx.results if r.rule_id == "CF460")
 
     def test_missing_value(self):
         policy = _valid_policy()
         del policy["value"]
         ctx = _lint([policy])
-        assert "CF460" in _ids(ctx)
+        assert_lint(ctx, "CF460")
         assert any("value" in r.message for r in ctx.results if r.rule_id == "CF460")
 
 
@@ -72,42 +69,42 @@ class TestS001MissingFields:
 class TestS002InvalidAction:
     def test_invalid_action_block(self):
         ctx = _lint([_valid_policy(action="block")])
-        assert "CF461" in _ids(ctx)
+        assert_lint(ctx, "CF461")
         s002 = [r for r in ctx.results if r.rule_id == "CF461"]
         assert "block" in s002[0].message
 
     def test_valid_action_allow(self):
         ctx = _lint([_valid_policy(action="allow")])
-        assert "CF461" not in _ids(ctx)
+        assert_no_lint(ctx, "CF461")
 
     def test_valid_action_log(self):
         ctx = _lint([_valid_policy(action="log")])
-        assert "CF461" not in _ids(ctx)
+        assert_no_lint(ctx, "CF461")
 
 
 # ── CF462: Invalid field types ───────────────────────────────────────────────
 class TestS003InvalidTypes:
     def test_description_not_string(self):
         ctx = _lint([_valid_policy(description=123)])
-        assert "CF462" in _ids(ctx)
+        assert_lint(ctx, "CF462")
         s003 = [r for r in ctx.results if r.rule_id == "CF462"]
         assert any("description" in r.message for r in s003)
 
     def test_enabled_not_bool(self):
         ctx = _lint([_valid_policy(enabled="yes")])
-        assert "CF462" in _ids(ctx)
+        assert_lint(ctx, "CF462")
         s003 = [r for r in ctx.results if r.rule_id == "CF462"]
         assert any("enabled" in r.message for r in s003)
 
     def test_value_not_string(self):
         ctx = _lint([_valid_policy(value=123)])
-        assert "CF462" in _ids(ctx)
+        assert_lint(ctx, "CF462")
         s003 = [r for r in ctx.results if r.rule_id == "CF462"]
         assert any("value" in r.message for r in s003)
 
     def test_entry_not_dict(self):
         ctx = _lint(["not a dict"])
-        assert "CF462" in _ids(ctx)
+        assert_lint(ctx, "CF462")
         s003 = [r for r in ctx.results if r.rule_id == "CF462"]
         assert any("mapping" in r.message for r in s003)
 
@@ -121,7 +118,7 @@ class TestS004DuplicateDescription:
                 _valid_policy(description="Same name"),
             ]
         )
-        assert "CF463" in _ids(ctx)
+        assert_lint(ctx, "CF463")
         s004 = [r for r in ctx.results if r.rule_id == "CF463"]
         assert len(s004) == 1
         assert "Same name" in s004[0].message
@@ -133,7 +130,7 @@ class TestS004DuplicateDescription:
                 _valid_policy(description="Policy B"),
             ]
         )
-        assert "CF463" not in _ids(ctx)
+        assert_no_lint(ctx, "CF463")
 
 
 # ── Valid policy ────────────────────────────────────────────────────────────
@@ -149,17 +146,17 @@ class TestValidPolicy:
 class TestCatchAllExpressions:
     def test_cf015_always_true(self):
         ctx = _lint([_valid_policy(expression="true")])
-        assert "CF015" in _ids(ctx)
+        assert_lint(ctx, "CF015")
         m013 = [r for r in ctx.results if r.rule_id == "CF015"]
         assert m013[0].phase == "page_shield_policies"
 
     def test_cf015_always_true_parenthesized(self):
         ctx = _lint([_valid_policy(expression="(true)")])
-        assert "CF015" in _ids(ctx)
+        assert_lint(ctx, "CF015")
 
     def test_cf016_always_false(self):
         ctx = _lint([_valid_policy(expression="false")])
-        assert "CF016" in _ids(ctx)
+        assert_lint(ctx, "CF016")
         m014 = [r for r in ctx.results if r.rule_id == "CF016"]
         assert m014[0].phase == "page_shield_policies"
 
@@ -168,7 +165,7 @@ class TestCatchAllExpressions:
 class TestExpressionAnalysis:
     def test_cf522_regex_anchor_fires(self):
         ctx = _lint([_valid_policy(expression='http.request.uri.path eq "^/api"')])
-        assert "CF522" in _ids(ctx)
+        assert_lint(ctx, "CF522")
 
     def test_ref_override_shows_description(self):
         ctx = _lint(
@@ -198,7 +195,7 @@ class TestPhaseFilter:
             [_valid_policy(action="block")],
             phase_filter=["page_shield_policies"],
         )
-        assert "CF461" in _ids(ctx)
+        assert_lint(ctx, "CF461")
 
 
 # ── Integration with lint_zone_file ─────────────────────────────────────────
@@ -210,7 +207,7 @@ class TestIntegration:
             ],
         }
         ctx = lint_zone_file(rules_data)
-        assert "CF461" in [r.rule_id for r in ctx.results]
+        assert_lint(ctx, "CF461")
 
     def test_lint_zone_file_page_shield_alongside_phases(self):
         rules_data = {

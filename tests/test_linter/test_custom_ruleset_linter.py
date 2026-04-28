@@ -1,6 +1,7 @@
 """Tests for custom ruleset validation (Category T)."""
 
 from octorules.linter.engine import LintContext
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.custom_ruleset_linter import lint_custom_rulesets
 
@@ -9,10 +10,6 @@ def _lint(rules_data, **kwargs):
     ctx = LintContext(**kwargs)
     lint_custom_rulesets(rules_data, ctx)
     return ctx
-
-
-def _ids(ctx):
-    return [r.rule_id for r in ctx.results]
 
 
 class TestCustomRulesetStructure:
@@ -24,7 +21,7 @@ class TestCustomRulesetStructure:
                 ]
             }
         )
-        assert "CF022" in _ids(ctx)
+        assert_lint(ctx, "CF022")
 
     def test_cf022_missing_name(self):
         ctx = _lint(
@@ -38,7 +35,7 @@ class TestCustomRulesetStructure:
                 ]
             }
         )
-        assert "CF022" in _ids(ctx)
+        assert_lint(ctx, "CF022")
 
     def test_cf022_missing_phase(self):
         ctx = _lint(
@@ -52,7 +49,7 @@ class TestCustomRulesetStructure:
                 ]
             }
         )
-        assert "CF022" in _ids(ctx)
+        assert_lint(ctx, "CF022")
 
     def test_cf022_all_present_no_error(self):
         ctx = _lint(
@@ -67,7 +64,7 @@ class TestCustomRulesetStructure:
                 ]
             }
         )
-        assert "CF022" not in _ids(ctx)
+        assert_no_lint(ctx, "CF022")
 
 
 class TestCustomRulesetIdFormat:
@@ -84,7 +81,7 @@ class TestCustomRulesetIdFormat:
                 ]
             }
         )
-        assert "CF023" in _ids(ctx)
+        assert_lint(ctx, "CF023")
 
     def test_cf023_valid_hex_id(self):
         ctx = _lint(
@@ -99,7 +96,7 @@ class TestCustomRulesetIdFormat:
                 ]
             }
         )
-        assert "CF023" not in _ids(ctx)
+        assert_no_lint(ctx, "CF023")
 
 
 class TestCustomRulesetDuplicateRefs:
@@ -119,7 +116,7 @@ class TestCustomRulesetDuplicateRefs:
                 ]
             }
         )
-        assert "CF024" in _ids(ctx)
+        assert_lint(ctx, "CF024")
 
     def test_cf025_duplicate_ref_across_rulesets(self):
         ctx = _lint(
@@ -140,7 +137,7 @@ class TestCustomRulesetDuplicateRefs:
                 ]
             }
         )
-        assert "CF025" in _ids(ctx)
+        assert_lint(ctx, "CF025")
 
 
 class TestCF026RuleCount:
@@ -158,7 +155,7 @@ class TestCF026RuleCount:
                 ]
             }
         )
-        assert "CF026" in _ids(ctx)
+        assert_lint(ctx, "CF026")
 
     def test_cf026_at_limit(self):
         rules = [{"ref": f"rule-{i}", "expression": "true", "action": "block"} for i in range(1000)]
@@ -174,10 +171,10 @@ class TestCF026RuleCount:
                 ]
             }
         )
-        assert "CF026" not in _ids(ctx)
+        assert_no_lint(ctx, "CF026")
 
 
 class TestNoCustomRulesets:
     def test_no_custom_rulesets_no_errors(self):
         ctx = _lint({"waf_custom_rules": []})
-        assert _ids(ctx) == []
+        assert len(ctx.results) == 0

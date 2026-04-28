@@ -1,6 +1,7 @@
 """Tests for list validation (Category Q)."""
 
 from octorules.linter.engine import LintContext
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.list_linter import lint_lists
 
@@ -11,14 +12,10 @@ def _lint(rules_data, **kwargs):
     return ctx
 
 
-def _ids(ctx):
-    return [r.rule_id for r in ctx.results]
-
-
 class TestListStructure:
     def test_cf470_missing_name(self):
         ctx = _lint({"lists": [{"kind": "ip", "items": []}]})
-        assert "CF470" in _ids(ctx)
+        assert_lint(ctx, "CF470")
 
     def test_cf470_duplicate_name(self):
         ctx = _lint(
@@ -29,15 +26,15 @@ class TestListStructure:
                 ]
             }
         )
-        assert "CF470" in _ids(ctx)
+        assert_lint(ctx, "CF470")
 
     def test_cf471_missing_kind(self):
         ctx = _lint({"lists": [{"name": "mylist", "items": []}]})
-        assert "CF471" in _ids(ctx)
+        assert_lint(ctx, "CF471")
 
     def test_cf471_invalid_kind(self):
         ctx = _lint({"lists": [{"name": "mylist", "kind": "bogus", "items": []}]})
-        assert "CF471" in _ids(ctx)
+        assert_lint(ctx, "CF471")
 
     def test_valid_list_no_errors(self):
         ctx = _lint(
@@ -51,17 +48,17 @@ class TestListStructure:
                 ]
             }
         )
-        assert _ids(ctx) == []
+        assert len(ctx.results) == 0
 
 
 class TestIPListItems:
     def test_cf472_missing_ip_field(self):
         ctx = _lint({"lists": [{"name": "myips", "kind": "ip", "items": [{"comment": "oops"}]}]})
-        assert "CF472" in _ids(ctx)
+        assert_lint(ctx, "CF472")
 
     def test_cf473_invalid_ip(self):
         ctx = _lint({"lists": [{"name": "myips", "kind": "ip", "items": [{"ip": "not-an-ip"}]}]})
-        assert "CF473" in _ids(ctx)
+        assert_lint(ctx, "CF473")
 
     def test_cf475_duplicate_ip(self):
         ctx = _lint(
@@ -75,7 +72,7 @@ class TestIPListItems:
                 ]
             }
         )
-        assert "CF475" in _ids(ctx)
+        assert_lint(ctx, "CF475")
 
     def test_valid_ips(self):
         ctx = _lint(
@@ -93,27 +90,27 @@ class TestIPListItems:
                 ]
             }
         )
-        assert _ids(ctx) == []
+        assert len(ctx.results) == 0
 
 
 class TestASNListItems:
     def test_cf474_invalid_asn_type(self):
         ctx = _lint({"lists": [{"name": "myasns", "kind": "asn", "items": [{"asn": "not-int"}]}]})
-        assert "CF474" in _ids(ctx)
+        assert_lint(ctx, "CF474")
 
     def test_cf474_asn_boolean_true_rejected(self):
         """bool is a subclass of int in Python — True should not be accepted as ASN."""
         ctx = _lint({"lists": [{"name": "myasns", "kind": "asn", "items": [{"asn": True}]}]})
-        assert "CF474" in _ids(ctx)
+        assert_lint(ctx, "CF474")
 
     def test_cf474_asn_boolean_false_rejected(self):
         """bool is a subclass of int in Python — False should not be accepted as ASN."""
         ctx = _lint({"lists": [{"name": "myasns", "kind": "asn", "items": [{"asn": False}]}]})
-        assert "CF474" in _ids(ctx)
+        assert_lint(ctx, "CF474")
 
     def test_cf474_asn_out_of_range(self):
         ctx = _lint({"lists": [{"name": "myasns", "kind": "asn", "items": [{"asn": -1}]}]})
-        assert "CF474" in _ids(ctx)
+        assert_lint(ctx, "CF474")
 
     def test_cf475_duplicate_asn(self):
         ctx = _lint(
@@ -127,7 +124,7 @@ class TestASNListItems:
                 ]
             }
         )
-        assert "CF475" in _ids(ctx)
+        assert_lint(ctx, "CF475")
 
     def test_valid_asns(self):
         ctx = _lint(
@@ -141,7 +138,7 @@ class TestASNListItems:
                 ]
             }
         )
-        assert _ids(ctx) == []
+        assert len(ctx.results) == 0
 
 
 class TestHostnameListItems:
@@ -160,7 +157,7 @@ class TestHostnameListItems:
                 ]
             }
         )
-        assert "CF475" in _ids(ctx)
+        assert_lint(ctx, "CF475")
 
 
 class TestRedirectListItems:
@@ -168,7 +165,7 @@ class TestRedirectListItems:
         ctx = _lint(
             {"lists": [{"name": "redirects", "kind": "redirect", "items": [{"bogus": "val"}]}]}
         )
-        assert "CF472" in _ids(ctx)
+        assert_lint(ctx, "CF472")
 
     def test_cf475_duplicate_redirect_source(self):
         ctx = _lint(
@@ -195,19 +192,19 @@ class TestRedirectListItems:
                 ]
             }
         )
-        assert "CF475" in _ids(ctx)
+        assert_lint(ctx, "CF475")
 
 
 class TestCF476ListItemCount:
     def test_cf476_over_limit(self):
         items = [{"ip": f"10.0.{i // 256}.{i % 256}"} for i in range(10001)]
         ctx = _lint({"lists": [{"name": "biglist", "kind": "ip", "items": items}]})
-        assert "CF476" in _ids(ctx)
+        assert_lint(ctx, "CF476")
 
     def test_cf476_at_limit(self):
         items = [{"ip": f"10.0.{i // 256}.{i % 256}"} for i in range(10000)]
         ctx = _lint({"lists": [{"name": "biglist", "kind": "ip", "items": items}]})
-        assert "CF476" not in _ids(ctx)
+        assert_no_lint(ctx, "CF476")
 
 
 class TestCF477HostBitsSet:
@@ -226,7 +223,7 @@ class TestCF477HostBitsSet:
                 ]
             }
         )
-        assert "CF477" in _ids(ctx)
+        assert_lint(ctx, "CF477")
         cf477 = [r for r in ctx.results if r.rule_id == "CF477"]
         assert "host bits" in cf477[0].message
         assert "10.0.0.0/24" in cf477[0].message  # suggestion
@@ -244,7 +241,7 @@ class TestCF477HostBitsSet:
                 ]
             }
         )
-        assert "CF477" not in _ids(ctx)
+        assert_no_lint(ctx, "CF477")
 
     def test_cf477_single_host(self):
         """/32 single host should never trigger CF477."""
@@ -259,7 +256,7 @@ class TestCF477HostBitsSet:
                 ]
             }
         )
-        assert "CF477" not in _ids(ctx)
+        assert_no_lint(ctx, "CF477")
 
     def test_cf477_ipv6_host_bits(self):
         """IPv6 with host bits set should trigger CF477."""
@@ -274,7 +271,7 @@ class TestCF477HostBitsSet:
                 ]
             }
         )
-        assert "CF477" in _ids(ctx)
+        assert_lint(ctx, "CF477")
 
 
 class TestCF478IPOverlap:
@@ -293,7 +290,7 @@ class TestCF478IPOverlap:
                 ]
             }
         )
-        assert "CF478" in _ids(ctx)
+        assert_lint(ctx, "CF478")
 
     def test_cf478_no_overlap(self):
         """10.0.0.0/24 and 10.0.1.0/24 don't overlap — should NOT trigger CF478."""
@@ -308,7 +305,7 @@ class TestCF478IPOverlap:
                 ]
             }
         )
-        assert "CF478" not in _ids(ctx)
+        assert_no_lint(ctx, "CF478")
 
     def test_cf478_exact_duplicate_not_cf478(self):
         """Exact duplicates are CF475, not CF478."""
@@ -323,8 +320,8 @@ class TestCF478IPOverlap:
                 ]
             }
         )
-        assert "CF475" in _ids(ctx)
-        assert "CF478" not in _ids(ctx)
+        assert_lint(ctx, "CF475")
+        assert_no_lint(ctx, "CF478")
 
     def test_cf478_host_in_network(self):
         """A /32 host inside a broader network should trigger CF478."""
@@ -339,7 +336,7 @@ class TestCF478IPOverlap:
                 ]
             }
         )
-        assert "CF478" in _ids(ctx)
+        assert_lint(ctx, "CF478")
 
     def test_cf478_ipv6_overlap(self):
         """IPv6 overlap should also be detected."""
@@ -357,7 +354,7 @@ class TestCF478IPOverlap:
                 ]
             }
         )
-        assert "CF478" in _ids(ctx)
+        assert_lint(ctx, "CF478")
 
     def test_cf478_ipv4_ipv6_no_cross(self):
         """IPv4 and IPv6 should not be compared for overlap."""
@@ -372,7 +369,7 @@ class TestCF478IPOverlap:
                 ]
             }
         )
-        assert "CF478" not in _ids(ctx)
+        assert_no_lint(ctx, "CF478")
 
     def test_cf478_sweep_line_fast_on_large_input(self):
         """CF478 uses O(n log n) sweep-line (v0.7.8 rewrite). 1,000 disjoint
@@ -397,10 +394,10 @@ class TestCF478IPOverlap:
         elapsed = time.monotonic() - start
         assert elapsed < 1.0, f"CF478 sweep-line too slow: {elapsed:.2f}s for 1000 items"
         # Disjoint /32s → zero CF478 findings.
-        assert "CF478" not in _ids(ctx)
+        assert_no_lint(ctx, "CF478")
 
 
 class TestNoListsSection:
     def test_no_lists_no_errors(self):
         ctx = _lint({"waf_custom_rules": []})
-        assert _ids(ctx) == []
+        assert len(ctx.results) == 0

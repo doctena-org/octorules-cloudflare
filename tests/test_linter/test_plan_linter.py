@@ -1,6 +1,7 @@
 """Tests for plan linter (Category H)."""
 
 from octorules.linter.engine import LintContext
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.plan_linter import lint_plan_tier
 
@@ -9,10 +10,6 @@ def _lint(rules_data, plan_tier="free"):
     ctx = LintContext(plan_tier=plan_tier)
     lint_plan_tier(rules_data, ctx)
     return ctx
-
-
-def _ids(ctx):
-    return [r.rule_id for r in ctx.results]
 
 
 class TestRegexAvailability:
@@ -29,7 +26,7 @@ class TestRegexAvailability:
             },
             plan_tier="free",
         )
-        assert "CF500" in _ids(ctx)
+        assert_lint(ctx, "CF500")
 
     def test_cf500_regex_on_pro_plan(self):
         ctx = _lint(
@@ -44,7 +41,7 @@ class TestRegexAvailability:
             },
             plan_tier="pro",
         )
-        assert "CF500" in _ids(ctx)
+        assert_lint(ctx, "CF500")
 
     def test_cf500_regex_on_business_plan_ok(self):
         ctx = _lint(
@@ -59,7 +56,7 @@ class TestRegexAvailability:
             },
             plan_tier="business",
         )
-        assert "CF500" not in _ids(ctx)
+        assert_no_lint(ctx, "CF500")
 
     def test_cf500_regex_on_enterprise_plan_ok(self):
         ctx = _lint(
@@ -74,7 +71,7 @@ class TestRegexAvailability:
             },
             plan_tier="enterprise",
         )
-        assert "CF500" not in _ids(ctx)
+        assert_no_lint(ctx, "CF500")
 
 
 class TestRuleLimits:
@@ -83,21 +80,21 @@ class TestRuleLimits:
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(11)
         ]
         ctx = _lint({"redirect_rules": rules}, plan_tier="free")
-        assert "CF501" in _ids(ctx)
+        assert_lint(ctx, "CF501")
 
     def test_cf501_within_free_limit(self):
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(10)
         ]
         ctx = _lint({"redirect_rules": rules}, plan_tier="free")
-        assert "CF501" not in _ids(ctx)
+        assert_no_lint(ctx, "CF501")
 
     def test_cf501_enterprise_no_limit(self):
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(200)
         ]
         ctx = _lint({"redirect_rules": rules}, plan_tier="enterprise")
-        assert "CF501" not in _ids(ctx)
+        assert_no_lint(ctx, "CF501")
 
 
 class TestNonPhaseKeysIgnored:
