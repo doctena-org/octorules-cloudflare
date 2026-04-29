@@ -1,5 +1,6 @@
 """Tests for CloudflareProvider Page Shield policy methods."""
 
+import typing
 from unittest.mock import MagicMock
 
 import pytest
@@ -172,80 +173,28 @@ class TestPageShieldPolicies:
 
     # --- Error wrapping tests ---
 
-    def test_list_page_shield_policies_auth_error_wraps(self, mock_cf_client):
-        """AuthenticationError on list_page_shield_policies is wrapped as ProviderAuthError."""
-        from cloudflare import AuthenticationError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_cf_client.page_shield.policies.list.side_effect = AuthenticationError(
-            message="Invalid API token", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Invalid API token"):
-            provider.list_page_shield_policies(_zs())
-
-    def test_list_page_shield_policies_api_error_wraps(self, mock_cf_client):
-        """APIError on list_page_shield_policies is wrapped as ProviderError."""
-        from cloudflare import APIError
-
-        mock_cf_client.page_shield.policies.list.side_effect = APIError(
-            "Server Error", request=MagicMock(), body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Server Error"):
-            provider.list_page_shield_policies(_zs())
-
-    def test_create_page_shield_policy_auth_error_wraps(self, mock_cf_client):
-        """AuthenticationError on create_page_shield_policy is wrapped as ProviderAuthError."""
-        from cloudflare import AuthenticationError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_cf_client.page_shield.policies.create.side_effect = AuthenticationError(
-            message="Invalid API token", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Invalid API token"):
-            provider.create_page_shield_policy(
+    # Mapping from method name -> (sdk_path, lambda calling the provider method).
+    # Keeps the parametrized test compact while still exercising every
+    # public Page Shield method.
+    _PS_METHODS: typing.ClassVar[dict] = {
+        "list": (
+            "page_shield.policies.list",
+            lambda p: p.list_page_shield_policies(_zs()),
+        ),
+        "create": (
+            "page_shield.policies.create",
+            lambda p: p.create_page_shield_policy(
                 _zs(),
                 description="test",
                 action="allow",
                 expression="true",
                 enabled=True,
                 value="script-src 'self'",
-            )
-
-    def test_create_page_shield_policy_api_error_wraps(self, mock_cf_client):
-        """APIError on create_page_shield_policy is wrapped as ProviderError."""
-        from cloudflare import APIError
-
-        mock_cf_client.page_shield.policies.create.side_effect = APIError(
-            "Server Error", request=MagicMock(), body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Server Error"):
-            provider.create_page_shield_policy(
-                _zs(),
-                description="test",
-                action="allow",
-                expression="true",
-                enabled=True,
-                value="script-src 'self'",
-            )
-
-    def test_update_page_shield_policy_auth_error_wraps(self, mock_cf_client):
-        """AuthenticationError on update_page_shield_policy is wrapped as ProviderAuthError."""
-        from cloudflare import AuthenticationError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_cf_client.page_shield.policies.update.side_effect = AuthenticationError(
-            message="Invalid API token", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Invalid API token"):
-            provider.update_page_shield_policy(
+            ),
+        ),
+        "update": (
+            "page_shield.policies.update",
+            lambda p: p.update_page_shield_policy(
                 _zs(),
                 "pol-1",
                 description="test",
@@ -253,95 +202,68 @@ class TestPageShieldPolicies:
                 expression="true",
                 enabled=True,
                 value="script-src 'self'",
-            )
+            ),
+        ),
+        "delete": (
+            "page_shield.policies.delete",
+            lambda p: p.delete_page_shield_policy(_zs(), "pol-1"),
+        ),
+        "get_all": (
+            "page_shield.policies.list",  # get_all uses .list under the hood
+            lambda p: p.get_all_page_shield_policies(_zs()),
+        ),
+    }
 
-    def test_update_page_shield_policy_api_error_wraps(self, mock_cf_client):
-        """APIError on update_page_shield_policy is wrapped as ProviderError."""
-        from cloudflare import APIError
+    @staticmethod
+    def _sdk_attr(client, dotted: str):
+        obj = client
+        for part in dotted.split("."):
+            obj = getattr(obj, part)
+        return obj
 
-        mock_cf_client.page_shield.policies.update.side_effect = APIError(
-            "Server Error", request=MagicMock(), body=None
-        )
+    @pytest.mark.parametrize(
+        "error_factory,expected_exc,match",
+        [
+            (
+                lambda: __import__("cloudflare").AuthenticationError(
+                    message="Invalid API token",
+                    response=MagicMock(status_code=401),
+                    body=None,
+                ),
+                ProviderAuthError,
+                "Invalid API token",
+            ),
+            (
+                lambda: __import__("cloudflare").PermissionDeniedError(
+                    message="Forbidden",
+                    response=MagicMock(status_code=403),
+                    body=None,
+                ),
+                ProviderAuthError,
+                "Forbidden",
+            ),
+            (
+                lambda: __import__("cloudflare").APIError(
+                    "Server Error", request=MagicMock(), body=None
+                ),
+                ProviderError,
+                "Server Error",
+            ),
+            (
+                lambda: __import__("cloudflare").APIConnectionError(request=MagicMock()),
+                ProviderError,
+                "",  # APIConnectionError has no specific message we can match on
+            ),
+        ],
+        ids=["auth", "permission_denied", "api_error", "connection"],
+    )
+    @pytest.mark.parametrize("method_name", list(_PS_METHODS.keys()))
+    def test_error_wrapping(self, mock_cf_client, method_name, error_factory, expected_exc, match):
+        """Each Page Shield public method wraps SDK errors into the provider
+        exception hierarchy. Verified for every (method × error type) pair.
+        """
+        sdk_path, invoke = self._PS_METHODS[method_name]
+        self._sdk_attr(mock_cf_client, sdk_path).side_effect = error_factory()
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Server Error"):
-            provider.update_page_shield_policy(
-                _zs(),
-                "pol-1",
-                description="test",
-                action="allow",
-                expression="true",
-                enabled=True,
-                value="script-src 'self'",
-            )
-
-    def test_delete_page_shield_policy_auth_error_wraps(self, mock_cf_client):
-        """AuthenticationError on delete_page_shield_policy is wrapped as ProviderAuthError."""
-        from cloudflare import AuthenticationError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_cf_client.page_shield.policies.delete.side_effect = AuthenticationError(
-            message="Invalid API token", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Invalid API token"):
-            provider.delete_page_shield_policy(_zs(), "pol-1")
-
-    def test_delete_page_shield_policy_api_error_wraps(self, mock_cf_client):
-        """APIError on delete_page_shield_policy is wrapped as ProviderError."""
-        from cloudflare import APIError
-
-        mock_cf_client.page_shield.policies.delete.side_effect = APIError(
-            "Server Error", request=MagicMock(), body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Server Error"):
-            provider.delete_page_shield_policy(_zs(), "pol-1")
-
-    def test_get_all_page_shield_policies_auth_error_wraps(self, mock_cf_client):
-        """AuthenticationError on get_all_page_shield_policies is wrapped as ProviderAuthError."""
-        from cloudflare import AuthenticationError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_cf_client.page_shield.policies.list.side_effect = AuthenticationError(
-            message="Invalid API token", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Invalid API token"):
-            provider.get_all_page_shield_policies(_zs())
-
-    def test_get_all_page_shield_policies_api_error_wraps(self, mock_cf_client):
-        """APIError on get_all_page_shield_policies is wrapped as ProviderError."""
-        from cloudflare import APIError
-
-        mock_cf_client.page_shield.policies.list.side_effect = APIError(
-            "Server Error", request=MagicMock(), body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Server Error"):
-            provider.get_all_page_shield_policies(_zs())
-
-    def test_list_page_shield_policies_permission_denied_wraps(self, mock_cf_client):
-        """PermissionDeniedError on list_page_shield_policies is wrapped as ProviderAuthError."""
-        from cloudflare import PermissionDeniedError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 403
-        mock_cf_client.page_shield.policies.list.side_effect = PermissionDeniedError(
-            message="Forbidden", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Forbidden"):
-            provider.list_page_shield_policies(_zs())
-
-    def test_list_page_shield_policies_connection_error_wraps(self, mock_cf_client):
-        """APIConnectionError on list_page_shield_policies is wrapped as ProviderError."""
-        from cloudflare import APIConnectionError
-
-        mock_cf_client.page_shield.policies.list.side_effect = APIConnectionError(
-            request=MagicMock()
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError):
-            provider.list_page_shield_policies(_zs())
+        with pytest.raises(expected_exc, match=match):
+            invoke(provider)

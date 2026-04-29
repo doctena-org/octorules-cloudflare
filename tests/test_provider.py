@@ -911,50 +911,47 @@ class TestListZones:
         result = provider.list_zones()
         assert result == []
 
-    def test_list_zones_auth_error_wraps(self, mock_cf_client):
-        """AuthenticationError on list_zones is wrapped as ProviderAuthError."""
-        from cloudflare import AuthenticationError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_cf_client.zones.list.side_effect = AuthenticationError(
-            message="Invalid API token", response=mock_response, body=None
-        )
+    @pytest.mark.parametrize(
+        "error_factory,expected_exc,match",
+        [
+            (
+                lambda: __import__("cloudflare").AuthenticationError(
+                    message="Invalid API token",
+                    response=MagicMock(status_code=401),
+                    body=None,
+                ),
+                ProviderAuthError,
+                "Invalid API token",
+            ),
+            (
+                lambda: __import__("cloudflare").PermissionDeniedError(
+                    message="Forbidden",
+                    response=MagicMock(status_code=403),
+                    body=None,
+                ),
+                ProviderAuthError,
+                "Forbidden",
+            ),
+            (
+                lambda: __import__("cloudflare").APIError(
+                    "Server Error", request=MagicMock(), body=None
+                ),
+                ProviderError,
+                "Server Error",
+            ),
+            (
+                lambda: __import__("cloudflare").APIConnectionError(request=MagicMock()),
+                ProviderError,
+                "",
+            ),
+        ],
+        ids=["auth", "permission_denied", "api_error", "connection"],
+    )
+    def test_list_zones_wraps_sdk_errors(self, mock_cf_client, error_factory, expected_exc, match):
+        """``list_zones`` wraps every SDK error class into the provider hierarchy."""
+        mock_cf_client.zones.list.side_effect = error_factory()
         provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Invalid API token"):
-            provider.list_zones()
-
-    def test_list_zones_api_error_wraps(self, mock_cf_client):
-        """APIError on list_zones is wrapped as ProviderError."""
-        from cloudflare import APIError
-
-        mock_cf_client.zones.list.side_effect = APIError(
-            "Server Error", request=MagicMock(), body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError, match="Server Error"):
-            provider.list_zones()
-
-    def test_list_zones_permission_denied_wraps(self, mock_cf_client):
-        """PermissionDeniedError on list_zones is wrapped as ProviderAuthError."""
-        from cloudflare import PermissionDeniedError
-
-        mock_response = MagicMock()
-        mock_response.status_code = 403
-        mock_cf_client.zones.list.side_effect = PermissionDeniedError(
-            message="Forbidden", response=mock_response, body=None
-        )
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderAuthError, match="Forbidden"):
-            provider.list_zones()
-
-    def test_list_zones_connection_error_wraps(self, mock_cf_client):
-        """APIConnectionError on list_zones is wrapped as ProviderError."""
-        from cloudflare import APIConnectionError
-
-        mock_cf_client.zones.list.side_effect = APIConnectionError(request=MagicMock())
-        provider = CloudflareProvider(token="token", client=mock_cf_client)
-        with pytest.raises(ProviderError):
+        with pytest.raises(expected_exc, match=match):
             provider.list_zones()
 
 
@@ -1103,6 +1100,30 @@ class TestResolveZoneId:
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         provider.resolve_zone_id("example.com")
         assert "example.com" not in provider.zone_plans
+
+    def test_zone_plans_returns_defensive_copy(self, mock_cf_client):
+        """Mutating the returned dict must not corrupt provider state.
+
+        Returning ``self._zone_plans`` directly would expose the live
+        internal dict; callers mutating their snapshot would silently
+        corrupt the provider's view. Matches the contract used by Google
+        and Bunny.
+        """
+        zone = MagicMock()
+        zone.name = "example.com"
+        zone.id = "aabbccdd" * 4
+        zone.plan.name = "Enterprise"
+        mock_cf_client.zones.list.return_value = [zone]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        provider.resolve_zone_id("example.com")
+
+        snapshot = provider.zone_plans
+        snapshot["example.com"] = "free"  # caller mutation
+        snapshot["sneaky.com"] = "business"
+
+        # Provider's view must be unaffected.
+        assert provider.zone_plans["example.com"] == "enterprise"
+        assert "sneaky.com" not in provider.zone_plans
 
 
 class TestConcurrentResolveZoneId:
@@ -1438,6 +1459,57 @@ class TestGetListItemsRetry:
         with patch("octorules.retry.time.sleep"):
             with pytest.raises(ProviderError):
                 provider.get_list_items(Scope(account_id="a"), "lst-1")
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
+
+
+class TestListItemsPaginationGuard:
+    """Cursor pagination is bounded by _LIST_MAX_PAGES.
+
+    Without a guard, a server that always returns a non-empty cursor —
+    misbehaving API or malformed cursor chain — would hang the caller
+    forever. The guard caps total pages and raises so the caller can
+    surface the failure.
+    """
+
+    @staticmethod
+    def _make_raw_response(items, next_cursor):
+        import json
+
+        body = {
+            "result": items,
+            "result_info": {"cursors": {"after": next_cursor}} if next_cursor else {},
+        }
+        raw = MagicMock()
+        raw.http_response.text = json.dumps(body)
+        return raw
+
+    def test_pagination_raises_when_max_pages_exhausted(self, mock_cf_client):
+        """When the cursor never resolves, the loop raises rather than hangs."""
+        from octorules_cloudflare import provider as cf_provider_module
+
+        always_more = self._make_raw_response([{"ip": "1.0.0.1"}], "next")
+        mock_cf_client.rules.lists.items.with_raw_response.list.return_value = always_more
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+
+        # Patch _LIST_MAX_PAGES to a small value so the test stays fast.
+        with patch.object(cf_provider_module, "_LIST_MAX_PAGES", 5):
+            with pytest.raises(ProviderError, match="exceeded 5 pages"):
+                provider.get_list_items(Scope(account_id="a"), "lst-1")
+
+        # Exactly _LIST_MAX_PAGES API calls were made before the guard fired.
+        assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 5
+
+    def test_pagination_returns_when_cursor_clears(self, mock_cf_client):
+        """Normal pagination still terminates when the server signals end-of-data."""
+        responses = [
+            self._make_raw_response([{"ip": "1.0.0.1"}], "p1"),
+            self._make_raw_response([{"ip": "1.0.0.2"}], "p2"),
+            self._make_raw_response([{"ip": "1.0.0.3"}], None),  # no more cursor
+        ]
+        mock_cf_client.rules.lists.items.with_raw_response.list.side_effect = responses
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        items = provider.get_list_items(Scope(account_id="a"), "lst-1")
+        assert len(items) == 3
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
 
 

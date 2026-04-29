@@ -3,6 +3,7 @@
 import io
 import json
 
+import pytest
 from octorules.formatter import (
     build_report_data,
     format_plan_html,
@@ -24,37 +25,82 @@ from octorules_cloudflare.page_shield import PageShieldFormatter, PageShieldPoli
 REDIRECT_PHASE = get_phase("redirect_rules")
 
 
+def _format_text(zp):
+    return format_zone_plan(zp, use_color=False)
+
+
+def _format_md(zp):
+    return format_plan_markdown([zp])
+
+
+def _format_html(zp):
+    return format_plan_html([zp])
+
+
+# (formatter, expected_substrings) per output format. Keeps the parametrized
+# tests below compact while still asserting per-format markers (table tags,
+# ```diff fences, HTML-encoded diff glyphs).
+_CREATE_FORMATS = {
+    "text": (_format_text, ["page_shield: CSP on all", "+ create policy"]),
+    "markdown": (_format_md, ["page_shield:CSP on all", "create policy"]),
+    "html": (
+        _format_html,
+        ["page_shield: CSP on all", "<table>", "Create", "create policy"],
+    ),
+}
+
+_DELETE_FORMATS = {
+    "text": (_format_text, ["page_shield: Old CSP", "- delete policy"]),
+    "markdown": (_format_md, ["page_shield:Old CSP", "delete policy"]),
+    "html": (_format_html, ["Delete", "delete policy", "Summary: Deletes=1"]),
+}
+
+_MODIFY_FORMATS = {
+    "text": (_format_text, ["page_shield: CSP on all", "modify: CSP on all", "action"]),
+    "markdown": (
+        _format_md,
+        ["page_shield:CSP on all", "```diff", "- action: 'log'", "+ action: 'allow'"],
+    ),
+    "html": (_format_html, ["Update", "&minus;&ensp;", "+&ensp;"]),
+}
+
+
 class TestPageShieldPolicyFormatting:
     """Tests for Page Shield policy plan formatting across all output formats."""
 
-    def test_text_format_create_policy(self):
+    @pytest.mark.parametrize("fmt_name", list(_CREATE_FORMATS.keys()))
+    def test_format_create_policy(self, fmt_name):
+        formatter, expected = _CREATE_FORMATS[fmt_name]
         psp = PageShieldPolicyPlan(description="CSP on all", create=True)
         zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_zone_plan(zp, use_color=False)
-        assert "page_shield: CSP on all" in output
-        assert "+ create policy" in output
+        output = formatter(zp)
+        for substr in expected:
+            assert substr in output, f"{fmt_name}: missing {substr!r}"
 
-    def test_text_format_delete_policy(self):
+    @pytest.mark.parametrize("fmt_name", list(_DELETE_FORMATS.keys()))
+    def test_format_delete_policy(self, fmt_name):
+        formatter, expected = _DELETE_FORMATS[fmt_name]
         psp = PageShieldPolicyPlan(description="Old CSP", policy_id="p1", delete=True)
         zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_zone_plan(zp, use_color=False)
-        assert "page_shield: Old CSP" in output
-        assert "- delete policy" in output
+        output = formatter(zp)
+        for substr in expected:
+            assert substr in output, f"{fmt_name}: missing {substr!r}"
 
-    def test_text_format_modify_policy(self):
+    @pytest.mark.parametrize("fmt_name", list(_MODIFY_FORMATS.keys()))
+    def test_format_modify_policy(self, fmt_name):
+        formatter, expected = _MODIFY_FORMATS[fmt_name]
         change = RuleChange(
             ChangeType.MODIFY,
             "CSP on all",
             REDIRECT_PHASE,
-            current={"action": "log", "expression": "true", "enabled": True, "value": "old"},
-            desired={"action": "allow", "expression": "true", "enabled": True, "value": "old"},
+            current={"action": "log"},
+            desired={"action": "allow"},
         )
         psp = PageShieldPolicyPlan(description="CSP on all", policy_id="p1", changes=[change])
         zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_zone_plan(zp, use_color=False)
-        assert "page_shield: CSP on all" in output
-        assert "modify: CSP on all" in output
-        assert "action" in output
+        output = formatter(zp)
+        for substr in expected:
+            assert substr in output, f"{fmt_name}: missing {substr!r}"
 
     def test_text_format_total_changes(self):
         psp = PageShieldPolicyPlan(description="CSP", create=True)
@@ -103,68 +149,6 @@ class TestPageShieldPolicyFormatting:
         assert psp_data["changes"][0]["type"] == "modify"
         assert "current" in psp_data["changes"][0]
         assert "desired" in psp_data["changes"][0]
-
-    def test_markdown_format_create_policy(self):
-        psp = PageShieldPolicyPlan(description="CSP on all", create=True)
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_plan_markdown([zp])
-        assert "page_shield:CSP on all" in output
-        assert "create policy" in output
-
-    def test_markdown_format_delete_policy(self):
-        psp = PageShieldPolicyPlan(description="Old CSP", policy_id="p1", delete=True)
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_plan_markdown([zp])
-        assert "page_shield:Old CSP" in output
-        assert "delete policy" in output
-
-    def test_markdown_format_modify_policy(self):
-        change = RuleChange(
-            ChangeType.MODIFY,
-            "CSP",
-            REDIRECT_PHASE,
-            current={"action": "log"},
-            desired={"action": "allow"},
-        )
-        psp = PageShieldPolicyPlan(description="CSP", policy_id="p1", changes=[change])
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_plan_markdown([zp])
-        assert "page_shield:CSP" in output
-        assert "```diff" in output
-        assert "- action: 'log'" in output
-        assert "+ action: 'allow'" in output
-
-    def test_html_format_create_policy(self):
-        psp = PageShieldPolicyPlan(description="CSP on all", create=True)
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_plan_html([zp])
-        assert "page_shield: CSP on all" in output
-        assert "<table>" in output
-        assert "Create" in output
-        assert "create policy" in output
-
-    def test_html_format_delete_policy(self):
-        psp = PageShieldPolicyPlan(description="Old CSP", policy_id="p1", delete=True)
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_plan_html([zp])
-        assert "Delete" in output
-        assert "delete policy" in output
-        assert "Summary: Deletes=1" in output
-
-    def test_html_format_modify_policy(self):
-        change = RuleChange(
-            ChangeType.MODIFY,
-            "CSP",
-            REDIRECT_PHASE,
-            current={"action": "log"},
-            desired={"action": "allow"},
-        )
-        psp = PageShieldPolicyPlan(description="CSP", policy_id="p1", changes=[change])
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        output = format_plan_html([zp])
-        assert "Update" in output
-        assert "&minus;&ensp;" in output
-        assert "+&ensp;" in output
 
     def test_report_includes_page_shield(self):
         psp = PageShieldPolicyPlan(description="CSP on all", create=True)

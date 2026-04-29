@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.12] - 2026-04-29
+
+### Fixed
+- `CloudflareProvider.zone_plans` now returns a snapshot copy of the
+  internal mapping. Callers can no longer mutate the provider's
+  cached zone-plan state by accident (matches the contract already
+  used by the Google and Bunny providers).
+- `_list_items` (used by `octorules` for IP/redirect/ASN lists) now
+  caps pagination at 1000 pages. A malformed cursor chain from the
+  API can no longer hang the caller indefinitely; `ProviderError` is
+  raised instead.
+
 ## [0.7.10] - 2026-04-18
 
 ### Fixed

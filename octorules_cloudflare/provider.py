@@ -56,6 +56,10 @@ log = logging.getLogger(__name__)
 _KNOWN_PLANS = {"free", "pro", "business", "enterprise"}
 _LIST_ITEMS_PER_PAGE = 500
 _LIST_PAGE_BACKOFF = (1.0, 2.0, 3.0, 5.0)
+# Hard cap on pagination iterations to defend against malformed cursor chains
+# from the API (theoretically impossible, defensively bounded). At 500 items
+# per page, 1000 pages = 500k items — well past any realistic CF list size.
+_LIST_MAX_PAGES = 1000
 _BULK_POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
 _BULK_POLL_MAX_ATTEMPTS = 30
 
@@ -147,8 +151,12 @@ class CloudflareProvider:
 
     @property
     def zone_plans(self) -> dict[str, str]:
-        """Zone name -> normalized plan tier, populated during resolve_zone_id."""
-        return self._zone_plans
+        """Zone name -> normalized plan tier, populated during resolve_zone_id.
+
+        Returns a snapshot copy — callers cannot mutate the provider's
+        internal state. Matches the contract used by Google and Bunny.
+        """
+        return dict(self._zone_plans)
 
     @_wrap_provider_errors
     def resolve_zone_id(self, zone_name: str) -> str:
@@ -467,7 +475,7 @@ class CloudflareProvider:
         _retryable = (APIError, APIConnectionError, _json.JSONDecodeError)
         all_items: list[dict] = []
         cursor: str | None = None
-        while True:
+        for _ in range(_LIST_MAX_PAGES):
             kwargs: dict = {**scope.api_kwargs, "per_page": _LIST_ITEMS_PER_PAGE}
             if cursor:
                 kwargs["cursor"] = cursor
@@ -502,8 +510,13 @@ class CloudflareProvider:
                 if isinstance(cursors, dict):
                     cursor = cursors.get("after") or None
             if not cursor:
-                break
-        return all_items
+                return all_items
+        # _LIST_MAX_PAGES exhausted with cursor still set: bail loudly so a
+        # malformed cursor chain can't hang the caller indefinitely.
+        raise ProviderError(
+            f"Pagination exceeded {_LIST_MAX_PAGES} pages for list {list_id} ({sl}); "
+            "likely a malformed cursor chain"
+        )
 
     @_wrap_provider_errors
     def put_list_items(self, scope: Scope, list_id: str, items: list[dict]) -> str:
