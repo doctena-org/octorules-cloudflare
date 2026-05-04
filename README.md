@@ -255,7 +255,7 @@ Each policy entry requires:
 
 ## Linting
 
-152 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+153 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|

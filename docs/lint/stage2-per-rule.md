@@ -1500,6 +1500,34 @@ Conservative scope: only fires on alphanumerics + `_`, `-`, `/`, and escaped dot
 
 Fix: Replace `matches "^foo$"` with `eq "foo"` (unescape any `\.` to `.`).
 
+### CF550 — Percent-encoded literal value on decoded URI field
+
+| Severity | Category |
+|----------|----------|
+| WARNING | value |
+
+Triggers when a rule uses a percent-encoded literal (e.g., `%2F`, `%20`, `%2E`) paired with a decoded URI field and a literal-comparison operator. The field value is always decoded before comparison, so a percent-encoded literal will never match.
+
+Applies to decoded URI fields: `http.request.uri`, `http.request.uri.path`, `http.request.full_uri`, `http.host`, and `http.referer`.
+
+Applies to literal-comparison operators: `eq`, `ne`, `contains`, `starts_with`, `ends_with`, and `in`.
+
+```yaml
+# Fires:
+- ref: r-block-api-slash
+  expression: http.request.uri.path eq "/api%2Fv1"  # %2F is encoded /
+
+# Suggested replacements:
+- ref: r-block-api-slash
+  expression: http.request.uri.path eq "/api/v1"  # use decoded form
+
+# or:
+- ref: r-block-api-slash
+  expression: raw.http.request.uri.path eq "/api%2Fv1"  # use raw field
+```
+
+Fix: Either use the decoded literal form, or switch to the `raw.*` field variant to match percent-encoded values in the original request.
+
 ---
 
 ## Category B — Phase Restrictions (3 rules)

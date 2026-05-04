@@ -2113,3 +2113,136 @@ class TestCF549UnnecessaryRegex:
         # No regex_field_pair recorded for function-call LHS.
         ctx = _lint(r'lower(http.host) matches "^example$"')
         assert_no_lint(ctx, "CF549")
+
+
+# ---------------------------------------------------------------------------
+# CF550 — percent-encoded literal on decoded URI field
+# ---------------------------------------------------------------------------
+
+
+class TestCF550PercentEncodedLiteral:
+    def test_percent_encoded_slash_on_path_fires(self):
+        # Literal with %2F (encoded /) on http.request.uri.path fires.
+        ctx = _lint('http.request.uri.path eq "/api%2Fv1"')
+        cf550 = assert_lint(ctx, "CF550", count=1, severity=Severity.WARNING)
+        assert "%2F" in cf550[0].message or "percent-encoded" in cf550[0].message.lower()
+
+    def test_percent_encoded_dot_on_host_fires(self):
+        # Literal with %2E (encoded .) on http.host fires.
+        ctx = _lint('http.host eq "example%2Ecom"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_percent_encoded_question_on_uri_fires(self):
+        # Literal with %3F (encoded ?) on http.request.uri fires.
+        ctx = _lint('http.request.uri eq "/api%3Fv=1"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_percent_encoded_on_referer_fires(self):
+        # Literal with %2F on http.referer fires.
+        ctx = _lint('http.referer eq "https://example.com%2Fadmin"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_percent_encoded_on_full_uri_fires(self):
+        # Literal with %20 (space) on http.request.full_uri fires.
+        ctx = _lint('http.request.full_uri eq "https://example.com/path%20with%20space"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_raw_uri_field_no_fire(self):
+        # Percent-encoded literal on raw.http.request.uri.path does NOT fire
+        # (encoding is correct for raw fields).
+        ctx = _lint('raw.http.request.uri.path eq "/api%2Fv1"')
+        assert_no_lint(ctx, "CF550")
+
+    def test_regex_operator_no_fire(self):
+        # Percent-encoded sequence in a regex pattern does NOT fire
+        # (%XX may be intentional in regex bodies).
+        ctx = _lint('http.request.uri.path matches "/api%2Fv1"')
+        assert_no_lint(ctx, "CF550")
+
+    def test_no_percent_encoding_no_fire(self):
+        # Literal on decoded URI field without percent-encoding does NOT fire.
+        ctx = _lint('http.request.uri.path eq "/api/v1"')
+        assert_no_lint(ctx, "CF550")
+
+    def test_lowercase_percent_encoding_fires(self):
+        # Mixed-case percent-encoding (%2f lowercase) still fires.
+        ctx = _lint('http.request.uri.path eq "/api%2f"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_invalid_percent_sequence_no_fire(self):
+        # Percent not followed by 2 hex digits (e.g., `100%pure`) does NOT fire.
+        ctx = _lint('http.host eq "100%pure"')
+        assert_no_lint(ctx, "CF550")
+
+    def test_in_operator_with_percent_encoded_fires(self):
+        # The 'in' operator with a set containing percent-encoded values fires.
+        ctx = _lint('http.request.uri.path in {"/a%2F" "/b"}')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_ne_operator_with_percent_encoded_fires(self):
+        # The 'ne' operator also counts as a literal-comparison operator.
+        ctx = _lint('http.request.uri.path ne "/api%2Fv1"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_contains_operator_with_percent_encoded_fires(self):
+        # The 'contains' operator with percent-encoded value fires.
+        ctx = _lint('http.request.uri.path contains "%2Fadmin"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_starts_with_operator_with_percent_encoded_fires(self):
+        # The 'starts_with' operator with percent-encoded value fires.
+        ctx = _lint('http.request.uri.path starts_with "/api%2F"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_ends_with_operator_with_percent_encoded_fires(self):
+        # The 'ends_with' operator with percent-encoded value fires.
+        ctx = _lint('http.request.uri.path ends_with "%2Fadmin"')
+        assert_lint(ctx, "CF550", count=1)
+
+    def test_non_uri_field_no_fire(self):
+        # Percent-encoded literal on a non-URI field does NOT fire
+        # (the rule only targets decoded URI fields).
+        ctx = _lint('http.request.method eq "GET%20POST"')
+        assert_no_lint(ctx, "CF550")
+
+    def test_mixed_expression_with_decoded_uri_fires(self):
+        # If the expression uses a decoded URI field (even mixed with others),
+        # and has a percent-encoded literal, it fires.
+        ctx = _lint('(http.request.method eq "GET") and (http.request.uri.path eq "/api%2Fv1")')
+        assert_lint(ctx, "CF550", count=1)
+
+
+# ---------------------------------------------------------------------------
+# Test Rule Overlap — Multiple rules fire independently on same input
+# ---------------------------------------------------------------------------
+class TestRuleOverlap:
+    """Document intentional double-firing behavior for known overlap pairs.
+
+    Lint rules fire independently — when two rules catch different concerns
+    on the same input, both should fire to give richer signal to the user.
+    """
+
+    def test_cf548_cf549_overlap_permissive_vs_literal(self):
+        """CF548 ∩ CF549: Document current behavior for overlap.
+
+        CF548: Overly-permissive regex patterns (^.+$, ^.*$, etc.)
+        CF549: Fully-anchored literals (^foo$, ^/bar$, etc.)
+
+        A pattern like ^.+$ is permissive (CF548) but NOT a literal (not CF549).
+        A pattern like ^foo$ is a literal (CF549) but NOT permissive (not CF548).
+
+        Currently, they do NOT overlap because the permissive set excludes
+        literals, and the fully-anchored literal check excludes quantifiers.
+        This test documents that behavior.
+        """
+        # Permissive pattern: ^.+$ matches CF548 only
+        ctx1 = _lint('http.host matches "^.+$"')
+        rule_ids1 = {r.rule_id for r in ctx1.results}
+        assert "CF548" in rule_ids1, f"CF548 not found for ^.+$; got {rule_ids1}"
+        assert "CF549" not in rule_ids1, f"CF549 should NOT fire for ^.+$; got {rule_ids1}"
+
+        # Anchored literal pattern: ^foo$ matches CF549 only
+        ctx2 = _lint('http.host matches "^foo$"')
+        rule_ids2 = {r.rule_id for r in ctx2.results}
+        assert "CF548" not in rule_ids2, f"CF548 should NOT fire for ^foo$; got {rule_ids2}"
+        assert "CF549" in rule_ids2, f"CF549 not found for ^foo$; got {rule_ids2}"

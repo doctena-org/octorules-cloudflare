@@ -67,6 +67,7 @@ RULE_IDS = frozenset(
         "CF547",
         "CF548",
         "CF549",
+        "CF550",
         "CF502",
         "CF510",
         "CF511",
@@ -1172,11 +1173,12 @@ def _lint_value_constraints(
     _check_empty_in_list(info, phase_name, ref, ctx)
     _check_overly_permissive_regex(info, phase_name, ref, ctx)
     _check_unnecessary_regex(info, phase_name, ref, ctx)
+    _check_percent_encoded_literal(info, phase_name, ref, ctx)
 
 
 # Regexes that match every input — using one of these on a field is
 # almost always a mistake (the rule effectively has no condition).
-# Captured from jonasbb's `overly_permissive_pattern.rs` and grouped:
+# Two groups:
 #
 #   - Truly always-match in any context: ".", "", ".*", ".+", "^", "$", "|"
 #     plus the trivial anchor combinations
@@ -1301,6 +1303,89 @@ def _check_unnecessary_regex(
         )
 
 
+# Percent-encoded sequence pattern (e.g., %2F, %20, %3F, %2E).
+_PERCENT_ENCODED_SEQUENCE = re.compile(r"%[0-9A-Fa-f]{2}")
+
+# Fields where the URI is decoded (not percent-encoded).
+# Pairing percent-encoded literals with these fields is a logic error:
+# the literal will never match because the engine decodes the input before comparison.
+_DECODED_URI_FIELDS = frozenset(
+    {
+        "http.request.uri",
+        "http.request.uri.path",
+        "http.request.full_uri",
+        "http.host",
+        "http.referer",
+    }
+)
+
+# Operators where percent-encoded sequences in literals are meaningful (not regex).
+# The rule does not fire on 'matches' because %XX in regex may be intentional.
+_LITERAL_COMPARISON_OPERATORS = frozenset(
+    {
+        "eq",
+        "ne",
+        "contains",
+        "starts_with",
+        "ends_with",
+        "in",
+    }
+)
+
+
+def _check_percent_encoded_literal(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF550: Flag percent-encoded literal values on decoded URI fields.
+
+    When a string literal contains percent-encoded sequences (e.g., %2F, %20)
+    paired with a decoded URI field (e.g., http.request.uri.path), the rule
+    will never match because the field value is decoded before comparison.
+
+    Scoping: Fire when the rule's expression contains any decoded URI field
+    AND any string literal with percent-encoding AND uses a literal-comparison
+    operator (not regex). This is conservative — avoids false positives on
+    mixed expressions.
+    """
+    # Quick bailout: no string literals → nothing to check.
+    if not info.string_literals:
+        return
+
+    # Quick bailout: no decoded URI fields in use → rule is not affected.
+    if not any(f in info.fields_used for f in _DECODED_URI_FIELDS):
+        return
+
+    # Quick bailout: no literal-comparison operators → percent-encoding is
+    # expected (e.g., in a regex pattern).
+    if not any(op in info.operators_used for op in _LITERAL_COMPARISON_OPERATORS):
+        return
+
+    # Check each string literal for percent-encoded sequences.
+    for literal in info.string_literals:
+        if _PERCENT_ENCODED_SEQUENCE.search(literal):
+            # Found a percent-encoded sequence in a literal, paired with a decoded URI field.
+            ctx.add(
+                LintResult(
+                    rule_id="CF550",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Percent-encoded sequence in literal {literal!r} on decoded URI "
+                        "field; the literal will never match (field is decoded before "
+                        "comparison)"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                    suggestion=(
+                        "Use decoded form (e.g., '/' not '%2F') or the raw.* variant "
+                        "(e.g., raw.http.request.uri.path)"
+                    ),
+                )
+            )
+            # Report once per rule, not once per literal, to avoid noise.
+            break
+
+
 # Fields where CF semantically expects dotted-path literals (hostnames,
 # URI paths). An unescaped `.` in a regex against one of these is almost
 # certainly a typo for a literal dot — see CF546.
@@ -1380,9 +1465,6 @@ def _has_unescaped_question_outside_regex_context(regex: str) -> bool:
     The pattern ``https?`` (the protocol scheme) is a common, intentional
     use of `?` as a quantifier on `s`. Skip when the regex contains
     that substring.
-
-    Mirrors the ``has_unescaped_query_like`` check from jonasbb's
-    ``suspicious_regex.rs``.
     """
     if "https?" in regex:
         return False
@@ -1418,9 +1500,6 @@ def _has_slash_glob_pattern(regex: str) -> bool:
     Concretely fires when ``*`` is preceded by ``/`` AND followed by
     ``/`` or end-of-pattern. ``/foo/*/bar`` and ``/foo/*`` match;
     ``/foo/bar*`` (where ``*`` is preceded by a letter) does not.
-
-    Mirrors the ``contains_slash_star_slash`` check from jonasbb's
-    ``suspicious_regex.rs``.
     """
     in_class = False
     prev: str = ""

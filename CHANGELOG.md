@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-05-04
+
+### Added
+- **CF550** (value, WARNING): percent-encoded literal value (`%2F`, `%20`) on decoded URI field with a literal-comparison operator — never matches; use the decoded form or the `raw.*` field variant.
+
 ## [0.8.0] - 2026-05-04
 
 ### Added
@@ -25,10 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   evaluates to false (CF016 only caught the literal `false` form).
 - **CF548** (value, WARNING): regex pattern matches every value
   (`matches "."`, `".*"`, `""`); path-aware, so `"/"` and `"/.*"` also fire
-  on path fields. Inspired by jonasbb's `overly_permissive_pattern`.
+  on path fields.
 - **CF549** (value, INFO): fully-anchored literal regex (`^foo$`) that
   simplifies to `eq`. Conservative — only alphanumerics plus `_`, `-`, `/`,
-  and escaped dots/slashes. Inspired by jonasbb's `unnecessary_patterns`.
+  and escaped dots/slashes.
 
 ### Changed
 - Repinned `octorules-wirefilter` to `>=0.4.0,<1.0` for the 9 new fields,

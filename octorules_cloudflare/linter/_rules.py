@@ -223,6 +223,12 @@ CF549 = RuleMeta(
     "Regex pattern is a fully-anchored literal — can be simplified to eq",
     Severity.INFO,
 )
+CF550 = RuleMeta(
+    "CF550",
+    "value",
+    "Percent-encoded literal on decoded URI field — use raw.* or decoded form",
+    Severity.WARNING,
+)
 
 # Category O — Best Practice / Style
 CF510 = RuleMeta(

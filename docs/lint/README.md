@@ -2,6 +2,8 @@
 
 `octorules lint` performs offline static analysis of your rules files. **150 rules** across **19 categories**, organized into a 4-stage pipeline.
 
+**Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
+
 ### Suppressing rules
 
 Add a `# octorules:disable=RULE` comment immediately before a rule to suppress a specific finding. Multiple rule IDs can be comma-separated.
