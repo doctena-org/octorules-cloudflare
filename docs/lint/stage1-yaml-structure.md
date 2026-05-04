@@ -2,7 +2,7 @@
 
 Validates top-level keys, required fields, types, and structural correctness before any deeper analysis runs.
 
-## Category M — Structure (16 rules)
+## Category M — Structure (17 rules)
 
 ### CF003 — Missing ref field
 
@@ -243,3 +243,25 @@ waf_custom_rules:
 ```
 
 Fix: Remove the rule if it's no longer needed, or re-enable it.
+
+### CF027 — Expression has leading/trailing whitespace
+
+| Severity | Category |
+|----------|----------|
+| INFO | structure |
+
+Triggers when the expression string has leading or trailing whitespace that will be stripped by the Cloudflare API.
+
+```yaml
+- ref: r-bad-whitespace
+  expression: ' http.host eq "example.com"'  # leading space
+  action: block
+```
+
+Fix: Remove the leading or trailing whitespace from the expression.
+
+```yaml
+- ref: r-bad-whitespace
+  expression: 'http.host eq "example.com"'
+  action: block
+```

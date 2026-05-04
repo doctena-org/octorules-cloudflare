@@ -980,7 +980,7 @@ Fix: Split into separate rules, or restructure the expression to only unpack one
 
 ---
 
-## Category G — Value Constraints (26 rules)
+## Category G — Value Constraints (28 rules)
 
 ### CF520 — HTTP method should be uppercase
 
@@ -1378,6 +1378,128 @@ network_firewall_rules:
 
 Fix: Use valid offset (0–2040) and size (1–32) values.
 
+### CF546 — Suspicious regex: field-context heuristics
+
+| Severity | Category |
+|----------|----------|
+| WARNING | value |
+
+Triggers when a `matches` operator uses a regex pattern that's likely a typo for the field type. Three sub-checks dispatched by field:
+
+#### Sub-check 1 — Unescaped `.` (hostname / URI / path / cert-DN fields)
+
+The dot matches any character in regex; in field values that semantically contain literal dots (hostnames, paths, DNs), a bare `.` is almost always a typo for `\.`.
+
+**Fields in scope:**
+- Hostname / URI fields: `http.host`, `http.referer`, `http.request.uri`, `http.request.uri.path`, `http.request.full_uri`, `cf.worker.upstream_zone`, plus the `raw.*` request-URI variants.
+- X.509 Distinguished Name fields (the `CN=` portion is hostname-style; OIDs need the same escaping): `cf.tls_client_auth.cert_subject_dn`, `cert_subject_dn_legacy`, `cert_subject_dn_rfc2253`, `cert_issuer_dn`, `cert_issuer_dn_legacy`, `cert_issuer_dn_rfc2253`.
+
+```yaml
+# Fires
+- expression: http.host matches "api.example.com"        # `.` matches any char
+- expression: cf.tls_client_auth.cert_subject_dn matches "CN=api.example.com"
+
+# No fire
+- expression: http.host matches "api\.example\.com"      # escaped dots
+- expression: http.host matches ".*\.example\.com"       # `.*` is quantifier-followed, intentional wildcard
+```
+
+#### Sub-check 2 — Unescaped `?` (URI-context fields)
+
+`?` is a regex zero-or-one quantifier. In a URI context a literal `?` is the query separator; users sometimes write `matches "/foo?bar=1"` thinking they're matching a query string, but `o?` actually means "zero or one `o`".
+
+**Fields in scope:** `http.referer`, `http.request.uri`, `http.request.full_uri`, plus `raw.*` variants.
+
+The `?` is suspect when not preceded by a regex-quantifier-eligible token (`*`, `+`, `(`, `)`, `[`, `]`). The `https?` protocol pattern is a documented exception (the `s?` is intentional optional `s`).
+
+```yaml
+# Fires
+- expression: http.request.uri matches "/foo?bar=1"      # `o?` is regex, not literal `?`
+
+# No fire
+- expression: http.request.uri matches "/foo\?bar=1"     # escaped
+- expression: http.request.uri matches "https?://example\.com/foo"  # https? exception
+- expression: http.request.uri matches "[a-z]?foo"       # quantifier on class
+```
+
+#### Sub-check 3 — Glob-style `/*/` (path fields)
+
+`*` is a regex zero-or-more quantifier on the preceding char. In a path context users often write `/*/` thinking they're matching "any segment" (glob style), but `o*/` means "zero or more `o`s followed by `/`".
+
+**Fields in scope:** `http.request.uri.path`, `raw.http.request.uri.path`.
+
+The check fires when `*` is preceded by `/` AND followed by `/` or end-of-pattern.
+
+```yaml
+# Fires
+- expression: http.request.uri.path matches "/foo/*/bar"  # `o*/` is regex
+- expression: http.request.uri.path matches "/foo/*"      # trailing `/*`
+
+# No fire
+- expression: http.request.uri.path matches "/foo*/bar"   # `*` after letter is normal quantifier
+- expression: http.request.uri.path matches "/foo/.*/bar" # `.*` is intentional wildcard
+```
+
+**Fix:** Use the `wildcard` operator for glob matches, or the `eq`/`contains` operators for literal substring matching. If regex is needed, escape literal metacharacters (`\.`, `\?`) or use explicit constructs (`/[^/]+/` for "any path segment").
+
+### CF547 — Empty inline list 'in {}' (always false)
+
+| Severity | Category |
+|----------|----------|
+| WARNING | value |
+
+Triggers when an inline `in {}` list is empty. An empty list matches nothing, so the expression always evaluates to false and the rule will never match.
+
+```yaml
+- ref: r-empty-list
+  expression: ip.src in {}   # always false
+  action: block
+```
+
+Fix: Remove the rule, populate the list, or use a different expression.
+
+### CF548 — Overly permissive regex pattern (matches every value)
+
+| Severity | Category |
+|----------|----------|
+| WARNING | value |
+
+Triggers when a `matches` regex on a plain field LHS is one of the always-match patterns (`.`, `.*`, `.+`, `^`, `$`, `^.*$`, `|`, etc.). The rule effectively has no condition and fires on every request — almost always a typo or oversight.
+
+For path fields (`http.request.uri.path`, `raw.http.request.uri.path`), additional patterns are flagged: `/`, `^/`, `/.*`, `^/.*`, etc. Paths always start with `/`, so these are also always-match in path context.
+
+Uses the `regex_field_pairs` from wirefilter to determine field context; silently no-ops when wirefilter is unavailable.
+
+```yaml
+- ref: r-block-everything
+  expression: http.host matches ".*"   # matches every host — rule fires on every request
+  action: block
+```
+
+Fix: Use a more specific pattern, or remove the rule if the match-all behavior is intentional.
+
+### CF549 — Regex pattern is a fully-anchored literal (use eq instead)
+
+| Severity | Category |
+|----------|----------|
+| INFO | value |
+
+Triggers when a `matches` regex is anchored at both ends (`^…$`) and the body contains no regex metacharacters — the pattern is just a literal string. Same semantics as `eq`, simpler to read, and avoids the regex engine.
+
+Conservative scope: only fires on alphanumerics + `_`, `-`, `/`, and escaped dots/slashes. Patterns with alternation (`a|b`), character classes (`[abc]`), or quantifiers (`+`, `*`, `?`, `{n}`) fall through — those are real regexes.
+
+```yaml
+# Fires:
+- ref: r-block-host
+  expression: http.host matches "^api\.example\.com$"
+
+# Suggested replacement:
+- ref: r-block-host
+  expression: http.host eq "api.example.com"
+```
+
+Fix: Replace `matches "^foo$"` with `eq "foo"` (unescape any `\.` to `.`).
+
 ---
 
 ## Category B — Phase Restrictions (3 rules)
@@ -1416,7 +1538,7 @@ Fix: Upgrade to the required plan tier, or use an alternative field/function.
 
 ---
 
-## Category O — Best Practice / Style (6 rules)
+## Category O — Best Practice / Style (9 rules)
 
 ### CF510 — Consider using in operator for multiple OR values
 
@@ -1528,4 +1650,80 @@ Fix:
 
 ```yaml
 expression: 'http.request.uri.path matches r"\.(js|css)$"'
+```
+
+### CF516 — Mixed operator notation
+
+| Severity | Category |
+|----------|----------|
+| INFO | style |
+
+Triggers when an expression uses both English operators (and/or/eq/ne) and C-like operators (&&/||/==/!=) in the same expression. Pick one notation for consistency.
+
+```yaml
+- ref: r-mixed-ops
+  expression: http.host eq "a" and ip.src == 1.2.3.4   # eq + ==
+  action: block
+```
+
+Fix: Use only English notation or only C-like notation throughout the expression.
+
+```yaml
+- ref: r-mixed-ops
+  expression: http.host eq "a" and ip.src eq 1.2.3.4
+  action: block
+```
+
+### CF517 — Mixed "and"/"or" without explicit parentheses
+
+| Severity | Category |
+|----------|----------|
+| INFO | style |
+
+Triggers when an expression mixes `and` and `or` at the top level (outside of parentheses). Cloudflare binds `and` tighter than `or` — `A and B or C` parses as `(A and B) or C` — but many readers find this precedence surprising. Add parentheses to make the intended grouping explicit.
+
+```yaml
+- ref: r-no-parens
+  expression: http.host eq "a" and ip.src eq 1.2.3.4 or http.host eq "b"
+  action: block
+```
+
+Fix: Wrap conditions in parentheses to clarify precedence.
+
+```yaml
+- ref: r-no-parens
+  expression: (http.host eq "a" and ip.src eq 1.2.3.4) or http.host eq "b"
+  action: block
+```
+
+### CF518 — Inline list exceeds readability threshold
+
+| Severity | Category |
+|----------|----------|
+| INFO | style |
+
+Triggers when an inline `in {…}` list contains more than 25 entries. Large inline lists reduce readability; consider extracting the list to a named managed list instead.
+
+```yaml
+- ref: r-long-inline
+  expression: ip.src in {1.2.3.4 5.6.7.8 9.10.11.12 ... 30 entries total}
+  action: block
+```
+
+Fix: Move the list to a managed list at the top level.
+
+```yaml
+lists:
+  - name: blocked_ips
+    kind: ip
+    items:
+      - 1.2.3.4
+      - 5.6.7.8
+      - 9.10.11.12
+      # ... more entries
+
+waf_custom_rules:
+  - ref: r-long-inline
+    expression: ip.src in $blocked_ips
+    action: block
 ```

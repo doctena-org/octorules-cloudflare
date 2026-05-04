@@ -39,6 +39,7 @@ CF016 = RuleMeta(
 )
 CF017 = RuleMeta("CF017", "structure", "Expression exceeds 4,096 character limit", Severity.ERROR)
 CF018 = RuleMeta("CF018", "structure", "Rule is disabled (enabled: false)", Severity.INFO)
+CF027 = RuleMeta("CF027", "structure", "Expression has leading/trailing whitespace", Severity.INFO)
 
 # Category C — Action Validation
 CF200 = RuleMeta("CF200", "action", "Invalid action for this phase", Severity.ERROR)
@@ -203,6 +204,25 @@ CF542 = RuleMeta("CF542", "value", "Invalid regex pattern in matches operator", 
 CF543 = RuleMeta("CF543", "value", "substring() index out of bounds or inverted", Severity.WARNING)
 CF544 = RuleMeta("CF544", "value", "lookup_json path should start with /", Severity.WARNING)
 CF545 = RuleMeta("CF545", "value", "bit_slice offset or size out of range", Severity.WARNING)
+CF546 = RuleMeta(
+    "CF546",
+    "value",
+    "Suspicious regex: unescaped literal in field-context",
+    Severity.WARNING,
+)
+CF547 = RuleMeta("CF547", "value", "Empty inline list 'in {}' (always false)", Severity.WARNING)
+CF548 = RuleMeta(
+    "CF548",
+    "value",
+    "Overly permissive regex pattern (matches every value)",
+    Severity.WARNING,
+)
+CF549 = RuleMeta(
+    "CF549",
+    "value",
+    "Regex pattern is a fully-anchored literal — can be simplified to eq",
+    Severity.INFO,
+)
 
 # Category O — Best Practice / Style
 CF510 = RuleMeta(
@@ -216,6 +236,19 @@ CF514 = RuleMeta(
 )
 CF515 = RuleMeta(
     "CF515", "style", "Regex pattern uses literal escapes instead of raw string", Severity.INFO
+)
+CF516 = RuleMeta(
+    "CF516",
+    "style",
+    "Mixed operator notation (English and C-like in same expression)",
+    Severity.INFO,
+)
+CF517 = RuleMeta("CF517", "style", 'Mixed "and"/"or" without explicit parentheses', Severity.INFO)
+CF518 = RuleMeta(
+    "CF518",
+    "style",
+    "Inline list exceeds readability threshold (consider stored list)",
+    Severity.INFO,
 )
 
 # Category S — Page Shield Structure

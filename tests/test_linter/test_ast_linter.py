@@ -1022,13 +1022,41 @@ class TestF002UnknownField:
         f002 = [r for r in ctx.results if r.rule_id == "CF308"]
         assert "ip.src" in (f002[0].suggestion or "")
 
-    def test_cf308_jwt_exp_field_known(self):
-        """JWT exp claim fields should be recognized (not trigger CF308)."""
+    def test_cf308_jwt_exp_field_intentionally_absent(self):
+        """JWT ``exp`` claim fields are intentionally NOT in the scheme.
+
+        Cloudflare validates ``exp`` internally via ``is_jwt_valid()`` and
+        does not expose it as a queryable field. Earlier wirefilter
+        registrations of ``http.request.jwt.claims.exp.sec`` (and
+        ``.sec.names``, ``.sec.values``) were speculative and have been
+        removed. Re-adding any of them must be backed by current CF docs
+        evidence, not symmetry with ``aud`` / ``iss`` / ``sub`` etc.
+        """
         from octorules_cloudflare.linter.schemas.fields import get_field
 
-        assert get_field("http.request.jwt.claims.exp.sec") is not None
-        assert get_field("http.request.jwt.claims.exp.sec.names") is not None
-        assert get_field("http.request.jwt.claims.exp.sec.values") is not None
+        for name in [
+            "http.request.jwt.claims.exp.sec",
+            "http.request.jwt.claims.exp.sec.names",
+            "http.request.jwt.claims.exp.sec.values",
+        ]:
+            assert get_field(name) is None, (
+                f"{name!r} is intentionally absent (speculative addition); "
+                "do not re-add without grep-verifying against the canonical "
+                "CF fields YAML at cloudflare/cloudflare-docs/src/content/"
+                "fields/index.yaml"
+            )
+
+    def test_cf308_response_headers_truncated_intentionally_absent(self):
+        """``http.response.headers.truncated`` is intentionally NOT in the
+        scheme. CF docs only expose the request-side
+        ``http.request.headers.truncated``; the response variant was an
+        earlier speculative addition.
+        """
+        from octorules_cloudflare.linter.schemas.fields import get_field
+
+        assert get_field("http.response.headers.truncated") is None
+        # Sanity: the request-side variant IS in the scheme.
+        assert get_field("http.request.headers.truncated") is not None
 
 
 class TestF001ArrayMapFields:
@@ -1509,3 +1537,579 @@ class TestExtractFunctionCallArgs:
         """A ) inside a quoted string does not close the argument list."""
         result = _extract_function_call_args('split(http.host, ")")', "split")
         assert result == [["http.host", '")"']]
+
+
+# ---------------------------------------------------------------------------
+# CF027 — expression-whitespace
+# ---------------------------------------------------------------------------
+
+
+class TestCF027ExpressionWhitespace:
+    def test_leading_whitespace_fires(self):
+        ctx = _lint(' http.host eq "example.com"')
+        cf027 = assert_lint(ctx, "CF027", count=1, severity=Severity.INFO, ref="test")
+        assert "whitespace" in cf027[0].message.lower()
+
+    def test_trailing_whitespace_fires(self):
+        ctx = _lint('http.host eq "example.com" ')
+        assert_lint(ctx, "CF027", count=1, severity=Severity.INFO)
+
+    def test_both_sides_fires_once(self):
+        ctx = _lint('  http.host eq "example.com"\t')
+        # Single CF027 even when whitespace is on both sides.
+        assert_lint(ctx, "CF027", count=1)
+
+    def test_no_whitespace_no_fire(self):
+        ctx = _lint('http.host eq "example.com"')
+        assert_no_lint(ctx, "CF027")
+
+    def test_whitespace_inside_expression_no_fire(self):
+        # Internal whitespace is part of normal syntax — not a CF027 case.
+        ctx = _lint('http.host eq "example.com" and ip.src eq 1.2.3.4')
+        assert_no_lint(ctx, "CF027")
+
+
+# ---------------------------------------------------------------------------
+# CF516 — operator_style (mixed English / C-like notation)
+# ---------------------------------------------------------------------------
+
+
+class TestCF516OperatorStyle:
+    def test_mixed_eq_and_double_equals_fires(self):
+        ctx = _lint('http.host eq "a" and ip.src == 1.2.3.4')
+        assert_lint(ctx, "CF516", count=1, severity=Severity.INFO, ref="test")
+
+    def test_mixed_and_with_double_amp_fires(self):
+        ctx = _lint('http.host eq "a" && ip.src eq 1.2.3.4')
+        assert_lint(ctx, "CF516", count=1)
+
+    def test_all_english_no_fire(self):
+        ctx = _lint('http.host eq "a" and ip.src eq 1.2.3.4')
+        assert_no_lint(ctx, "CF516")
+
+    def test_all_clike_no_fire(self):
+        ctx = _lint('http.host == "a" && ip.src == 1.2.3.4')
+        assert_no_lint(ctx, "CF516")
+
+    def test_clike_op_inside_string_literal_does_not_fire(self):
+        # `==` inside a string literal must NOT be counted as a C-like
+        # operator. _strip_literals masks string content first.
+        ctx = _lint('http.host eq "a == b"')
+        assert_no_lint(ctx, "CF516")
+
+
+# ---------------------------------------------------------------------------
+# CF517 — ambiguous-precedence (mixed and/or without parens)
+# ---------------------------------------------------------------------------
+
+
+class TestCF517AmbiguousPrecedence:
+    def test_mixed_and_or_at_top_level_fires(self):
+        ctx = _lint('http.host eq "a" and ip.src eq 1.2.3.4 or http.host eq "b"')
+        assert_lint(ctx, "CF517", count=1, severity=Severity.INFO, ref="test")
+
+    def test_explicit_parens_no_fire(self):
+        ctx = _lint('(http.host eq "a" and ip.src eq 1.2.3.4) or http.host eq "b"')
+        assert_no_lint(ctx, "CF517")
+
+    def test_only_and_no_fire(self):
+        ctx = _lint('http.host eq "a" and ip.src eq 1.2.3.4')
+        assert_no_lint(ctx, "CF517")
+
+    def test_only_or_no_fire(self):
+        ctx = _lint('http.host eq "a" or http.host eq "b"')
+        assert_no_lint(ctx, "CF517")
+
+    def test_clike_mixed_fires(self):
+        # `&&` and `||` mixed at top level — same hazard as `and`/`or`.
+        ctx = _lint('http.host == "a" && ip.src == 1.2.3.4 || http.host == "b"')
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_and_or_inside_string_literal_does_not_fire(self):
+        # The keyword inside the literal must not trip the check.
+        ctx = _lint('http.host eq "and-or-inside" and ip.src eq 1.2.3.4')
+        assert_no_lint(ctx, "CF517")
+
+
+# ---------------------------------------------------------------------------
+# CF517 — ambiguous-precedence stress cases
+#
+# Closes coverage gaps identified by the 19-case stress matrix run during
+# review. Each case below is a real expression shape a user could write;
+# the assertion documents whether CF517 should fire.
+# ---------------------------------------------------------------------------
+
+
+class TestCF517StressCases:
+    def test_negation_in_mix_fires(self):
+        # `not A and B or C` — `not` doesn't change the and/or hazard.
+        ctx = _lint('not http.host eq "a" and ip.src eq 1.2.3.4 or http.host eq "b"')
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_negated_paren_then_or_no_fire(self):
+        # `not (A and B) or C` — `and` is inside parens, only `or` at depth 0.
+        ctx = _lint('not (http.host eq "a" and ip.src eq 1.2.3.4) or http.host eq "b"')
+        assert_no_lint(ctx, "CF517")
+
+    def test_clike_only_chain_with_mixed_fires(self):
+        # `A && B && C || D` — three-way chain is C-like-only but mixed.
+        ctx = _lint(
+            'http.host == "a" && ip.src == 1.2.3.4 && http.referer == "x" || http.host == "b"'
+        )
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_clike_or_then_and_fires(self):
+        # `A || B && C` — C-like or-then-and at depth 0.
+        ctx = _lint('http.host == "a" || ip.src == 1.2.3.4 && http.host == "b"')
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_english_and_clike_or_mixed_fires(self):
+        # Mixed English `and` with C-like `||` at depth 0 — both CF516
+        # and CF517 fire (different concerns).
+        ctx = _lint('http.host eq "a" and ip.src == 1.2.3.4 || http.host eq "b"')
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_fully_parenthesized_groups_no_fire(self):
+        # `((A and B) or (C and D))` — every and/or is inside parens.
+        ctx = _lint(
+            '((http.host eq "a" and ip.src eq 1.2.3.4) or (http.host eq "b" and ip.src eq 5.6.7.8))'
+        )
+        assert_no_lint(ctx, "CF517")
+
+    def test_nested_or_at_depth_zero_only_no_fire(self):
+        # `((A or B) and C) or D` — outer paren has and+or, but only `or`
+        # appears at the absolute top level (depth 0 after the outer
+        # group closes). The check tracks depth strictly.
+        ctx = _lint(
+            '((http.host eq "a" or http.host eq "b") and ip.src eq 1.2.3.4) or http.host eq "c"'
+        )
+        # Only `or` at depth 0 → no fire on CF517.
+        assert_no_lint(ctx, "CF517")
+
+    def test_xor_combined_with_and_or_fires(self):
+        # `A and B xor C or D` — `xor` plus `and`/`or` at depth 0 is
+        # even harder to read than two-way mixing; should fire.
+        ctx = _lint(
+            'http.host eq "a" and ip.src eq 1.2.3.4 xor cf.threat_score gt 10 or http.host eq "b"'
+        )
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_function_call_parens_isolate_inner_and_or(self):
+        # `foo(A and B) or C` — `and` is inside the function-call parens
+        # (depth 1), only `or` at depth 0. No mix at top level → no fire.
+        ctx = _lint('any(http.request.headers.names[*] eq "x") or http.host eq "a"')
+        assert_no_lint(ctx, "CF517")
+
+    def test_function_calls_with_top_level_mix_fires(self):
+        # `foo(A) and bar(B) or C` — function calls produce atom-shaped
+        # operands, but `and` and `or` are still at depth 0.
+        ctx = _lint('len(http.host) gt 5 and len(http.request.uri.path) gt 1 or http.host eq "b"')
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_parens_around_atoms_still_fires(self):
+        # `(A) and (B) or (C)` — parens are around atoms, not around
+        # mixed groups. Both `and` and `or` still at depth 0.
+        ctx = _lint('(http.host eq "a") and (ip.src eq 1.2.3.4) or (http.host eq "b")')
+        assert_lint(ctx, "CF517", count=1)
+
+    def test_uppercase_keywords_no_fire(self):
+        # `A AND B OR C` — wirefilter rejects uppercase at parse time
+        # (CF001 fires); CF517 should not fire because the regex is
+        # case-sensitive (matches wirefilter's behavior).
+        ctx = _lint('http.host eq "a" AND ip.src eq 1.2.3.4 OR http.host eq "b"')
+        assert_no_lint(ctx, "CF517")
+
+    def test_empty_and_bare_field_no_fire(self):
+        # Single field, no operators at all.
+        ctx = _lint("ssl")
+        assert_no_lint(ctx, "CF517")
+
+
+# ---------------------------------------------------------------------------
+# CF518 — long-in-list (readability)
+# ---------------------------------------------------------------------------
+
+
+class TestCF518LongInList:
+    def test_above_threshold_fires(self):
+        # Register 30 entries — comfortably above the 25-entry threshold.
+        entries = " ".join(f'"v{i}"' for i in range(30))
+        ctx = _lint(f"http.host in {{{entries}}}")
+        cf518 = assert_lint(ctx, "CF518", count=1, severity=Severity.INFO)
+        assert "30" in cf518[0].message
+        assert "25" in cf518[0].message
+
+    def test_at_threshold_no_fire(self):
+        # Exactly 25 — boundary case, doesn't fire (the check is `>`, not `>=`).
+        entries = " ".join(f'"v{i}"' for i in range(25))
+        ctx = _lint(f"http.host in {{{entries}}}")
+        assert_no_lint(ctx, "CF518")
+
+    def test_one_above_threshold_fires(self):
+        # 26 entries — first value above the threshold; off-by-one guard.
+        entries = " ".join(f'"v{i}"' for i in range(26))
+        ctx = _lint(f"http.host in {{{entries}}}")
+        assert_lint(ctx, "CF518", count=1)
+
+    def test_short_list_no_fire(self):
+        ctx = _lint('http.host in {"a" "b" "c"}')
+        assert_no_lint(ctx, "CF518")
+
+
+# ---------------------------------------------------------------------------
+# CF546 — suspicious_regex (unescaped `.` on dotted-context fields)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not WIREFILTER_AVAILABLE,
+    reason="CF546 needs regex_field_pairs from wirefilter",
+)
+class TestCF546SuspiciousRegex:
+    def test_unescaped_dot_in_hostname_regex_fires(self):
+        ctx = _lint(r'http.host matches "api.example.com"')
+        cf546 = assert_lint(ctx, "CF546", count=1, severity=Severity.WARNING)
+        assert "unescaped" in cf546[0].message.lower() or "." in cf546[0].message
+
+    def test_escaped_dot_no_fire(self):
+        ctx = _lint(r'http.host matches "api\.example\.com"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_dot_inside_character_class_no_fire(self):
+        # `.` inside `[...]` is a literal dot already — no false positive.
+        ctx = _lint(r'http.host matches "[a-z.]+"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_path_field_unescaped_dot_fires(self):
+        ctx = _lint(r'http.request.uri.path matches "/foo.bar/"')
+        assert_lint(ctx, "CF546", count=1)
+
+    def test_function_call_lhs_no_fire(self):
+        # `lower(http.host)` — function-call LHS, no field-regex pair
+        # recorded; CF546 should not fire (no false positives on
+        # transformed LHS).
+        ctx = _lint(r'lower(http.host) matches "api.example.com"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_non_dotted_context_field_no_fire(self):
+        # CF546 only fires on hostname/path-style fields. A regex on
+        # cf.bot_management.ja3_hash is unrelated.
+        ctx = _lint(r'cf.bot_management.ja3_hash matches "abc.def"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_intentional_wildcard_dot_star_no_fire(self):
+        # `.*` is an intentional any-char wildcard, not a typo for `\.`.
+        # The heuristic skips `.` followed by `*`, `+`, `?`, or `{`.
+        ctx = _lint(r'http.host matches ".*"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_wildcard_with_unescaped_literal_dot_fires(self):
+        # `.*example.com` — leading `.*` is a wildcard (skipped), but
+        # `example.com` has a bare literal-context dot that's almost
+        # certainly meant to be `\.`.
+        ctx = _lint(r'http.host matches ".*example.com"')
+        assert_lint(ctx, "CF546", count=1)
+
+    def test_dot_followed_by_plus_no_fire(self):
+        # `.+` is the same as `.*` — quantifier-following dots are
+        # intentional any-char + repetition.
+        ctx = _lint(r'http.host matches ".+\.example\.com"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_dot_followed_by_brace_quantifier_no_fire(self):
+        # `.{3}` — bounded any-char repetition. Intentional.
+        ctx = _lint(r'http.host matches "x.{3}\.example\.com"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_upstream_zone_field_in_dotted_context(self):
+        # cf.worker.upstream_zone is a hostname; treated as dotted-context
+        # alongside http.host etc.
+        ctx = _lint(r'cf.worker.upstream_zone matches "tenant.example.com"')
+        assert_lint(ctx, "CF546", count=1)
+
+    def test_cert_subject_dn_unescaped_dot_fires(self):
+        # X.509 Distinguished Name: the CN= portion contains hostname-style
+        # content. `CN=api.example.com` has 2 unescaped dots that are
+        # wildcards by accident — same bug shape as a bare hostname regex.
+        ctx = _lint(r'cf.tls_client_auth.cert_subject_dn matches "CN=api.example.com"')
+        assert_lint(ctx, "CF546", count=1, severity=Severity.WARNING)
+
+    def test_cert_subject_dn_escaped_no_fire(self):
+        # Properly-escaped DN regex — no false positive.
+        ctx = _lint(r'cf.tls_client_auth.cert_subject_dn matches "CN=api\.example\.com,"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_cert_subject_dn_wildcard_subdomain_no_fire(self):
+        # `.*\.example\.com,` — `.*` is a quantifier-followed wildcard
+        # (skipped by heuristic); the `\.` are escaped.
+        ctx = _lint(r'cf.tls_client_auth.cert_subject_dn matches "CN=.*\.example\.com,"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_cert_issuer_dn_unescaped_dot_fires(self):
+        # Same logic for issuer DN — both subject and issuer are
+        # in _DOTTED_CONTEXT_FIELDS.
+        ctx = _lint(r'cf.tls_client_auth.cert_issuer_dn matches "O=Acme,CN=ca.acme.com"')
+        assert_lint(ctx, "CF546", count=1)
+
+    def test_cert_subject_dn_oid_escaping_required(self):
+        # OIDs like `1.2.840.113549` need escaping just like hostnames —
+        # bare dots match any char. Lint correctly fires on bare form.
+        ctx = _lint(r'cf.tls_client_auth.cert_subject_dn matches "1.2.840.113549"')
+        assert_lint(ctx, "CF546", count=1)
+        # And with proper escaping, no fire.
+        ctx2 = _lint(r'cf.tls_client_auth.cert_subject_dn matches "1\.2\.840\.113549"')
+        assert_no_lint(ctx2, "CF546")
+
+    def test_cert_dn_legacy_and_rfc2253_variants_fire(self):
+        # All 3 forms of subject DN and 3 of issuer DN are in scope.
+        for field in [
+            "cf.tls_client_auth.cert_subject_dn",
+            "cf.tls_client_auth.cert_subject_dn_legacy",
+            "cf.tls_client_auth.cert_subject_dn_rfc2253",
+            "cf.tls_client_auth.cert_issuer_dn",
+            "cf.tls_client_auth.cert_issuer_dn_legacy",
+            "cf.tls_client_auth.cert_issuer_dn_rfc2253",
+        ]:
+            ctx = _lint(rf'{field} matches "CN=foo.bar.com"')
+            cf546 = [r for r in ctx.results if r.rule_id == "CF546"]
+            assert len(cf546) == 1, f"{field}: expected CF546 to fire, got {ctx.results}"
+
+    def test_cert_dn_no_dot_no_fire(self):
+        # No `.` in the regex — no fire even on a DN field.
+        ctx = _lint(r'cf.tls_client_auth.cert_subject_dn matches "O=Acme Corp"')
+        assert_no_lint(ctx, "CF546")
+
+    # ── Unescaped `?` in URI-context fields ────────────────────
+
+    def test_unescaped_question_in_uri_fires(self):
+        # `/foo?bar=1` — `o?` is a regex quantifier ("zero or one o");
+        # almost certainly the user meant the literal `?` query separator.
+        ctx = _lint(r'http.request.uri matches "/foo?bar=1"')
+        cf546 = assert_lint(ctx, "CF546", count=1, severity=Severity.WARNING)
+        assert "?" in cf546[0].message or "query separator" in cf546[0].message.lower()
+
+    def test_escaped_question_in_uri_no_fire(self):
+        # Properly escaped — no fire.
+        ctx = _lint(r'http.request.uri matches "/foo\?bar=1"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_https_optional_protocol_no_fire(self):
+        # `https?` is the documented exception — `s?` is intentional
+        # protocol-letter optionality, not a literal `?`.
+        ctx = _lint(r'http.request.uri matches "https?://example\.com/foo"')
+        assert_no_lint(ctx, "CF546")
+
+    def test_question_in_regex_quantifier_context_no_fire(self):
+        # `?` after `*`, `+`, `)`, `]` are regex quantifier contexts.
+        for pattern in [
+            r"foo*?",  # lazy quantifier
+            r"foo+?",  # lazy quantifier
+            r"(foo)?",  # optional group
+            r"[abc]?",  # optional class
+            r"(?i)foo",  # regex flag
+        ]:
+            ctx = _lint(rf'http.request.uri matches "{pattern}"')
+            assert_no_lint(ctx, "CF546")
+
+    def test_question_check_only_for_uri_context_fields(self):
+        # `?` check should NOT fire on plain hostname fields — `?` in a
+        # hostname regex is unusual but not the same kind of typo as in
+        # a URI. Scope is intentionally narrow.
+        ctx = _lint(r'http.host matches "foo?bar"')
+        # No dot in the regex, so the dot check doesn't fire either.
+        assert_no_lint(ctx, "CF546")
+
+    # ── Glob `/*/` on path fields ──────────────────────────────
+
+    def test_slash_star_slash_in_path_fires(self):
+        # `/foo/*/bar` — user wrote a glob (intended to match any
+        # segment) but `o*/` means "zero or more `o`s followed by /".
+        ctx = _lint(r'http.request.uri.path matches "/foo/*/bar"')
+        cf546 = assert_lint(ctx, "CF546", count=1, severity=Severity.WARNING)
+        assert "wildcard" in cf546[0].message.lower() or "*" in cf546[0].message
+
+    def test_trailing_slash_star_in_path_fires(self):
+        # `/foo/*` at end — same shape, glob intent.
+        ctx = _lint(r'http.request.uri.path matches "/foo/*"')
+        assert_lint(ctx, "CF546", count=1)
+
+    def test_star_after_letter_in_path_no_fire(self):
+        # `/foo*/bar` — `*` after letter is a normal regex quantifier;
+        # no glob confusion. Glob check shouldn't fire.
+        ctx = _lint(r'http.request.uri.path matches "/foo*/bar"')
+        cf546_glob = [
+            r for r in ctx.results if r.rule_id == "CF546" and "wildcard" in r.message.lower()
+        ]
+        assert cf546_glob == []
+
+    def test_glob_check_only_for_path_fields(self):
+        # `/foo/*/bar` on http.host shouldn't fire the glob check
+        # (paths have a glob-vs-regex confusion; hostnames don't).
+        ctx = _lint(r'http.host matches "/foo/*/bar"')
+        cf546_glob = [
+            r for r in ctx.results if r.rule_id == "CF546" and "wildcard" in r.message.lower()
+        ]
+        assert cf546_glob == []
+
+    def test_glob_check_takes_priority_over_dot_check(self):
+        # When both glob AND dot would fire, the glob message wins
+        # (more specific). Pattern with both: `/foo/*/api.example.com`.
+        ctx = _lint(r'http.request.uri.path matches "/foo/*/api.example.com"')
+        cf546 = assert_lint(ctx, "CF546", count=1)
+        # Message should be about glob, not about dots.
+        assert "wildcard" in cf546[0].message.lower() or "*" in cf546[0].message
+
+
+# ---------------------------------------------------------------------------
+# CF547 — empty-in-list (`field in {}` always false)
+# ---------------------------------------------------------------------------
+
+
+class TestCF547EmptyInList:
+    def test_empty_in_set_fires(self):
+        ctx = _lint("ip.src in {}")
+        cf547 = assert_lint(ctx, "CF547", count=1, severity=Severity.WARNING)
+        assert "empty" in cf547[0].message.lower() or "always" in cf547[0].message.lower()
+
+    def test_empty_in_set_with_whitespace_fires(self):
+        ctx = _lint("ip.src in {  }")
+        assert_lint(ctx, "CF547", count=1)
+
+    def test_non_empty_in_set_no_fire(self):
+        ctx = _lint('http.host in {"a" "b"}')
+        assert_no_lint(ctx, "CF547")
+
+    def test_empty_braces_inside_string_literal_no_fire(self):
+        # `in {}` inside a string literal must not fire.
+        ctx = _lint('http.host eq "in {}"')
+        assert_no_lint(ctx, "CF547")
+
+
+# ---------------------------------------------------------------------------
+# CF548 — overly-permissive regex (matches every value)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not WIREFILTER_AVAILABLE,
+    reason="CF548 needs regex_field_pairs from wirefilter",
+)
+class TestCF548OverlyPermissiveRegex:
+    def test_dot_alone_fires(self):
+        ctx = _lint(r'http.host matches "."')
+        cf548 = assert_lint(ctx, "CF548", count=1, severity=Severity.WARNING)
+        msg = cf548[0].message.lower()
+        assert "every value" in msg or "no condition" in msg
+
+    def test_dot_star_fires(self):
+        ctx = _lint(r'http.host matches ".*"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_dot_plus_fires(self):
+        ctx = _lint(r'http.host matches ".+"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_anchored_dot_star_fires(self):
+        ctx = _lint(r'http.host matches "^.*$"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_caret_alone_fires(self):
+        # `^` anchors to start but matches empty string — always-match.
+        ctx = _lint(r'http.host matches "^"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_dollar_alone_fires(self):
+        ctx = _lint(r'http.host matches "$"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_alternation_with_empty_fires(self):
+        # `|` matches empty on either side — always-match.
+        ctx = _lint(r'http.host matches "|"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_path_only_overly_permissive(self):
+        # `/` and `^/` always match for path fields (paths start with /).
+        ctx = _lint(r'http.request.uri.path matches "/"')
+        assert_lint(ctx, "CF548", count=1)
+        ctx = _lint(r'http.request.uri.path matches "/.*"')
+        assert_lint(ctx, "CF548", count=1)
+
+    def test_path_only_overly_permissive_does_not_fire_for_other_fields(self):
+        # `/` is not always-match for http.host — could fail on hosts
+        # that don't contain `/`. Check that the path-specific rule
+        # doesn't leak to non-path fields.
+        ctx = _lint(r'http.host matches "/"')
+        assert_no_lint(ctx, "CF548")
+
+    def test_specific_pattern_no_fire(self):
+        # A non-trivial pattern doesn't fire.
+        ctx = _lint(r'http.host matches "^api\.example\.com$"')
+        assert_no_lint(ctx, "CF548")
+
+    def test_literal_dot_no_fire(self):
+        # `\.` is escaped — not always-match.
+        ctx = _lint(r'http.host matches "\."')
+        assert_no_lint(ctx, "CF548")
+
+
+# ---------------------------------------------------------------------------
+# CF549 — unnecessary-regex (simplifies to eq)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not WIREFILTER_AVAILABLE,
+    reason="CF549 needs regex_field_pairs from wirefilter",
+)
+class TestCF549UnnecessaryRegex:
+    def test_anchored_literal_fires_with_eq_suggestion(self):
+        ctx = _lint(r'http.host matches "^example$"')
+        cf549 = assert_lint(ctx, "CF549", count=1, severity=Severity.INFO)
+        assert "eq" in cf549[0].suggestion
+        assert "example" in cf549[0].suggestion
+
+    def test_anchored_literal_with_escaped_dot_fires(self):
+        # `^api\.example\.com$` simplifies to `eq "api.example.com"`.
+        ctx = _lint(r'http.host matches "^api\.example\.com$"')
+        cf549 = assert_lint(ctx, "CF549", count=1)
+        # Suggestion should unescape the dots back to literal form.
+        assert "api.example.com" in cf549[0].suggestion
+
+    def test_anchored_literal_with_path_chars(self):
+        # Slashes and hyphens are literal-friendly in URI paths.
+        ctx = _lint(r'http.request.uri.path matches "^/api/v1/health$"')
+        cf549 = assert_lint(ctx, "CF549", count=1)
+        assert "/api/v1/health" in cf549[0].suggestion
+
+    def test_partial_anchor_no_fire(self):
+        # Only one anchor — not a full-match-literal case.
+        ctx = _lint(r'http.host matches "^example"')
+        assert_no_lint(ctx, "CF549")
+        ctx = _lint(r'http.host matches "example$"')
+        assert_no_lint(ctx, "CF549")
+
+    def test_no_anchors_no_fire(self):
+        ctx = _lint(r'http.host matches "example"')
+        assert_no_lint(ctx, "CF549")
+
+    def test_alternation_no_fire(self):
+        # `^(foo|bar)$` is not a single literal — don't fire.
+        # (Could be its own simplification rule for `in {…}` but that's
+        # a separate diagnostic; CF549 is scoped to single-literal case.)
+        ctx = _lint(r'http.host matches "^(foo|bar)$"')
+        assert_no_lint(ctx, "CF549")
+
+    def test_character_class_no_fire(self):
+        # `^[abc]$` has a character class — not a literal.
+        ctx = _lint(r'http.host matches "^[abc]$"')
+        assert_no_lint(ctx, "CF549")
+
+    def test_quantifier_no_fire(self):
+        # `^foo+$` has a quantifier — not a literal.
+        ctx = _lint(r'http.host matches "^foo+$"')
+        assert_no_lint(ctx, "CF549")
+
+    def test_function_call_lhs_no_fire(self):
+        # No regex_field_pair recorded for function-call LHS.
+        ctx = _lint(r'lower(http.host) matches "^example$"')
+        assert_no_lint(ctx, "CF549")

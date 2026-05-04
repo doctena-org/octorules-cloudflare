@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **144 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **150 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 ### Suppressing rules
 
@@ -64,8 +64,8 @@ Suppressed findings are excluded from the report but counted in the summary line
 
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
-| 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF018 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF545 | 101 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF027 | 17 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF549 | 109 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF478 | 9 | [stage2d-lists.md](stage2d-lists.md) |
@@ -77,7 +77,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF Range | Category | Rules |
 |----------|----------|-------|
 | CF001–CF002 | Parse / syntax errors | 2 |
-| CF003–CF018 | Structure | 16 |
+| CF003–CF027 | Structure | 17 |
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF104 | Cross-rule | 5 |
@@ -93,8 +93,8 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF460–CF463 | Page Shield structure | 4 |
 | CF470–CF478 | List validation | 9 |
 | CF500–CF502 | Plan/entitlement | 3 |
-| CF510–CF515 | Best practice / style | 6 |
-| CF520–CF545 | Value constraints | 26 |
+| CF510–CF518 | Best practice / style | 9 |
+| CF520–CF549 | Value constraints | 30 |
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "_generated_with": "octorules-wirefilter 0.3.5",
+  "_generated_with": "octorules-wirefilter 0.4.0",
   "fields": [
     {
       "name": "cf.api_gateway.auth_id_present",
@@ -63,6 +63,10 @@
       "type": "BOOL"
     },
     {
+      "name": "cf.edge.l4.delivery_rate",
+      "type": "INT"
+    },
+    {
       "name": "cf.edge.server_ip",
       "type": "IP"
     },
@@ -73,6 +77,11 @@
     {
       "name": "cf.hostname.metadata",
       "type": "STRING"
+    },
+    {
+      "name": "cf.llm.prompt.custom_topic_categories",
+      "type": "MAP_STRING_INT",
+      "requires_plan": "enterprise"
     },
     {
       "name": "cf.llm.prompt.detected",
@@ -92,6 +101,11 @@
     {
       "name": "cf.llm.prompt.pii_detected",
       "type": "BOOL",
+      "requires_plan": "enterprise"
+    },
+    {
+      "name": "cf.llm.prompt.token_count",
+      "type": "INT",
       "requires_plan": "enterprise"
     },
     {
@@ -127,6 +141,10 @@
       "type": "INT"
     },
     {
+      "name": "cf.timings.client_quic_rtt_msec",
+      "type": "INT"
+    },
+    {
       "name": "cf.timings.client_tcp_rtt_msec",
       "type": "INT"
     },
@@ -139,12 +157,24 @@
       "type": "INT"
     },
     {
+      "name": "cf.timings.worker_msec",
+      "type": "INT"
+    },
+    {
       "name": "cf.tls_cipher",
       "type": "STRING"
     },
     {
       "name": "cf.tls_ciphers_sha1",
       "type": "STRING"
+    },
+    {
+      "name": "cf.tls_client_auth.cert_chain_rfc9440",
+      "type": "STRING"
+    },
+    {
+      "name": "cf.tls_client_auth.cert_chain_rfc9440_too_large",
+      "type": "BOOL"
     },
     {
       "name": "cf.tls_client_auth.cert_fingerprint_sha1",
@@ -188,6 +218,14 @@
     },
     {
       "name": "cf.tls_client_auth.cert_revoked",
+      "type": "BOOL"
+    },
+    {
+      "name": "cf.tls_client_auth.cert_rfc9440",
+      "type": "STRING"
+    },
+    {
+      "name": "cf.tls_client_auth.cert_rfc9440_too_large",
       "type": "BOOL"
     },
     {
@@ -457,21 +495,6 @@
       "requires_plan": "enterprise"
     },
     {
-      "name": "http.request.jwt.claims.exp.sec",
-      "type": "MAP_ARRAY_INT",
-      "requires_plan": "enterprise"
-    },
-    {
-      "name": "http.request.jwt.claims.exp.sec.names",
-      "type": "ARRAY_STRING",
-      "requires_plan": "enterprise"
-    },
-    {
-      "name": "http.request.jwt.claims.exp.sec.values",
-      "type": "ARRAY_INT",
-      "requires_plan": "enterprise"
-    },
-    {
       "name": "http.request.jwt.claims.iat.sec",
       "type": "MAP_ARRAY_INT",
       "requires_plan": "enterprise"
@@ -609,11 +632,6 @@
     {
       "name": "http.response.headers.values",
       "type": "ARRAY_STRING",
-      "is_response": true
-    },
-    {
-      "name": "http.response.headers.truncated",
-      "type": "BOOL",
       "is_response": true
     },
     {
@@ -914,6 +932,12 @@
         "response_header_rules",
         "url_rewrite_rules"
       ]
+    },
+    {
+      "name": "is_jwt_valid"
+    },
+    {
+      "name": "is_jwt_present"
     },
     {
       "name": "http.request.uri.path",

@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-05-04
+
+### Added
+- **CF027** (structure, INFO): expression has leading/trailing whitespace.
+- **CF516** (style, INFO): mixed English (`and`/`eq`) and C-like (`&&`/`==`)
+  operators in the same expression.
+- **CF517** (style, INFO): mixed `and`/`or` without explicit parentheses —
+  wirefilter binds `and` tighter, surprising readers.
+- **CF518** (style, INFO): inline list `in {…}` exceeds 25 entries; suggest
+  extracting to a stored list.
+- **CF546** (value, WARNING): suspicious regex pattern, dispatched by field
+  type — unescaped `.` on hostname/URI/path/cert-DN fields, unescaped `?` on
+  URI fields (with an `https?` exception), and `/*/` or trailing `/*` on
+  path fields. Uses `regex_field_pairs` from wirefilter 0.4.0; no-ops when
+  wirefilter is unavailable. See `docs/lint/stage2-per-rule.md` for the
+  full sub-check breakdown.
+- **CF547** (value, WARNING): empty inline list `field in {}` always
+  evaluates to false (CF016 only caught the literal `false` form).
+- **CF548** (value, WARNING): regex pattern matches every value
+  (`matches "."`, `".*"`, `""`); path-aware, so `"/"` and `"/.*"` also fire
+  on path fields. Inspired by jonasbb's `overly_permissive_pattern`.
+- **CF549** (value, INFO): fully-anchored literal regex (`^foo$`) that
+  simplifies to `eq`. Conservative — only alphanumerics plus `_`, `-`, `/`,
+  and escaped dots/slashes. Inspired by jonasbb's `unnecessary_patterns`.
+
+### Changed
+- Repinned `octorules-wirefilter` to `>=0.4.0,<1.0` for the 9 new fields,
+  2 new JWT functions, and `regex_field_pairs` output.
+- `overlay.toml`: added Enterprise-tier markers for the 2 new
+  `cf.llm.prompt.*` fields; removed 3 entries for the deleted
+  `http.request.jwt.claims.exp.sec` family.
+- `schemas.json` regenerated from wirefilter 0.4.0.
+
 ## [0.7.12] - 2026-04-29
 
 ### Fixed

@@ -13,10 +13,12 @@
 "cf.bot_management.score" = { requires_plan = "enterprise" }
 "cf.bot_management.static_resource" = { requires_plan = "enterprise" }
 "cf.bot_management.verified_bot" = { requires_plan = "enterprise" }
+"cf.llm.prompt.custom_topic_categories" = { requires_plan = "enterprise" }
 "cf.llm.prompt.detected" = { requires_plan = "enterprise" }
 "cf.llm.prompt.injection_score" = { requires_plan = "enterprise" }
 "cf.llm.prompt.pii_categories" = { requires_plan = "enterprise" }
 "cf.llm.prompt.pii_detected" = { requires_plan = "enterprise" }
+"cf.llm.prompt.token_count" = { requires_plan = "enterprise" }
 "cf.llm.prompt.unsafe_topic_categories" = { requires_plan = "enterprise" }
 "cf.llm.prompt.unsafe_topic_detected" = { requires_plan = "enterprise" }
 "cf.response.1xxx_code" = { is_response = true }
@@ -55,9 +57,6 @@
 "http.request.jwt.claims.aud" = { requires_plan = "enterprise" }
 "http.request.jwt.claims.aud.names" = { requires_plan = "enterprise" }
 "http.request.jwt.claims.aud.values" = { requires_plan = "enterprise" }
-"http.request.jwt.claims.exp.sec" = { requires_plan = "enterprise" }
-"http.request.jwt.claims.exp.sec.names" = { requires_plan = "enterprise" }
-"http.request.jwt.claims.exp.sec.values" = { requires_plan = "enterprise" }
 "http.request.jwt.claims.iat.sec" = { requires_plan = "enterprise" }
 "http.request.jwt.claims.iat.sec.names" = { requires_plan = "enterprise" }
 "http.request.jwt.claims.iat.sec.values" = { requires_plan = "enterprise" }

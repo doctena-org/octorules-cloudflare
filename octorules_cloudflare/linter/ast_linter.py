@@ -26,6 +26,7 @@ RULE_IDS = frozenset(
         "CF001",
         "CF002",
         "CF021",
+        "CF027",
         "CF300",
         "CF301",
         "CF302",
@@ -62,6 +63,10 @@ RULE_IDS = frozenset(
         "CF543",
         "CF544",
         "CF545",
+        "CF546",
+        "CF547",
+        "CF548",
+        "CF549",
         "CF502",
         "CF510",
         "CF511",
@@ -69,6 +74,9 @@ RULE_IDS = frozenset(
         "CF513",
         "CF514",
         "CF515",
+        "CF516",
+        "CF517",
+        "CF518",
     }
 )
 
@@ -154,6 +162,26 @@ _METHOD_COMPARISON = re.compile(r"http\.request\.method\s+(?:eq|==|!=|ne|in)\s+"
 # Patterns for extracting values from 'in' sets
 _IN_SET_PATTERN = re.compile(r"\bin\s*\{([^}]+)\}")
 _QUOTED_STRING = re.compile(r'"(?:[^"\\]|\\.)*"')
+# Raw and regular string literals — used by _strip_literals to mask
+# literal payloads before scanning expression text for operator
+# patterns.
+_LITERAL_PATTERNS = re.compile(
+    r'r"(?:[^"\\]|\\.)*"'  # raw strings
+    r'|"(?:[^"\\]|\\.)*"',  # regular strings
+)
+
+
+def _strip_literals(expr: str) -> str:
+    """Replace string and regex literals with empty `""` placeholders.
+
+    Used by lints that scan raw expression text for operator patterns
+    (operator-style mixing, mixed `and`/`or` precedence, etc.) where
+    matching against tokens inside a literal would produce false
+    positives. Length-changing replacement is fine — we only use the
+    output for substring/regex scanning, not for character offsets.
+    """
+    return _LITERAL_PATTERNS.sub('""', expr)
+
 
 # Pattern for extracting string values compared against a specific field.
 # Matches: field eq "value", field ne "value", field == "value", field != "value"
@@ -297,6 +325,23 @@ def lint_expressions(
                 ref=ref,
                 field="expression",
                 suggestion="Simplify the expression to reduce nesting depth",
+            )
+        )
+
+    # CF027: Leading/trailing whitespace in the YAML expression value.
+    # Check the original ``expr`` — ``info.raw`` has been normalised by
+    # ``normalize_expression`` (collapses outside-quote whitespace),
+    # which would mask the very thing CF027 is trying to catch.
+    if expr != expr.strip():
+        ctx.add(
+            LintResult(
+                rule_id="CF027",
+                severity=Severity.INFO,
+                message="Expression has leading or trailing whitespace",
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion="Trim whitespace from the expression value",
             )
         )
 
@@ -1115,7 +1160,7 @@ def _check_regex_patterns(
 def _lint_value_constraints(
     info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
 ) -> None:
-    """Check literal values against field-specific constraints (CF520-CF544)."""
+    """Check literal values against field-specific constraints (CF520-CF549)."""
     _check_deprecated_fields(info, phase_name, ref, ctx)
     _check_ip_values(info, phase_name, ref, ctx)
     _check_string_literal_values(info, phase_name, ref, ctx)
@@ -1123,6 +1168,423 @@ def _lint_value_constraints(
     _check_numeric_constraints(info, phase_name, ref, ctx)
     _check_function_arg_constraints(info, phase_name, ref, ctx)
     _check_regex_patterns(info, phase_name, ref, ctx)
+    _check_suspicious_regex(info, phase_name, ref, ctx)
+    _check_empty_in_list(info, phase_name, ref, ctx)
+    _check_overly_permissive_regex(info, phase_name, ref, ctx)
+    _check_unnecessary_regex(info, phase_name, ref, ctx)
+
+
+# Regexes that match every input — using one of these on a field is
+# almost always a mistake (the rule effectively has no condition).
+# Captured from jonasbb's `overly_permissive_pattern.rs` and grouped:
+#
+#   - Truly always-match in any context: ".", "", ".*", ".+", "^", "$", "|"
+#     plus the trivial anchor combinations
+_OVERLY_PERMISSIVE_REGEX_ANY_CONTEXT = frozenset(
+    {
+        "",
+        ".",
+        ".*",
+        "^.*",
+        ".*$",
+        "^.*$",
+        ".+",
+        "^.+",
+        ".+$",
+        "^.+$",
+        "^",
+        "$",
+        "|",
+    }
+)
+
+# Path fields always start with `/`, so these patterns are also
+# always-match for path context.
+_OVERLY_PERMISSIVE_REGEX_FOR_PATHS = frozenset(
+    {
+        "/",
+        "^/",
+        "/.*",
+        "^/.*",
+        "/.*$",
+        "^/.*$",
+    }
+)
+
+_PATH_FIELDS_FOR_PERMISSIVE_CHECK = frozenset(
+    {
+        "http.request.uri.path",
+        "raw.http.request.uri.path",
+    }
+)
+
+
+def _check_overly_permissive_regex(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF548: Flag regex patterns that match every value.
+
+    Uses ``info.regex_field_pairs`` so the lint only fires when the LHS
+    is a plain field (not a function call) — matches the precision
+    pattern used by CF546. Silently no-ops when wirefilter is
+    unavailable (regex fallback can't pair regex with field reliably).
+    """
+    for field_name, regex in info.regex_field_pairs:
+        permissive = _OVERLY_PERMISSIVE_REGEX_ANY_CONTEXT
+        if field_name in _PATH_FIELDS_FOR_PERMISSIVE_CHECK:
+            permissive = permissive | _OVERLY_PERMISSIVE_REGEX_FOR_PATHS
+        if regex in permissive:
+            ctx.add(
+                LintResult(
+                    rule_id="CF548",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Regex {regex!r} on field {field_name!r} matches every "
+                        "value; this rule has effectively no condition"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                    suggestion=(
+                        "Use a more specific pattern, or remove the rule if the "
+                        "match-all behavior is intentional"
+                    ),
+                )
+            )
+
+
+# A regex of the form ``^<literal>$`` where <literal> contains no
+# regex metacharacters (only word chars, hyphens, slashes, and escaped
+# dots/slashes). Anything else falls through — the conservative bar
+# avoids false positives on patterns that happen to look literal but
+# contain alternation, character classes, or quantifiers.
+_FULLY_ANCHORED_LITERAL_REGEX = re.compile(
+    r"^\^"  # start anchor
+    r"((?:[a-zA-Z0-9_/-]|\\\.|\\/)+)"  # literal-only payload (escaped . or / OK)
+    r"\$$"  # end anchor
+)
+
+
+def _check_unnecessary_regex(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF549: Flag ``matches "^foo$"`` patterns that are just literals.
+
+    A regex anchored at both ends with no metacharacters in between is
+    equivalent to ``eq "foo"`` — same semantics, simpler to read, and
+    avoids the regex engine. Suggests the simpler form.
+
+    Conservative scope: only fires on alphanumerics + `_`, `-`, `/`, and
+    escaped dots/slashes. Patterns containing alternation, character
+    classes, or quantifiers fall through (those are real regexes that
+    don't simplify to ``eq``).
+    """
+    for field_name, regex in info.regex_field_pairs:
+        m = _FULLY_ANCHORED_LITERAL_REGEX.match(regex)
+        if m is None:
+            continue
+        # Reconstruct the literal: unescape `\.` → `.` and `\/` → `/`.
+        literal = m.group(1).replace(r"\.", ".").replace(r"\/", "/")
+        ctx.add(
+            LintResult(
+                rule_id="CF549",
+                severity=Severity.INFO,
+                message=(
+                    f"Regex {regex!r} on field {field_name!r} is a fully-anchored "
+                    f"literal; can be simplified to {field_name} eq {literal!r}"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion=f'Replace with: {field_name} eq "{literal}"',
+            )
+        )
+
+
+# Fields where CF semantically expects dotted-path literals (hostnames,
+# URI paths). An unescaped `.` in a regex against one of these is almost
+# certainly a typo for a literal dot — see CF546.
+_DOTTED_CONTEXT_FIELDS = frozenset(
+    {
+        "http.host",
+        "http.referer",
+        "http.request.uri",
+        "http.request.uri.path",
+        "http.request.full_uri",
+        "raw.http.request.uri",
+        "raw.http.request.uri.path",
+        "raw.http.request.full_uri",
+        "cf.worker.upstream_zone",
+        # X.509 Distinguished Name fields. The CN= portion contains
+        # hostname-style content where bare `.` is almost always a
+        # typo for `\.`; OIDs (1.2.840.113549...) need the same
+        # escaping. The quantifier-skip heuristic below covers `.*`
+        # wildcards correctly, so subdomain patterns like `CN=.*\.example\.com,`
+        # don't false-fire.
+        "cf.tls_client_auth.cert_subject_dn",
+        "cf.tls_client_auth.cert_subject_dn_legacy",
+        "cf.tls_client_auth.cert_subject_dn_rfc2253",
+        "cf.tls_client_auth.cert_issuer_dn",
+        "cf.tls_client_auth.cert_issuer_dn_legacy",
+        "cf.tls_client_auth.cert_issuer_dn_rfc2253",
+    }
+)
+
+
+def _has_unescaped_dot_outside_class(regex: str) -> bool:
+    """Return True if the regex contains a `.` that's likely a
+    typo-for-literal rather than an intentional any-char wildcard.
+
+    Heuristic: walk the string, track whether we're inside `[...]`,
+    track backslash escapes. A `.` is *suspect* when:
+    - it's not escaped (`\\.`)
+    - it's not inside a character class (`[abc.]`)
+    - it's NOT followed by a regex quantifier (`*`, `+`, `?`, `{`)
+
+    The quantifier exclusion eliminates legitimate wildcards like
+    `.*example\\.com` from firing on the leading `.*`. Only bare
+    literal-context dots ("api.example.com") trigger the lint.
+    """
+    in_class = False
+    i = 0
+    while i < len(regex):
+        ch = regex[i]
+        if ch == "\\" and i + 1 < len(regex):
+            i += 2
+            continue
+        if ch == "[":
+            in_class = True
+        elif ch == "]":
+            in_class = False
+        elif ch == "." and not in_class:
+            # Look ahead: if followed by a quantifier, it's an
+            # intentional wildcard — skip.
+            nxt = regex[i + 1] if i + 1 < len(regex) else ""
+            if nxt not in ("*", "+", "?", "{"):
+                return True
+        i += 1
+    return False
+
+
+def _has_unescaped_question_outside_regex_context(regex: str) -> bool:
+    """Return True if the regex contains a `?` that's likely a
+    literal-query-separator typo rather than a regex quantifier.
+
+    A `?` is a regex zero-or-one quantifier when it follows ``*``,
+    ``+``, ``)``, ``]``, or another regex token that takes a quantifier.
+    A `?` immediately after a regex-grouping opener (``(`` for flag/
+    group syntax like ``(?i)``) is also valid. Anything else — typically
+    a `?` after an alphanumeric character — looks like the user thought
+    they were writing a literal query separator.
+
+    The pattern ``https?`` (the protocol scheme) is a common, intentional
+    use of `?` as a quantifier on `s`. Skip when the regex contains
+    that substring.
+
+    Mirrors the ``has_unescaped_query_like`` check from jonasbb's
+    ``suspicious_regex.rs``.
+    """
+    if "https?" in regex:
+        return False
+    in_class = False
+    prev: str = ""
+    i = 0
+    while i < len(regex):
+        ch = regex[i]
+        if ch == "\\" and i + 1 < len(regex):
+            prev = regex[i + 1]
+            i += 2
+            continue
+        if ch == "[":
+            in_class = True
+        elif ch == "]":
+            in_class = False
+        elif ch == "?" and not in_class:
+            # Valid regex contexts where `?` follows a quantifier-eligible
+            # token — `*?`, `+?` (lazy quantifiers), `)?` (optional group),
+            # `]?` (optional class), `(?` (group syntax / flag).
+            if prev not in ("*", "+", "(", ")", "[", "]"):
+                return True
+        prev = ch
+        i += 1
+    return False
+
+
+def _has_slash_glob_pattern(regex: str) -> bool:
+    """Return True if the regex contains ``/*/`` or ends with ``/*``
+    (unescaped) — patterns that suggest the user intended a path glob
+    rather than ``*`` as a regex zero-or-more quantifier.
+
+    Concretely fires when ``*`` is preceded by ``/`` AND followed by
+    ``/`` or end-of-pattern. ``/foo/*/bar`` and ``/foo/*`` match;
+    ``/foo/bar*`` (where ``*`` is preceded by a letter) does not.
+
+    Mirrors the ``contains_slash_star_slash`` check from jonasbb's
+    ``suspicious_regex.rs``.
+    """
+    in_class = False
+    prev: str = ""
+    i = 0
+    while i < len(regex):
+        ch = regex[i]
+        if ch == "\\" and i + 1 < len(regex):
+            prev = regex[i + 1]
+            i += 2
+            continue
+        if ch == "[":
+            in_class = True
+        elif ch == "]":
+            in_class = False
+        elif ch == "*" and not in_class and prev == "/":
+            nxt = regex[i + 1] if i + 1 < len(regex) else ""
+            if nxt == "/" or nxt == "":
+                return True
+        prev = ch
+        i += 1
+    return False
+
+
+# Fields where the URI semantics make ``?`` a likely query separator
+# (so an unescaped ``?`` outside regex-quantifier contexts is suspect).
+_URI_CONTEXT_FIELDS = frozenset(
+    {
+        "http.referer",
+        "http.request.uri",
+        "http.request.full_uri",
+        "raw.http.request.uri",
+        "raw.http.request.full_uri",
+    }
+)
+
+# Fields where the path semantics make ``/*/`` a likely glob pattern
+# (so ``*`` between ``/`` separators is suspect — user wrote a glob,
+# but the regex interprets ``*`` as zero-or-more of the previous token).
+_PATH_GLOB_CONTEXT_FIELDS = frozenset(
+    {
+        "http.request.uri.path",
+        "raw.http.request.uri.path",
+    }
+)
+
+
+def _check_suspicious_regex(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF546: Flag suspect regex patterns on field-typed contexts.
+
+    Three sub-checks, dispatched per field-type:
+    - **Unescaped ``.``** on hostname/URI/path/cert-DN fields. The dot
+      matches any char in regex; bare dots in literal hostname-style
+      content are almost always typos for ``\\.``.
+    - **Unescaped ``?``** on URI-context fields. ``?`` is a regex
+      zero-or-one quantifier; in a URI a literal ``?`` is the query
+      separator. Users writing ``/foo?bar=1`` thinking they're matching
+      a query string actually get ``o?`` ("zero or one o"). The
+      ``https?`` protocol pattern is a documented exception.
+    - **``/*/`` or trailing ``/*``** on path fields. The ``*`` is a
+      regex quantifier on the preceding char, but in a path context the
+      user often meant a glob ``*`` (any segment).
+
+    Uses ``info.regex_field_pairs`` (populated by wirefilter when the
+    LHS of ``matches`` is a plain field). When wirefilter is absent or
+    the LHS is a function call, the pair list is empty and the check
+    silently no-ops — the regex fallback can't infer field context
+    accurately enough to fire this without false positives.
+    """
+    for field_name, regex in info.regex_field_pairs:
+        # `/*/` glob pattern on path fields takes priority — the
+        # message is more specific than the generic dot warning.
+        if field_name in _PATH_GLOB_CONTEXT_FIELDS and _has_slash_glob_pattern(regex):
+            ctx.add(
+                LintResult(
+                    rule_id="CF546",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Regex {regex!r} on field {field_name!r} uses '*' as a "
+                        "quantifier between path separators ('/*/' or trailing "
+                        "'/*'); if you meant a glob match for any segment, use "
+                        "the 'wildcard' operator or '/[^/]+/' instead"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                    suggestion=(
+                        "Use the 'wildcard' operator for glob matches, or "
+                        "explicit segment patterns like '/[^/]+/' if regex is needed"
+                    ),
+                )
+            )
+            continue
+
+        # Unescaped `?` on URI-context fields — likely literal query
+        # separator typo, not a regex quantifier.
+        if field_name in _URI_CONTEXT_FIELDS and _has_unescaped_question_outside_regex_context(
+            regex
+        ):
+            ctx.add(
+                LintResult(
+                    rule_id="CF546",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Regex {regex!r} on field {field_name!r} contains an "
+                        "unescaped '?' that looks like a literal query separator "
+                        "rather than a regex quantifier"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                    suggestion=(
+                        "Escape literal '?' as '\\?' if you meant the query "
+                        "separator — or use 'eq'/'contains' if no regex needed"
+                    ),
+                )
+            )
+            continue
+
+        # Unescaped `.` on dotted-context fields — the original CF546
+        # check, covering hostnames, URIs, paths, and cert DNs.
+        if field_name in _DOTTED_CONTEXT_FIELDS and _has_unescaped_dot_outside_class(regex):
+            ctx.add(
+                LintResult(
+                    rule_id="CF546",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Regex {regex!r} on field {field_name!r} contains an "
+                        "unescaped '.' (matches any char). If you meant a "
+                        "literal dot, escape as '\\.' or use 'eq'."
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                    suggestion=(
+                        "Escape literal dots as \\. — e.g. "
+                        '"api\\.example\\.com" — or compare with eq if no regex needed'
+                    ),
+                )
+            )
+
+
+_EMPTY_IN_LIST_PATTERN = re.compile(r"\bin\s*\{\s*\}")
+
+
+def _check_empty_in_list(info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext) -> None:
+    """CF547: Flag literal ``in {}`` (always false).
+
+    CF016 (always-false) only matches a bare ``false`` literal — not
+    the structurally-always-false ``field in {}`` form.
+    """
+    if _EMPTY_IN_LIST_PATTERN.search(_strip_literals(info.raw)):
+        ctx.add(
+            LintResult(
+                rule_id="CF547",
+                severity=Severity.WARNING,
+                message="Inline list 'in {}' is empty; expression always evaluates to false",
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion="Remove the rule or populate the list",
+            )
+        )
 
 
 def _find_int_range_overlaps(content: str) -> list[tuple[str, str]]:
@@ -1840,3 +2302,107 @@ def _lint_style(info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContex
                     suggestion='Use r"..." format for regex patterns with backslashes',
                 )
             )
+
+    # Stripped expression for token scans — operator pattern matches
+    # against literals would otherwise produce false positives on rules
+    # like ``http.host eq "a && b"``.
+    expr_stripped = _strip_literals(expr)
+
+    # CF516: mixed English operators (and/or/eq/...) and C-like (&&/||/==/...)
+    # within the same expression. INFO — neither style is wrong, just
+    # inconsistent.
+    has_english_op = bool(re.search(r"\b(?:and|or|not|eq|ne|lt|gt|le|ge)\b", expr_stripped))
+    has_clike_op = bool(re.search(r"&&|\|\||==|!=|<=|>=", expr_stripped))
+    if has_english_op and has_clike_op:
+        ctx.add(
+            LintResult(
+                rule_id="CF516",
+                severity=Severity.INFO,
+                message=(
+                    "Expression mixes English operators (and/or/eq/...) and "
+                    "C-like operators (&&/||/==/...). Pick one notation for "
+                    "consistency."
+                ),
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion="Use either all English or all C-like operators",
+            )
+        )
+
+    # CF517: mixed ``and`` / ``or`` at paren depth 0 (and the C-like
+    # equivalents). Wirefilter binds ``and`` tighter than ``or`` —
+    # ``A and B or C`` parses as ``(A and B) or C``. Many readers
+    # mis-read this. INFO with a parens fix.
+    if _has_mixed_and_or_at_depth_zero(expr_stripped):
+        ctx.add(
+            LintResult(
+                rule_id="CF517",
+                severity=Severity.INFO,
+                message=(
+                    'Expression mixes "and" and "or" without explicit '
+                    "parentheses; precedence may surprise readers."
+                ),
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion='Wrap with parens: "(A and B) or C" or "A and (B or C)"',
+            )
+        )
+
+    # CF518: inline ``in {…}`` with many entries — readability nudge.
+    # CF476 already caps stored lists at 10,000; this fires on inline
+    # readability long before the API limit.
+    for m_inline in _IN_SET_PATTERN.finditer(expr):
+        entries = m_inline.group(1).split()
+        if len(entries) > _LONG_IN_LIST_THRESHOLD:
+            ctx.add(
+                LintResult(
+                    rule_id="CF518",
+                    severity=Severity.INFO,
+                    message=(
+                        f"Inline list has {len(entries)} entries "
+                        f"(>{_LONG_IN_LIST_THRESHOLD} threshold); consider "
+                        "extracting to a stored list"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="expression",
+                    suggestion=(
+                        "Move the entries to the 'lists' section and reference as $list_name"
+                    ),
+                )
+            )
+
+
+# CF518 readability threshold — values above this fire as INFO. Not
+# configurable per `no-speculative-apis.md`: ship the constant first,
+# add a knob only if a real caller asks for one.
+_LONG_IN_LIST_THRESHOLD = 25
+
+
+def _has_mixed_and_or_at_depth_zero(expr_stripped: str) -> bool:
+    """Return True if both an ``and`` and an ``or`` token appear at
+    parenthesis depth 0 in *expr_stripped*.
+
+    Walk the stripped expression tracking paren depth; collect tokens
+    seen at depth 0; check both keywords are present. Uses regex to
+    tokenize so embedded ``and``/``or`` inside identifiers don't fire.
+    """
+    found_and = False
+    found_or = False
+    depth = 0
+    # Tokenize into parens, word-tokens (English), and C-like operators.
+    token_pattern = re.compile(r"\(|\)|\b(?:and|or|not)\b|&&|\|\|")
+    for m_tok in token_pattern.finditer(expr_stripped):
+        tok = m_tok.group(0)
+        if tok == "(":
+            depth += 1
+        elif tok == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            if tok in ("and", "&&"):
+                found_and = True
+            elif tok in ("or", "||"):
+                found_or = True
+    return found_and and found_or

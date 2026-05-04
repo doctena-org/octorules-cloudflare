@@ -32,6 +32,12 @@ class ExpressionInfo:
     operators_used: list[str] = field(default_factory=list)
     string_literals: list[str] = field(default_factory=list)
     regex_literals: list[str] = field(default_factory=list)
+    regex_field_pairs: list[tuple[str, str]] = field(default_factory=list)
+    """``(field, regex)`` pairs for ``matches`` operators against plain
+    field LHS. Empty when wirefilter is unavailable (regex fallback can't
+    reliably infer the LHS field for a regex literal). Lints that need
+    field context (e.g. flagging unescaped ``.`` in a hostname regex)
+    should iterate this and skip when empty."""
     ip_literals: list[str] = field(default_factory=list)
     int_literals: list[int] = field(default_factory=list)
     has_regex: bool = False
@@ -230,6 +236,10 @@ def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> Ex
                     parse_error_type="wirefilter_parse",
                 )
             regex_literals = result.get("regex_literals", [])
+            # Wirefilter returns each pair as a 2-element list ([field, regex]);
+            # convert to tuples for hashability and pattern-matching ergonomics.
+            pair_list = result.get("regex_field_pairs", [])
+            regex_field_pairs = [(p[0], p[1]) for p in pair_list]
             return ExpressionInfo(
                 raw=expr,
                 fields_used=result.get("fields", []),
@@ -237,6 +247,7 @@ def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> Ex
                 operators_used=result.get("operators", []),
                 string_literals=result.get("string_literals", []),
                 regex_literals=regex_literals,
+                regex_field_pairs=regex_field_pairs,
                 ip_literals=result.get("ip_literals", []),
                 int_literals=result.get("int_literals", []),
                 has_regex=bool(regex_literals),
