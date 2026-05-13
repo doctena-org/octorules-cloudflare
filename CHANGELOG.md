@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] - 2026-05-13
+
+### Fixed
+- Per-rule `logging.enabled` is now preserved across `dump` and `sync`.
+  Previously it was stripped from YAML and omitted from the PUT body,
+  so Cloudflare's PUT-default of `true` silently overwrote rules that
+  were `false` — turning quiet skip rules into per-match `firewall_event`
+  emitters. After upgrading, the next `dump` will materialise `logging:`
+  on every rule; review the diff and correct values that should be `false`.
+
+### Changed
+- Requires `octorules>=0.27.0` (for the matching planner default behaviour).
+
 ## [0.8.1] - 2026-05-04
 
 ### Added

@@ -28,8 +28,14 @@ def register_cloudflare_linter() -> None:
     register_linter(LintPlugin(name="cloudflare", lint_fn=cloudflare_lint, rule_ids=CF_RULE_IDS))
     register_rules(CF_RULE_METAS)
 
-    # Register Cloudflare-specific API fields to strip
-    register_api_fields("rule", {"id", "version", "last_updated", "categories", "logging"})
+    # Register Cloudflare-specific API fields to strip.
+    #
+    # ``logging`` is intentionally **not** in this set: it's user-controllable
+    # per-rule (``logging.enabled: true/false``) and Cloudflare's PUT default
+    # is ``true``. Stripping it on dump and omitting it on sync silently
+    # flipped previously-quiet skip rules into firewall_event emitters,
+    # blowing up Logpush volume. See CHANGELOG 0.8.2 for the full story.
+    register_api_fields("rule", {"id", "version", "last_updated", "categories"})
     register_api_fields("action_parameters", {"version", "disable_railgun"})
     register_api_fields("list_item", {"id", "created_on", "modified_on"})
     register_api_fields("page_shield_policy", {"id", "last_updated"})
