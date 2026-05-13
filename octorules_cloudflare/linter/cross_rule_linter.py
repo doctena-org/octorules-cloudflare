@@ -12,7 +12,7 @@ from octorules.expression import normalize_expression
 from octorules.linter.engine import LintContext, LintResult, Severity, is_always_true
 from octorules.phases import KNOWN_NON_PHASE_KEYS, PHASE_BY_NAME
 
-RULE_IDS = frozenset({"CF100", "CF101", "CF102", "CF103", "CF104"})
+RULE_IDS = frozenset({"CF100", "CF101", "CF102", "CF103", "CF104", "CF105"})
 
 # Pattern for list references in expressions: $list_name (including dotted managed list names)
 _LIST_REF_PATTERN = re.compile(r"\$([a-zA-Z_][a-zA-Z0-9_.]*)")
@@ -60,6 +60,7 @@ def lint_cross_rules(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
         _check_duplicate_expressions(phase_name, rules, ctx)
         _check_unreachable_after_terminating(phase_name, rules, ctx)
+        _check_duplicate_managed_ruleset_execute(phase_name, rules, ctx)
 
     # Cross-rule checks inside custom_rulesets
     custom_rulesets = rules_data.get("custom_rulesets")
@@ -191,6 +192,61 @@ def _iter_all_rules(
                 if isinstance(rule, dict):
                     pairs.append((phase_name, rule))
     return pairs
+
+
+def _check_duplicate_managed_ruleset_execute(
+    phase_name: str, rules: list[dict], ctx: LintContext
+) -> None:
+    """CF105: Detect multiple ``execute`` actions targeting the same managed
+    ruleset within a phase.
+
+    Cloudflare's API rejects the second deploy of the same managed ruleset
+    in one phase entrypoint with error 20014: "more than one rule is trying
+    to execute the same managed ruleset". Catching this at lint time avoids
+    a sync that's guaranteed to fail.
+
+    Each offending rule produces a finding, so users can suppress per-ref
+    with ``# octorules:disable=CF105`` if they want to keep the others
+    visible while working out which to consolidate.
+    """
+    by_id: dict[str, list[dict]] = {}
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        if rule.get("action") != "execute":
+            continue
+        ap = rule.get("action_parameters")
+        if not isinstance(ap, dict):
+            continue
+        rs_id = ap.get("id")
+        if not isinstance(rs_id, str) or not rs_id:
+            continue
+        by_id.setdefault(rs_id, []).append(rule)
+
+    for rs_id, group in by_id.items():
+        if len(group) <= 1:
+            continue
+        for rule in group:
+            ctx.set_location(rule)
+            ctx.add(
+                LintResult(
+                    rule_id="CF105",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"Phase {phase_name!r} has {len(group)} `execute` rules "
+                        f"targeting managed ruleset {rs_id}; Cloudflare allows "
+                        f"only one execute per managed ruleset per phase"
+                    ),
+                    phase=phase_name,
+                    ref=str(rule.get("ref", "")),
+                    field="action_parameters.id",
+                    suggestion=(
+                        "Consolidate into a single execute and vary behaviour "
+                        "via action_parameters.overrides.categories[] or "
+                        "action_parameters.overrides.rules[]."
+                    ),
+                )
+            )
 
 
 def _check_list_references(rules_data: dict[str, Any], ctx: LintContext) -> None:

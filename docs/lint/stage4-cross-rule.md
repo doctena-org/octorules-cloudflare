@@ -3,7 +3,7 @@
 Analyzes relationships between rules within each phase. Rules inside
 `custom_rulesets` entries are also included (CF102, CF103, CF104).
 
-## Category P — Cross-Rule / Ruleset-Level (5 rules)
+## Category P — Cross-Rule / Ruleset-Level (6 rules)
 
 ### CF100 — Duplicate expression across rules
 
@@ -109,3 +109,41 @@ waf_custom_rules:
 ```
 
 Fix: Use the correct field for the list kind (e.g., `ip.src.asnum in $my_asns`), or change the list kind.
+
+### CF105 — Duplicate execute of managed ruleset within phase
+
+| Severity | Category |
+|----------|----------|
+| ERROR | cross_rule |
+
+Triggers when two or more rules in the same phase have `action: execute` with the same `action_parameters.id` (managed ruleset UUID). Cloudflare's API rejects this at deploy time with error 20014: *"more than one rule is trying to execute the same managed ruleset"*. Lint catches the violation before sync fails.
+
+```yaml
+waf_managed_rules:
+  - ref: rule-a
+    action: execute
+    action_parameters:
+      id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # same id
+      overrides:
+        categories:
+          - category: wordpress
+            enabled: false
+    expression: "true"
+
+  - ref: rule-b
+    action: execute
+    action_parameters:
+      id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # ← duplicate
+      overrides:
+        enabled: false
+        categories:
+          - category: wordpress
+            enabled: true
+    expression: '(http.host eq "example.com")'
+```
+
+Cloudflare permits one `execute` per managed-ruleset id per phase entrypoint, regardless of how the overrides differ.
+
+Fix: collapse to a single `execute` entry and vary behaviour via `action_parameters.overrides.categories[]` or `action_parameters.overrides.rules[]`. Conditional logic that depends on the request itself (host, path, etc.) is not expressible at the execute layer — restructure into custom rules upstream or use per-rule overrides.
+
+One finding is emitted per offending rule so that `# octorules:disable=CF105` directives can target individual refs if the configuration must remain in a transient state during a refactor.

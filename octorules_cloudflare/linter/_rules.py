@@ -271,6 +271,12 @@ CF101 = RuleMeta(
 CF102 = RuleMeta("CF102", "cross_rule", "Unresolved list reference", Severity.WARNING)
 CF103 = RuleMeta("CF103", "cross_rule", "Invalid managed list name", Severity.WARNING)
 CF104 = RuleMeta("CF104", "cross_rule", "Field type incompatible with list kind", Severity.WARNING)
+CF105 = RuleMeta(
+    "CF105",
+    "cross_rule",
+    "Duplicate execute of managed ruleset within phase",
+    Severity.ERROR,
+)
 
 # Category T — Custom Rulesets
 CF022 = RuleMeta("CF022", "custom_ruleset", "Missing required custom ruleset field", Severity.ERROR)

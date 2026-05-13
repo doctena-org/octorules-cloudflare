@@ -504,3 +504,161 @@ class TestPhaseFilter:
             phase_filter=["redirect_rules"],
         )
         assert_no_lint(ctx, "CF100")
+
+
+class TestDuplicateManagedRulesetExecute:
+    """CF105: two or more `execute` rules targeting the same managed ruleset
+    in one phase entrypoint — Cloudflare API rejects with error 20014."""
+
+    _RULESET_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    _RULESET_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+    def test_cf105_two_executes_same_ruleset_fires(self):
+        ctx = _lint(
+            {
+                "waf_managed_rules": [
+                    {
+                        "ref": "rule-A",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": "true",
+                    },
+                    {
+                        "ref": "rule-B",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": '(http.host eq "example.com")',
+                    },
+                ]
+            }
+        )
+        assert_lint(ctx, "CF105")
+        findings = [r for r in ctx.results if r.rule_id == "CF105"]
+        # One finding per offending rule so users can suppress per-ref.
+        assert len(findings) == 2
+        assert {f.ref for f in findings} == {"rule-A", "rule-B"}
+        assert all(f.severity == Severity.ERROR for f in findings)
+        assert all(self._RULESET_A in f.message for f in findings)
+
+    def test_cf105_single_execute_no_fire(self):
+        ctx = _lint(
+            {
+                "waf_managed_rules": [
+                    {
+                        "ref": "rule-A",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": "true",
+                    },
+                ]
+            }
+        )
+        assert_no_lint(ctx, "CF105")
+
+    def test_cf105_two_executes_different_ids_no_fire(self):
+        ctx = _lint(
+            {
+                "waf_managed_rules": [
+                    {
+                        "ref": "rule-A",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": "true",
+                    },
+                    {
+                        "ref": "rule-B",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_B},
+                        "expression": "true",
+                    },
+                ]
+            }
+        )
+        assert_no_lint(ctx, "CF105")
+
+    def test_cf105_execute_without_action_parameters_safe(self):
+        # Missing action_parameters is a separate problem (CF202); CF105
+        # must not crash on it nor produce a spurious finding.
+        ctx = _lint(
+            {
+                "waf_managed_rules": [
+                    {"ref": "rule-A", "action": "execute", "expression": "true"},
+                    {
+                        "ref": "rule-B",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": "true",
+                    },
+                ]
+            }
+        )
+        assert_no_lint(ctx, "CF105")
+
+    def test_cf105_other_phases_isolated(self):
+        # Two execute rules sharing a managed-ruleset id but in different
+        # phases are independent — each phase entrypoint is its own scope.
+        # (Even though `execute` in waf_custom_rules typically isn't valid,
+        # the cross-rule check should still group per-phase.)
+        ctx = _lint(
+            {
+                "waf_managed_rules": [
+                    {
+                        "ref": "rule-A",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": "true",
+                    },
+                ],
+                "waf_custom_rules": [
+                    {
+                        "ref": "rule-B",
+                        "action": "execute",
+                        "action_parameters": {"id": self._RULESET_A},
+                        "expression": "true",
+                    },
+                ],
+            }
+        )
+        assert_no_lint(ctx, "CF105")
+
+    def test_cf105_two_executes_same_ruleset_with_different_overrides(self):
+        # The PR-introduced pattern: same managed ruleset deployed twice
+        # with different overrides (e.g. globally with one category off,
+        # then re-enabled scoped to one host). Cloudflare still rejects
+        # this — the constraint is on the ruleset id, not the overrides.
+        ctx = _lint(
+            {
+                "waf_managed_rules": [
+                    {
+                        "ref": "rule-A",
+                        "action": "execute",
+                        "action_parameters": {
+                            "id": self._RULESET_A,
+                            "overrides": {
+                                "categories": [
+                                    {"category": "wordpress", "enabled": False},
+                                ],
+                            },
+                        },
+                        "expression": "true",
+                    },
+                    {
+                        "ref": "rule-B",
+                        "action": "execute",
+                        "action_parameters": {
+                            "id": self._RULESET_A,
+                            "overrides": {
+                                "enabled": False,
+                                "categories": [
+                                    {"category": "wordpress", "enabled": True},
+                                ],
+                            },
+                        },
+                        "expression": '(http.host eq "example.com")',
+                    },
+                ]
+            }
+        )
+        findings = [r for r in ctx.results if r.rule_id == "CF105"]
+        assert len(findings) == 2
+        assert {f.ref for f in findings} == {"rule-A", "rule-B"}

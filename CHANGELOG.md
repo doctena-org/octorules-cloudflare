@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.3] - 2026-05-13
+
+### Added
+- **CF105** (cross-rule, ERROR): two or more rules in the same phase with
+  `action: execute` targeting the same managed-ruleset `id`. Cloudflare's
+  API rejects this with error 20014; the rule catches the violation at
+  lint time before `sync` fails.
+
 ## [0.8.2] - 2026-05-13
 
 ### Fixed
