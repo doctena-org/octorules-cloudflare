@@ -345,21 +345,23 @@ class TestCfPrepareRuleNoMutation:
         with pytest.raises(ValueError, match=r"'my-rule-id'.*'waf_custom_rules'"):
             _cf_prepare_rule(rule, phase)
 
-    def test_prepare_rule_does_not_mutate_action_parameters(self):
+    def test_prepare_rule_does_not_mutate_ratelimit(self):
         from octorules_cloudflare import _cf_prepare_rule
 
         phase = get_phase("rate_limiting_rules")
-        ap = {"counting_expression": "  ip.src  eq  1.2.3.4  ", "id": "abc"}
+        # counting_expression lives inside the rule-level `ratelimit:` block
+        # per cloudflare-python BlockRule.ratelimit (sibling of action_parameters).
+        rl = {"counting_expression": "  ip.src  eq  1.2.3.4  "}
         original = {
             "ref": "r1",
             "expression": "true",
             "action": "block",
-            "action_parameters": ap,
+            "ratelimit": rl,
         }
-        original_ap_copy = ap.copy()
+        original_rl_copy = rl.copy()
         _cf_prepare_rule(original, phase)
-        # Original action_parameters should be unchanged
-        assert original["action_parameters"] == original_ap_copy
+        # Original ratelimit block should be unchanged (a copy was edited).
+        assert original["ratelimit"] == original_rl_copy
 
 
 class TestPhaseConsistency:

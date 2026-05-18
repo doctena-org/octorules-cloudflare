@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.4] - 2026-05-18
+
+### Fixed
+- Rate-limit lint checks (CF400-CF408, CF213) no longer false-fire
+  on well-formed rate-limit rules. They now read from the rule's
+  `ratelimit:` block instead of `action_parameters`.
+
 ## [0.8.3] - 2026-05-13
 
 ### Added

@@ -14,7 +14,9 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
     ``Phase.prepare_rule`` hook.  Handles:
 
     - Normalize ``expression`` (collapse whitespace).
-    - Normalize ``counting_expression`` inside ``action_parameters``.
+    - Normalize ``counting_expression`` inside the rule-level
+      ``ratelimit:`` block (the field's canonical location per
+      cloudflare-python ``BlockRule.ratelimit``).
     - Default ``enabled`` to ``True``.
     - Inject ``phase.default_action`` when rule has no ``action``.
 
@@ -27,11 +29,11 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
             f" is missing required 'expression' field"
         )
     rule["expression"] = normalize_expression(rule["expression"])
-    ap = rule.get("action_parameters")
-    if isinstance(ap, dict) and isinstance(ap.get("counting_expression"), str):
-        ap = ap.copy()
-        ap["counting_expression"] = normalize_expression(ap["counting_expression"])
-        rule["action_parameters"] = ap
+    rl = rule.get("ratelimit")
+    if isinstance(rl, dict) and isinstance(rl.get("counting_expression"), str):
+        rl = rl.copy()
+        rl["counting_expression"] = normalize_expression(rl["counting_expression"])
+        rule["ratelimit"] = rl
     if "enabled" not in rule:
         rule["enabled"] = True
     if "action" not in rule:

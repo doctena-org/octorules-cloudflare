@@ -168,6 +168,13 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
         )
         return
 
+    # Rate-limit validation runs against the rule-level `ratelimit:` block,
+    # which is independent of action_parameters. Dispatched here (before the
+    # action_params-is-None early return) so a rule with `ratelimit:` set
+    # and no `action_parameters` is still linted.
+    if phase_name == "rate_limiting_rules" and action not in ("execute", "skip"):
+        _lint_rate_limit_params(rule.get("ratelimit"), phase_name, ref, ctx)
+
     if action_params is None:
         return
 
@@ -221,16 +228,14 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
                 )
             )
 
-    # Phase-specific validation
+    # Phase-specific validation (rate_limiting_rules is handled earlier
+    # since `ratelimit:` is a rule-level field independent of action_parameters).
     if phase_name in ("redirect_rules", "bulk_redirect_rules"):
         _lint_redirect_params(action_params, phase_name, ref, ctx)
     elif phase_name == "cache_rules":
         _lint_cache_params(action_params, phase_name, ref, ctx)
     elif phase_name == "config_rules":
         _lint_config_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "rate_limiting_rules" and action not in ("execute", "skip"):
-        # execute/skip are ruleset references — thresholds live in the child rules.
-        _lint_rate_limit_params(action_params, phase_name, ref, ctx)
     elif phase_name == "origin_rules":
         _lint_origin_params(action_params, phase_name, ref, ctx)
     elif phase_name in ("url_rewrite_rules", "request_header_rules", "response_header_rules"):
@@ -594,8 +599,17 @@ def _lint_config_params(params: dict, phase_name: str, ref: str, ctx: LintContex
         )
 
 
-def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate rate limiting action_parameters (CF400-CF404)."""
+def _lint_rate_limit_params(ratelimit: object, phase_name: str, ref: str, ctx: LintContext) -> None:
+    """Validate the rule-level ``ratelimit:`` block (CF400-CF408, CF213, CF406).
+
+    The Cloudflare API places rate-limit configuration in a top-level
+    ``ratelimit`` rule field (sibling of ``action_parameters``) — see
+    cloudflare-python ``BlockRule.ratelimit`` / ``Ratelimit`` typed
+    params. A missing or non-dict block is treated as empty so the
+    "missing threshold" / "missing characteristics" findings still fire.
+    """
+    params: dict = ratelimit if isinstance(ratelimit, dict) else {}
+
     period = params.get("period")
     if isinstance(period, int):
         _check_enum(
@@ -603,7 +617,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
             VALID_RATE_LIMIT_PERIODS,
             rule_id="CF400",
             label="rate limiting period",
-            field_path="action_parameters.period",
+            field_path="ratelimit.period",
             phase_name=phase_name,
             ref=ref,
             ctx=ctx,
@@ -621,7 +635,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                 ),
                 phase=phase_name,
                 ref=ref,
-                field="action_parameters",
+                field="ratelimit",
             )
         )
 
@@ -638,7 +652,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                     ),
                     phase=phase_name,
                     ref=ref,
-                    field="action_parameters.requests_per_period",
+                    field="ratelimit.requests_per_period",
                 )
             )
 
@@ -653,7 +667,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                     message=(f"score_per_period ({spp}) is outside the valid range (1-10,000,000)"),
                     phase=phase_name,
                     ref=ref,
-                    field="action_parameters.score_per_period",
+                    field="ratelimit.score_per_period",
                 )
             )
 
@@ -667,7 +681,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                 message=("Missing 'characteristics' — rate limit will apply globally"),
                 phase=phase_name,
                 ref=ref,
-                field="action_parameters.characteristics",
+                field="ratelimit.characteristics",
             )
         )
 
@@ -687,7 +701,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                         message=f"Unknown rate limit characteristic {char_val!r}",
                         phase=phase_name,
                         ref=ref,
-                        field="action_parameters.characteristics",
+                        field="ratelimit.characteristics",
                         suggestion=f"Valid: {sorted(VALID_RATE_LIMIT_CHARACTERISTICS)}",
                     )
                 )
@@ -705,7 +719,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                     ),
                     phase=phase_name,
                     ref=ref,
-                    field="action_parameters.characteristics",
+                    field="ratelimit.characteristics",
                 )
             )
 
@@ -723,7 +737,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                 message=(f"mitigation_timeout ({mitigation_timeout}s) exceeds period ({period}s)"),
                 phase=phase_name,
                 ref=ref,
-                field="action_parameters.mitigation_timeout",
+                field="ratelimit.mitigation_timeout",
             )
         )
 
@@ -737,7 +751,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                 message="'counting_expression' must be a string",
                 phase=phase_name,
                 ref=ref,
-                field="action_parameters.counting_expression",
+                field="ratelimit.counting_expression",
             )
         )
 
@@ -757,7 +771,7 @@ def _lint_rate_limit_params(params: dict, phase_name: str, ref: str, ctx: LintCo
                     message=(f"Invalid counting_expression: {ce_info.parse_error}"),
                     phase=phase_name,
                     ref=ref,
-                    field="action_parameters.counting_expression",
+                    field="ratelimit.counting_expression",
                 )
             )
 

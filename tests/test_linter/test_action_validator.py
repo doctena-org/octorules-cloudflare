@@ -658,7 +658,7 @@ class TestRateLimitParams:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 42,
                     "requests_per_period": 100,
                     "characteristics": ["ip.src"],
@@ -674,7 +674,7 @@ class TestRateLimitParams:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {"period": 60, "requests_per_period": 100},
+                "ratelimit": {"period": 60, "requests_per_period": 100},
             },
             "rate_limiting_rules",
         )
@@ -709,7 +709,7 @@ class TestRateLimitParams:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {"period": 60, "characteristics": ["ip.src"]},
+                "ratelimit": {"period": 60, "characteristics": ["ip.src"]},
             },
             "rate_limiting_rules",
         )
@@ -721,7 +721,7 @@ class TestRateLimitParams:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "score_per_period": 50,
                     "characteristics": ["ip.src"],
@@ -737,7 +737,7 @@ class TestRateLimitParams:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "mitigation_timeout": 120,
@@ -754,7 +754,7 @@ class TestRateLimitParams:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "counting_expression": 123,
@@ -827,7 +827,7 @@ class TestD006CountingExpression:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "counting_expression": "http.host gt",
@@ -844,7 +844,7 @@ class TestD006CountingExpression:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "counting_expression": 'http.host eq "example.com"',
@@ -861,7 +861,7 @@ class TestD006CountingExpression:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "counting_expression": "",
@@ -1444,7 +1444,7 @@ class TestC014RateLimitCharacteristics:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": ["bogus.field"],
@@ -1460,7 +1460,7 @@ class TestC014RateLimitCharacteristics:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": ["ip.src", "cf.colo.id"],
@@ -1476,7 +1476,7 @@ class TestC014RateLimitCharacteristics:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": ['http.request.headers["x-api-key"]'],
@@ -1492,7 +1492,7 @@ class TestC014RateLimitCharacteristics:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": ["ip.src", "bad.field"],
@@ -1762,7 +1762,7 @@ class TestCF406CharacteristicsPerPlan:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": [
@@ -1786,7 +1786,7 @@ class TestCF406CharacteristicsPerPlan:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": ["ip.src", "cf.colo.id"],
@@ -1805,7 +1805,7 @@ class TestCF407RequestsPerPeriodRange:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 0,
                     "characteristics": ["ip.src"],
@@ -1821,7 +1821,7 @@ class TestCF407RequestsPerPeriodRange:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 20000000,
                     "characteristics": ["ip.src"],
@@ -1837,7 +1837,7 @@ class TestCF407RequestsPerPeriodRange:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 100,
                     "characteristics": ["ip.src"],
@@ -1854,7 +1854,7 @@ class TestCF407RequestsPerPeriodRange:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 1,
                     "characteristics": ["ip.src"],
@@ -1871,7 +1871,7 @@ class TestCF407RequestsPerPeriodRange:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "requests_per_period": 10_000_000,
                     "characteristics": ["ip.src"],
@@ -1889,7 +1889,7 @@ class TestCF408ScorePerPeriod:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "score_per_period": -1,
                     "characteristics": ["ip.src"],
@@ -1905,7 +1905,7 @@ class TestCF408ScorePerPeriod:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "score_per_period": 0,
                     "characteristics": ["ip.src"],
@@ -1921,7 +1921,7 @@ class TestCF408ScorePerPeriod:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "score_per_period": 20_000_000,
                     "characteristics": ["ip.src"],
@@ -1937,7 +1937,7 @@ class TestCF408ScorePerPeriod:
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
-                "action_parameters": {
+                "ratelimit": {
                     "period": 60,
                     "score_per_period": 100,
                     "characteristics": ["ip.src"],
