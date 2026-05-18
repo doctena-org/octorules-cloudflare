@@ -61,7 +61,10 @@ _MODIFY_FORMATS = {
         _format_md,
         ["page_shield:CSP on all", "```diff", "- action: 'log'", "+ action: 'allow'"],
     ),
-    "html": (_format_html, ["Update", "&minus;&ensp;", "+&ensp;"]),
+    "html": (
+        _format_html,
+        ["Update", "<pre>- action: log</pre>", "<pre>+ action: allow</pre>"],
+    ),
 }
 
 

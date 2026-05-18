@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.5] - 2026-05-18
+
+### Fixed
+- Page Shield HTML formatter test expectations updated for the
+  `octorules` 0.27.1 PR-comment rendering refactor (diff prefixes
+  moved inside `<pre>` blocks). No behaviour change for users —
+  test-only fix; 0.8.4 never reached PyPI (CI gate caught the
+  stale assertion before publish).
+
 ## [0.8.4] - 2026-05-18
 
 ### Fixed
