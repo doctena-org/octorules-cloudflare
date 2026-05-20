@@ -67,12 +67,12 @@ Suppressed findings are excluded from the report but counted in the summary line
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
 | 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF027 | 17 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF549 | 109 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF549 | 110 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF478 | 9 | [stage2d-lists.md](stage2d-lists.md) |
 | 3. Plan-tier limits | Regex availability, rule count limits | CF500–CF502 | 3 | [stage3-plan-tier.md](stage3-plan-tier.md) |
-| 4. Cross-rule analysis | Duplicates, unreachable rules, list references | CF100–CF104 | 5 | [stage4-cross-rule.md](stage4-cross-rule.md) |
+| 4. Cross-rule analysis | Duplicates, unreachable rules, list references | CF100–CF105 | 6 | [stage4-cross-rule.md](stage4-cross-rule.md) |
 
 ## Categories
 
@@ -82,8 +82,8 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF003–CF027 | Structure | 17 |
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
-| CF100–CF104 | Cross-rule | 5 |
-| CF200–CF222 | Action validation | 23 |
+| CF100–CF105 | Cross-rule | 6 |
+| CF200–CF223 | Action validation | 24 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
 | CF400–CF408 | Rate limiting | 9 |
@@ -260,6 +260,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF220](stage2-per-rule.md#cf220--invalid-sensitivity_level-in-execute-overrides) | Invalid sensitivity_level in execute overrides | ERROR |
 | [CF221](stage2-per-rule.md#cf221--invalid-content_type-in-serve_error-response) | Invalid content_type in serve_error response | ERROR |
 | [CF222](stage2-per-rule.md#cf222--skip-ruleset-value-must-be-current) | Skip ruleset value must be "current" | ERROR |
+| [CF223](stage2-per-rule.md#cf223--skip-action-invalid-in-account-scoped-waf_custom_rules) | Skip action invalid in account-scoped waf_custom_rules | ERROR |
 | [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |
@@ -349,6 +350,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF102](stage4-cross-rule.md#cf102--unresolved-list-reference) | Unresolved list reference | WARNING |
 | [CF103](stage4-cross-rule.md#cf103--unknown-managed-list-name) | Unknown managed list name | WARNING |
 | [CF104](stage4-cross-rule.md#cf104--list-type--field-type-mismatch) | List type / field type mismatch | WARNING |
+| [CF105](stage4-cross-rule.md#cf105--duplicate-execute-of-managed-ruleset-within-phase) | Duplicate execute of managed ruleset within phase | ERROR |
 | [CF470](stage2d-lists.md#cf470--missing-or-duplicate-list-name) | Missing or duplicate list name | ERROR |
 | [CF471](stage2d-lists.md#cf471--missing-or-invalid-list-kind) | Missing or invalid list kind | ERROR |
 | [CF472](stage2d-lists.md#cf472--list-item-missing-required-field) | List item missing required field | ERROR |
