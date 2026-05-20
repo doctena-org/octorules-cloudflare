@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.7] - 2026-05-20
+
+### Added
+- **CF223** (action, ERROR): `action: skip` in account-scoped
+  `waf_custom_rules` rules. Cloudflare rejects this combo at deploy
+  with API error 20016 ("skip is not valid in kind=root rulesets
+  with phase http_request_firewall_custom"). Account scope is
+  detected by the documented `cf.zone.plan eq "ENT"` expression
+  suffix. Move the rule to a zone-level YAML, or rewrite the
+  action as `block` / `managed_challenge`.
+
 ## [0.8.6] - 2026-05-18
 
 ### Fixed

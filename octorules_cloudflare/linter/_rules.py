@@ -75,6 +75,12 @@ CF220 = RuleMeta(
 )
 CF221 = RuleMeta("CF221", "action", "Invalid serve_error content_type", Severity.ERROR)
 CF222 = RuleMeta("CF222", "action", "Invalid skip ruleset value", Severity.ERROR)
+CF223 = RuleMeta(
+    "CF223",
+    "action",
+    "Skip action invalid in account-scoped waf_custom_rules",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)

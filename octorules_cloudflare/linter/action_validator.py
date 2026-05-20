@@ -93,10 +93,19 @@ RULE_IDS = frozenset(
         "CF220",
         "CF221",
         "CF222",
+        "CF223",
     }
 )
 
 _VALID_HEADER_OPERATIONS = frozenset({"set", "remove", "add"})
+
+# CF223: account-scope marker. Per Cloudflare's deploy-custom-ruleset docs,
+# account-level rule expressions "must use parentheses to enclose any custom
+# conditions and end your expression with `and cf.zone.plan eq \"ENT\"`".
+# We treat the presence of that literal as the YAML-visible signal that the
+# rule is intended for account scope (kind=root), where CF rejects skip with
+# API error 20016.
+_ACCOUNT_SCOPE_MARKER = re.compile(r'cf\.zone\.plan\s+eq\s+"ENT"')
 
 
 def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
@@ -150,6 +159,27 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
             )
         )
         return  # skip parameter validation for invalid action
+
+    # CF223: skip in account-scoped waf_custom_rules is rejected by CF
+    # with API error 20016 (kind=root rulesets don't support skip).
+    if action == "skip" and phase_name == "waf_custom_rules":
+        expression = rule.get("expression", "")
+        if isinstance(expression, str) and _ACCOUNT_SCOPE_MARKER.search(expression):
+            ctx.add(
+                LintResult(
+                    rule_id="CF223",
+                    severity=Severity.ERROR,
+                    message=(
+                        "'skip' action is not valid in account-scoped"
+                        " waf_custom_rules (Cloudflare API error 20016)."
+                        " Use a zone-level YAML or rewrite as"
+                        " 'block' / 'managed_challenge'."
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action",
+                )
+            )
 
     action_params = rule.get("action_parameters")
     schema = ACTION_SCHEMAS.get(action)

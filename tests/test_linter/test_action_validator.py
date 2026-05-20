@@ -125,6 +125,113 @@ class TestActionValidity:
         assert "CF203" not in _ids(ctx)
 
 
+class TestCF223SkipInAccountScope:
+    """Skip action in account-scoped waf_custom_rules is rejected by CF API
+    with error code 20016. Account scope is detected by the documented
+    `cf.zone.plan eq "ENT"` expression suffix."""
+
+    _ACCOUNT_EXPR = '(ip.src.asnum eq 45566) and (cf.zone.plan eq "ENT")'
+
+    def test_fires_on_account_scoped_skip_in_waf_custom_rules(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": self._ACCOUNT_EXPR,
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF223" in _ids(ctx)
+        results = [r for r in ctx.results if r.rule_id == "CF223"]
+        assert len(results) == 1
+        assert results[0].severity == Severity.ERROR
+        assert "20016" in results[0].message
+
+    def test_does_not_fire_on_zone_scoped_skip(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src.asnum eq 45566)",
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF223" not in _ids(ctx)
+
+    def test_does_not_fire_on_account_scoped_block(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": self._ACCOUNT_EXPR,
+                "action": "block",
+            },
+            "waf_custom_rules",
+        )
+        assert "CF223" not in _ids(ctx)
+
+    def test_does_not_fire_on_skip_in_waf_managed_rules(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": self._ACCOUNT_EXPR,
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_managed_rules",
+        )
+        assert "CF223" not in _ids(ctx)
+
+    def test_does_not_fire_on_different_plan(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": '(ip.src.asnum eq 45566) and (cf.zone.plan eq "BIZ")',
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF223" not in _ids(ctx)
+
+    def test_whitespace_tolerant(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": '(ip.src.asnum eq 45566) and (cf.zone.plan  eq  "ENT")',
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF223" in _ids(ctx)
+
+    def test_does_not_crash_on_missing_expression(self):
+        """Defensive: if expression is missing, CF223 must not fire and must
+        not raise. Upstream CF001/structure rules handle the missing-expression
+        case separately."""
+        ctx = _lint_rule(
+            {"ref": "t", "action": "skip", "action_parameters": {"ruleset": "current"}},
+            "waf_custom_rules",
+        )
+        assert "CF223" not in _ids(ctx)
+
+    def test_does_not_crash_on_non_string_expression(self):
+        """Defensive: a malformed YAML with `expression: 123` must not crash
+        the CF223 check. The isinstance guard short-circuits to no-fire."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": 123,
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "waf_custom_rules",
+        )
+        assert "CF223" not in _ids(ctx)
+
+
 class TestDefaultActionParamValidation:
     def test_cf203_fires_on_default_action_with_unknown_param(self):
         # config_rules has default action 'set_config' — unknown params should be caught

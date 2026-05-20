@@ -413,6 +413,27 @@ waf_custom_rules:
 
 **Fix:** Set `ruleset` to `"current"`.
 
+### CF223 — Skip action invalid in account-scoped waf_custom_rules
+
+**Severity:** ERROR
+
+Cloudflare rejects `action: skip` in `waf_custom_rules` rules deployed at the account level with API error 20016: *"'skip' is not a valid value for action because it is not possible to use the skip action in a ruleset with phase http_request_firewall_custom and kind root"*. Account-scoped custom rulesets (`kind: root`) do not support the skip action.
+
+CF223 detects account scope via the `cf.zone.plan eq "ENT"` expression suffix that Cloudflare requires on account-level rules.
+
+```yaml
+# In an account-scoped YAML (e.g. <account-slug>.yaml):
+waf_custom_rules:
+  - ref: skip-trusted-asn
+    expression: '(ip.src.asnum eq 12345) and (cf.zone.plan eq "ENT")'
+    action: skip   # ERROR — CF rejects skip at account level
+    action_parameters:
+      ruleset: current
+      phases: [http_request_firewall_managed, http_ratelimit]
+```
+
+**Fix:** Move the rule to a zone-level YAML file, or rewrite the action as `block` / `managed_challenge` if the intent is to allow specific traffic through.
+
 ---
 
 ## Category D — Rate Limiting (9 rules)
