@@ -711,12 +711,27 @@ class CloudflareProvider:
 
     @_wrap_provider_errors
     def get_all_page_shield_policies(self, scope: Scope) -> list[dict]:
-        """Fetch all Page Shield policies, stripping API-only fields.
+        """Fetch all Page Shield policies, stripping API-only noise fields but
+        preserving ``id``.
 
-        Returns list of {description, action, expression, enabled, value} dicts.
+        The planner needs each existing policy's ``id`` to target updates and
+        deletes; ``diff_page_shield_policies`` reads ``current["id"]`` and the
+        apply stage skips any plan whose ``policy_id`` is falsy. The field diff
+        only compares user-managed fields (``_PAGE_SHIELD_DIFF_FIELDS``), so a
+        preserved ``id`` never surfaces as a spurious change, and the dump path
+        re-strips it via ``_clean_page_shield_policies`` before writing YAML.
+
+        Returns list of {id, description, action, expression, enabled, value} dicts.
         """
         policies = self.list_page_shield_policies(scope)
-        return [strip_api_fields(p, "page_shield_policy") for p in policies]
+        result = []
+        for p in policies:
+            stripped = strip_api_fields(p, "page_shield_policy")
+            pid = p.get("id")
+            if pid:
+                stripped["id"] = pid
+            result.append(stripped)
+        return result
 
     # --- Bot Management API ---
 

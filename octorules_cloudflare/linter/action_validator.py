@@ -94,10 +94,20 @@ RULE_IDS = frozenset(
         "CF221",
         "CF222",
         "CF223",
+        "CF224",
     }
 )
 
 _VALID_HEADER_OPERATIONS = frozenset({"set", "remove", "add"})
+
+# CF224: Cloudflare's Rulesets API rejects a rule expression longer than 4096
+# characters with API error 20127 ("expression size N exceeded maximum 4096").
+# CF measures the canonical (whitespace-normalized) form — the same form
+# octorules sends — so we measure the normalized length. 4096 is the maximum
+# *allowed* (the error fires when the size strictly exceeds it), so the cap is
+# breached at 4097+. A stored-list reference (e.g. `ip.src in $my_list`) stays
+# short, which is the intended remediation.
+_MAX_EXPRESSION_LENGTH = 4096
 
 # CF223: account-scope marker. Per Cloudflare's deploy-custom-ruleset docs,
 # account-level rule expressions "must use parentheses to enclose any custom
@@ -108,11 +118,43 @@ _VALID_HEADER_OPERATIONS = frozenset({"set", "remove", "add"})
 _ACCOUNT_SCOPE_MARKER = re.compile(r'cf\.zone\.plan\s+eq\s+"ENT"')
 
 
+def _check_expression_length(
+    rule: dict[str, Any], phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF224: flag rule expressions exceeding Cloudflare's 4096-char API cap."""
+    from octorules.expression import normalize_expression
+
+    expression = rule.get("expression")
+    if not isinstance(expression, str):
+        return
+    length = len(normalize_expression(expression))
+    if length > _MAX_EXPRESSION_LENGTH:
+        ctx.add(
+            LintResult(
+                rule_id="CF224",
+                severity=Severity.ERROR,
+                message=(
+                    f"Expression is {length} characters, exceeding Cloudflare's"
+                    f" {_MAX_EXPRESSION_LENGTH}-character API cap (error 20127)."
+                    " Move large inline value lists into a stored list and"
+                    " reference it (e.g. 'ip.src in $my_list')."
+                ),
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+            )
+        )
+
+
 def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
     """Run all action-related lint checks on a single rule."""
     ref = rule.get("ref", "")
     action = rule.get("action")
     phase_name = phase.friendly_name
+
+    # CF224: expression exceeds Cloudflare's 4096-char API cap. Checked first
+    # so it fires regardless of any action-validation early-return below.
+    _check_expression_length(rule, phase_name, ref, ctx)
 
     # CF201: Missing action in phase without default
     if action is None:

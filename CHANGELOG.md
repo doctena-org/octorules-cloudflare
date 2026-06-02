@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.8] - 2026-06-02
+
+### Added
+- **CF224** (action, ERROR): rule expression exceeds Cloudflare's
+  4096-character API cap. Cloudflare rejects longer expressions at
+  deploy with API error 20127 ("expression size N exceeded maximum
+  4096"); `octorules plan` cannot see it, so the failure only shows
+  up on the post-merge sync. CF224 catches it at lint time. The
+  length is measured on the normalized (single-line) form the API
+  receives, so multi-line YAML block scalars are judged by their
+  collapsed length. Move large inline value lists into a stored list
+  and reference it (e.g. `ip.src in $my_list`).
+
+### Fixed
+- Page Shield policy **updates and deletes** are no longer silently
+  skipped. `get_all_page_shield_policies` stripped each policy's `id`
+  before the planner saw it, so every existing policy was planned with
+  no id and dropped at apply time — `octorules plan` showed the change
+  but `sync` applied nothing (no error). The `id` is now preserved for
+  the planner and still stripped from `dump` output. Only creates were
+  unaffected.
+
 ## [0.8.7] - 2026-05-20
 
 ### Added

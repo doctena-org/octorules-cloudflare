@@ -36,7 +36,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (23 rules)
+## Category C — Action Validation (24 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -433,6 +433,29 @@ waf_custom_rules:
 ```
 
 **Fix:** Move the rule to a zone-level YAML file, or rewrite the action as `block` / `managed_challenge` if the intent is to allow specific traffic through.
+
+### CF224 — Expression exceeds 4096-char Cloudflare API cap
+
+**Severity:** ERROR
+
+Cloudflare's Rulesets API rejects a rule expression longer than 4096 characters with API error 20127 (*"expression size N exceeded maximum 4096"*). The failure happens server-side at deploy time, so `octorules plan` does not surface it — only the post-merge sync does. CF224 catches it statically at lint time.
+
+The length is measured against the canonical, whitespace-normalized form of the expression (the same form octorules sends to the API), so a multi-line YAML block scalar is judged by its collapsed single-line length, not its source-byte count. 4096 is the maximum allowed; the rule fires at 4097+.
+
+```yaml
+waf_custom_rules:
+  - ref: block-attackers
+    expression: '(ip.src in {1.2.3.4 5.6.7.8 ...})'   # 350+ inline IPs → 4097+ chars
+    action: block
+```
+
+**Fix:** Move large inline value lists into a stored list and reference it, which keeps the expression short:
+
+```yaml
+  - ref: block-attackers
+    expression: '(ip.src in $block_known_attackers)'
+    action: block
+```
 
 ---
 

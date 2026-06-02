@@ -135,7 +135,8 @@ class TestPageShieldPolicies:
         )
 
     def test_get_all_page_shield_policies(self, mock_cf_client):
-        """get_all_page_shield_policies strips API fields."""
+        """get_all_page_shield_policies preserves ``id`` (the planner needs it
+        to target updates/deletes) and strips noise fields like last_updated."""
         mock_cf_client.page_shield.policies.list.return_value = [
             MockRule(
                 {
@@ -153,15 +154,74 @@ class TestPageShieldPolicies:
         scope = Scope(zone_id="zone-123")
         result = provider.get_all_page_shield_policies(scope)
         assert len(result) == 1
-        assert "id" not in result[0]
-        assert "last_updated" not in result[0]
+        assert result[0]["id"] == "pol-1"  # preserved — planner targets updates/deletes by id
+        assert "last_updated" not in result[0]  # noise still stripped
         assert result[0] == {
+            "id": "pol-1",
             "description": "CSP on all",
             "action": "allow",
             "expression": "true",
             "enabled": True,
             "value": "script-src 'self'",
         }
+
+    def test_existing_policy_update_not_silently_skipped(self, mock_cf_client):
+        """Regression: an update to an EXISTING policy must reach the API.
+
+        Previously ``get_all_page_shield_policies`` stripped ``id``, so the
+        planner saw ``policy_id=None`` for every existing policy and the apply
+        stage silently skipped all updates/deletes (``if not psp.policy_id:
+        continue``) — no error, no API call. This drives the full
+        fetch -> diff -> apply seam that the other apply tests bypass by
+        hand-feeding an id-bearing ``current``.
+        """
+        from octorules.planner import ZonePlan
+
+        from octorules_cloudflare.page_shield import (
+            _apply_page_shield,
+            diff_page_shield_policies,
+        )
+
+        mock_cf_client.page_shield.policies.list.return_value = [
+            MockRule(
+                {
+                    "id": "pol-1",
+                    "description": "CSP",
+                    "action": "log",
+                    "expression": "true",
+                    "enabled": True,
+                    "value": "script-src 'self'",
+                    "last_updated": "2024-01-01T00:00:00Z",
+                }
+            ),
+        ]
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        scope = Scope(zone_id="zone-123")
+
+        current = provider.get_all_page_shield_policies(scope)
+        desired = [
+            {
+                "description": "CSP",
+                "action": "log",
+                "expression": "true",
+                "enabled": True,
+                "value": "script-src 'self' https://new.example",
+            }
+        ]
+        plans = diff_page_shield_policies(desired, current)
+
+        assert len(plans) == 1
+        assert plans[0].policy_id == "pol-1"  # was None under the bug
+        assert plans[0].changes  # the CSP value change is detected
+
+        apply_provider = MagicMock()
+        apply_provider.max_workers = 1
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": plans})
+        _synced, error = _apply_page_shield(zp, plans, scope, apply_provider)
+
+        assert error is None
+        apply_provider.update_page_shield_policy.assert_called_once()
+        assert apply_provider.update_page_shield_policy.call_args[0][1] == "pol-1"
 
     def test_get_all_page_shield_policies_empty(self, mock_cf_client):
         """get_all_page_shield_policies returns empty list when no policies."""

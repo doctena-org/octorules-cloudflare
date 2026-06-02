@@ -232,6 +232,88 @@ class TestCF223SkipInAccountScope:
         assert "CF223" not in _ids(ctx)
 
 
+class TestCF224ExpressionLengthCap:
+    """Cloudflare's Rulesets API rejects expressions longer than 4096 chars
+    (error 20127). CF measures the canonical normalized form, so CF224 does
+    too. 4096 is the maximum allowed; the cap is breached at 4097+."""
+
+    @staticmethod
+    def _expr_of_normalized_length(n):
+        """A single-line expression with no collapsible whitespace, so its
+        normalized length equals n exactly."""
+        prefix, suffix = 'http.host eq "', '"'
+        return prefix + ("a" * (n - len(prefix) - len(suffix))) + suffix
+
+    def test_does_not_fire_at_cap(self):
+        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+
+        ctx = _lint_rule(
+            {"ref": "t", "expression": self._expr_of_normalized_length(_MAX_EXPRESSION_LENGTH)},
+            "waf_custom_rules",
+        )
+        assert "CF224" not in _ids(ctx)
+
+    def test_does_not_fire_just_below_cap(self):
+        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+
+        ctx = _lint_rule(
+            {"ref": "t", "expression": self._expr_of_normalized_length(_MAX_EXPRESSION_LENGTH - 1)},
+            "waf_custom_rules",
+        )
+        assert "CF224" not in _ids(ctx)
+
+    def test_fires_above_cap(self):
+        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+
+        ctx = _lint_rule(
+            {"ref": "t", "expression": self._expr_of_normalized_length(_MAX_EXPRESSION_LENGTH + 1)},
+            "waf_custom_rules",
+        )
+        assert "CF224" in _ids(ctx)
+        result = next(r for r in ctx.results if r.rule_id == "CF224")
+        assert result.severity == Severity.ERROR
+        assert "20127" in result.message
+
+    def test_fires_on_large_inline_ip_list(self):
+        """The empirical shape: a big inline `ip.src in {...}` literal list."""
+        ips = " ".join(f"10.{i // 256 % 256}.{i % 256}.1" for i in range(500))
+        ctx = _lint_rule(
+            {"ref": "t", "expression": f"(ip.src in {{{ips}}})"},
+            "waf_custom_rules",
+        )
+        assert "CF224" in _ids(ctx)
+
+    def test_does_not_fire_on_stored_list_reference(self):
+        """The remediation: a stored-list reference stays short."""
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "(ip.src in $block_known_attackers)"},
+            "waf_custom_rules",
+        )
+        assert "CF224" not in _ids(ctx)
+
+    def test_measures_normalized_not_raw_length(self):
+        """A multi-line expression whose raw text exceeds the cap but whose
+        normalized form is well under it must not fire — CF measures the
+        normalized form octorules sends, not the YAML source bytes."""
+        from octorules.expression import normalize_expression
+
+        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+
+        raw = "(ip.src in {\n" + (" " * 5000) + "1.2.3.4\n})"
+        assert len(raw) > _MAX_EXPRESSION_LENGTH
+        assert len(normalize_expression(raw)) < _MAX_EXPRESSION_LENGTH
+        ctx = _lint_rule({"ref": "t", "expression": raw}, "waf_custom_rules")
+        assert "CF224" not in _ids(ctx)
+
+    def test_does_not_crash_on_non_string_expression(self):
+        ctx = _lint_rule({"ref": "t", "expression": 123}, "waf_custom_rules")
+        assert "CF224" not in _ids(ctx)
+
+    def test_does_not_crash_on_missing_expression(self):
+        ctx = _lint_rule({"ref": "t", "action": "block"}, "waf_custom_rules")
+        assert "CF224" not in _ids(ctx)
+
+
 class TestDefaultActionParamValidation:
     def test_cf203_fires_on_default_action_with_unknown_param(self):
         # config_rules has default action 'set_config' — unknown params should be caught

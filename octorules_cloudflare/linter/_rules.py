@@ -81,6 +81,12 @@ CF223 = RuleMeta(
     "Skip action invalid in account-scoped waf_custom_rules",
     Severity.ERROR,
 )
+CF224 = RuleMeta(
+    "CF224",
+    "action",
+    "Expression exceeds 4096-char Cloudflare API cap",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)

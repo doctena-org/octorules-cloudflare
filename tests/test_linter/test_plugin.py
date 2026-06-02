@@ -24,6 +24,14 @@ class TestPluginRegistration:
             f"  In CF_RULE_METAS but not in CF_RULE_IDS: {meta_ids - CF_RULE_IDS}"
         )
 
+    def test_rule_count(self):
+        """Guard against silent rule add/remove (mirrors Azure/Bunny). Bump
+        deliberately when intentionally adding or removing a rule."""
+        assert len(CF_RULE_METAS) == 156, (
+            f"Expected 156 CF rule metas, got {len(CF_RULE_METAS)}. "
+            "If you added or removed a rule, update this count intentionally."
+        )
+
     def test_all_cf_rules_in_registry(self):
         for rule_id in CF_RULE_IDS:
             assert rule_id in RULE_REGISTRY, f"{rule_id} not in global registry"
