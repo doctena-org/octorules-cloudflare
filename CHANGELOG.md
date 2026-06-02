@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.9] - 2026-06-02
+
+### Fixed
+- Page Shield policy **updates** no longer send the raw multi-line YAML CSP
+  value, which Cloudflare rejected with `HTTP 400` "unknown directive". The
+  update path now normalizes the `value` to its canonical single-line form
+  (matching the create path and the plan comparison). This was surfaced by
+  the 0.8.8 silent-skip fix, which made Page Shield updates actually execute
+  for the first time — exposing that the update path, unlike create, sent the
+  un-normalized value.
+
 ## [0.8.8] - 2026-06-02
 
 ### Added

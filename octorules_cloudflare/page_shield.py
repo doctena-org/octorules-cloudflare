@@ -237,6 +237,15 @@ def diff_page_shield_policies(
         entry = entry.copy()
         if isinstance(entry.get("expression"), str):
             entry["expression"] = normalize_expression(entry["expression"])
+        # Normalize the CSP value to its canonical single-line form here, so the
+        # value carried in `desired_policy` (used by the update PUT) and the
+        # value in `normalized_desired` (used by the create PUT) both match the
+        # comparison's canonical form. CSP values are authored as multi-line
+        # YAML block scalars; Cloudflare rejects a multi-line value on update
+        # with "unknown directive". This does not change diff detection — the
+        # field comparison already normalizes both sides.
+        if isinstance(entry.get("value"), str):
+            entry["value"] = normalize_csp_value(entry["value"])
         desc = entry["description"]
         desired_descs.add(desc)
         current = current_by_desc.get(desc)

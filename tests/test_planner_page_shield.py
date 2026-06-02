@@ -679,3 +679,45 @@ class TestPageShieldSingleFieldUpdateEndToEnd:
         assert kwargs["enabled"] is True
         assert kwargs["value"] == "script-src 'self'"
         assert len(kwargs) == 5
+
+    def test_update_normalizes_multiline_csp_value(self):
+        """Regression: a multi-line block-scalar CSP value must be collapsed to
+        its canonical single line before the update PUT. Cloudflare rejects a
+        multi-line value with HTTP 400 "unknown directive"; the update path
+        previously sent the raw YAML value (the create path normalized, so
+        creates worked and updates silently failed once they ran)."""
+        from octorules_cloudflare.page_shield import normalize_csp_value
+
+        current_policy = {
+            "id": "pol-9",
+            "description": "CSP",
+            "action": "allow",
+            "expression": "true",
+            "enabled": True,
+            "value": "script-src 'self' example.com",
+        }
+        # Authored as a multi-line block scalar, with an added source.
+        desired_value = "script-src\n  'self'\n  example.com\n  new.example.com"
+        desired_policy = {
+            "description": "CSP",
+            "action": "allow",
+            "expression": "true",
+            "enabled": True,
+            "value": desired_value,
+        }
+
+        plans = diff_page_shield_policies([desired_policy], [current_policy])
+        assert len(plans) == 1
+
+        mock_provider = MagicMock()
+        mock_provider.max_workers = 1
+        scope = Scope(zone_id="zone-1")
+        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": plans})
+        _synced, error = _apply_page_shield(zp, plans, scope, mock_provider)
+
+        assert error is None
+        mock_provider.update_page_shield_policy.assert_called_once()
+        sent_value = mock_provider.update_page_shield_policy.call_args[1]["value"]
+        # The core regression assertion: single line, no raw newlines.
+        assert "\n" not in sent_value
+        assert sent_value == normalize_csp_value(desired_value)
