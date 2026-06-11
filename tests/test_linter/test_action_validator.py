@@ -245,28 +245,28 @@ class TestCF224ExpressionLengthCap:
         return prefix + ("a" * (n - len(prefix) - len(suffix))) + suffix
 
     def test_does_not_fire_at_cap(self):
-        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+        from octorules_cloudflare.linter._constants import MAX_EXPRESSION_LENGTH
 
         ctx = _lint_rule(
-            {"ref": "t", "expression": self._expr_of_normalized_length(_MAX_EXPRESSION_LENGTH)},
+            {"ref": "t", "expression": self._expr_of_normalized_length(MAX_EXPRESSION_LENGTH)},
             "waf_custom_rules",
         )
         assert "CF224" not in _ids(ctx)
 
     def test_does_not_fire_just_below_cap(self):
-        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+        from octorules_cloudflare.linter._constants import MAX_EXPRESSION_LENGTH
 
         ctx = _lint_rule(
-            {"ref": "t", "expression": self._expr_of_normalized_length(_MAX_EXPRESSION_LENGTH - 1)},
+            {"ref": "t", "expression": self._expr_of_normalized_length(MAX_EXPRESSION_LENGTH - 1)},
             "waf_custom_rules",
         )
         assert "CF224" not in _ids(ctx)
 
     def test_fires_above_cap(self):
-        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+        from octorules_cloudflare.linter._constants import MAX_EXPRESSION_LENGTH
 
         ctx = _lint_rule(
-            {"ref": "t", "expression": self._expr_of_normalized_length(_MAX_EXPRESSION_LENGTH + 1)},
+            {"ref": "t", "expression": self._expr_of_normalized_length(MAX_EXPRESSION_LENGTH + 1)},
             "waf_custom_rules",
         )
         assert "CF224" in _ids(ctx)
@@ -297,11 +297,11 @@ class TestCF224ExpressionLengthCap:
         normalized form octorules sends, not the YAML source bytes."""
         from octorules.expression import normalize_expression
 
-        from octorules_cloudflare.linter.action_validator import _MAX_EXPRESSION_LENGTH
+        from octorules_cloudflare.linter._constants import MAX_EXPRESSION_LENGTH
 
         raw = "(ip.src in {\n" + (" " * 5000) + "1.2.3.4\n})"
-        assert len(raw) > _MAX_EXPRESSION_LENGTH
-        assert len(normalize_expression(raw)) < _MAX_EXPRESSION_LENGTH
+        assert len(raw) > MAX_EXPRESSION_LENGTH
+        assert len(normalize_expression(raw)) < MAX_EXPRESSION_LENGTH
         ctx = _lint_rule({"ref": "t", "expression": raw}, "waf_custom_rules")
         assert "CF224" not in _ids(ctx)
 
@@ -838,6 +838,36 @@ class TestConfigParams:
             "config_rules",
         )
         assert "CF423" in _ids(ctx)
+
+    def test_cf420_graduated_levels_rejected_in_config_rule(self):
+        """low/medium/high are a zone-wide baseline only — invalid in a config rule."""
+        for level in ("low", "medium", "high"):
+            ctx = _lint_rule(
+                {
+                    "ref": "t",
+                    "expression": "true",
+                    "action": "set_config",
+                    "action_parameters": {"security_level": level},
+                },
+                "config_rules",
+            )
+            assert "CF420" in _ids(ctx), level
+            diag = next(r for r in ctx.results if r.rule_id == "CF420")
+            assert "zone-wide" in diag.message
+
+    def test_cf420_config_security_levels_valid(self):
+        """off/essentially_off/under_attack are the only valid config-rule levels."""
+        for level in ("off", "essentially_off", "under_attack"):
+            ctx = _lint_rule(
+                {
+                    "ref": "t",
+                    "expression": "true",
+                    "action": "set_config",
+                    "action_parameters": {"security_level": level},
+                },
+                "config_rules",
+            )
+            assert "CF420" not in _ids(ctx), level
 
 
 class TestRateLimitParams:

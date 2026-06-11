@@ -1,5 +1,6 @@
 """Tests for zone security settings extension and provider methods."""
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -132,14 +133,19 @@ class TestDiffZoneSecurity:
         assert plan.has_changes
         assert len(plan.changes) == 1
 
-    def test_new_field(self):
+    def test_new_field_is_unsupported(self):
+        # Absent from a non-empty live response = the zone doesn't expose
+        # the setting; a note instead of a never-converging Modify.
         current = {"security_level": "medium"}
         desired = {"security_level": "medium", "browser_integrity_check": "on"}
         plan = diff_zone_security(current, desired)
-        assert plan.has_changes
-        assert plan.changes[0].field == "browser_integrity_check"
-        assert plan.changes[0].current is None
-        assert plan.changes[0].desired == "on"
+        assert not plan.has_changes
+        assert plan.unsupported == ["browser_integrity_check"]
+
+    def test_empty_current_keeps_legacy_diff(self):
+        plan = diff_zone_security({}, {"security_level": "high"})
+        assert plan.total_changes == 1
+        assert plan.unsupported == []
 
     def test_multiple_changes(self):
         current = {"challenge_passage": 300, "security_level": "low"}
@@ -655,3 +661,60 @@ class TestProviderUpdateZoneSecurity:
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         with pytest.raises(ProviderAuthError, match="Invalid API token"):
             provider.update_zone_security_settings(_zs(), {"security_level": "high"})
+
+
+class TestReadBackVerification:
+    def test_apply_warns_when_value_does_not_take(self, caplog):
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_zone_security_settings.return_value = {"security_level": "medium"}
+        plan = ZoneSecurityPlan(
+            changes=[ZoneSecurityChange("security_level", "medium", "under_attack")]
+        )
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            synced, error = _apply_zone_security(
+                MagicMock(), [plan], Scope(zone_id="z1", label="example.com"), provider
+            )
+        assert error is None
+        assert synced == ["cloudflare_zone_security"]
+        provider.get_zone_security_settings.assert_called_once()
+        assert "security_level" in caplog.text
+        assert "reads back" in caplog.text
+
+
+class TestUnsupportedNotes:
+    """Unsupported fields render as notes in every plan format."""
+
+    def _plan(self):
+        return ZoneSecurityPlan(changes=[], unsupported=["browser_integrity_check"])
+
+    def test_format_text_renders_note(self):
+        fmt = ZoneSecurityFormatter()
+        lines = fmt.format_text([self._plan()], use_color=False)
+        assert len(lines) == 1
+        assert "zone_security.browser_integrity_check" in lines[0]
+        assert "not exposed" in lines[0]
+
+    def test_format_markdown_renders_note(self):
+        fmt = ZoneSecurityFormatter()
+        lines = fmt.format_markdown([self._plan()], [])
+        assert len(lines) == 1
+        assert "not exposed on this zone" in lines[0]
+
+    def test_format_json_includes_unsupported(self):
+        fmt = ZoneSecurityFormatter()
+        assert fmt.format_json([self._plan()]) == [{"unsupported": ["browser_integrity_check"]}]
+
+    def test_format_html_renders_note(self):
+        fmt = ZoneSecurityFormatter()
+        lines: list[str] = []
+        _adds, _removes, modifies, _others = fmt.format_html([self._plan()], lines)
+        assert modifies == 0
+        html = "\n".join(lines)
+        assert "<td>Note</td>" in html
+        assert "zone_security.browser_integrity_check" in html
+
+    def test_format_report_note_is_not_drift(self):
+        fmt = ZoneSecurityFormatter()
+        phases_data: list = []
+        assert fmt.format_report([self._plan()], False, phases_data) is False
+        assert phases_data == []

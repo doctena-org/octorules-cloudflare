@@ -1,5 +1,6 @@
 """Tests for Cloudflare URL normalization settings and extension hooks."""
 
+import logging
 from unittest.mock import MagicMock
 
 from cloudflare import Cloudflare
@@ -115,14 +116,19 @@ class TestDiffUrlNormalization:
         assert len(plan.changes) == 1
         assert plan.changes[0].field == "type"
 
-    def test_new_field(self):
+    def test_new_field_is_unsupported(self):
+        # Absent from a non-empty live response = the zone doesn't expose
+        # the setting; a note instead of a never-converging Modify.
         current = {"scope": "incoming"}
         desired = {"scope": "incoming", "type": "rfc3986"}
         plan = diff_url_normalization(current, desired)
-        assert plan.has_changes
-        assert plan.changes[0].field == "type"
-        assert plan.changes[0].current is None
-        assert plan.changes[0].desired == "rfc3986"
+        assert not plan.has_changes
+        assert plan.unsupported == ["type"]
+
+    def test_empty_current_keeps_legacy_diff(self):
+        plan = diff_url_normalization({}, {"scope": "both", "type": "rfc3986"})
+        assert plan.total_changes == 2
+        assert plan.unsupported == []
 
     def test_multiple_changes(self):
         current = {"scope": "incoming", "type": "cloudflare"}
@@ -590,3 +596,58 @@ class TestProviderUpdateUrlNormalization:
             scope="both",
             type="rfc3986",
         )
+
+
+class TestReadBackVerification:
+    def test_apply_warns_when_value_does_not_take(self, caplog):
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_url_normalization.return_value = {"type": "cloudflare"}
+        plan = UrlNormalizationPlan(
+            changes=[UrlNormalizationChange("type", "cloudflare", "rfc3986")]
+        )
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            synced, error = _apply_url_normalization(MagicMock(), [plan], _scope(), provider)
+        assert error is None
+        assert synced == ["cloudflare_url_normalization"]
+        provider.get_url_normalization.assert_called_once()
+        assert "type" in caplog.text
+        assert "reads back" in caplog.text
+
+
+class TestUnsupportedNotes:
+    """Unsupported fields render as notes in every plan format."""
+
+    def _plan(self):
+        return UrlNormalizationPlan(changes=[], unsupported=["type"])
+
+    def test_format_text_renders_note(self):
+        fmt = UrlNormalizationFormatter()
+        lines = fmt.format_text([self._plan()], use_color=False)
+        assert len(lines) == 1
+        assert "url_normalization.type" in lines[0]
+        assert "not exposed" in lines[0]
+
+    def test_format_markdown_renders_note(self):
+        fmt = UrlNormalizationFormatter()
+        lines = fmt.format_markdown([self._plan()], [])
+        assert len(lines) == 1
+        assert "not exposed on this zone" in lines[0]
+
+    def test_format_json_includes_unsupported(self):
+        fmt = UrlNormalizationFormatter()
+        assert fmt.format_json([self._plan()]) == [{"unsupported": ["type"]}]
+
+    def test_format_html_renders_note(self):
+        fmt = UrlNormalizationFormatter()
+        lines: list[str] = []
+        _adds, _removes, modifies, _others = fmt.format_html([self._plan()], lines)
+        assert modifies == 0
+        html = "\n".join(lines)
+        assert "<td>Note</td>" in html
+        assert "url_normalization.type" in html
+
+    def test_format_report_note_is_not_drift(self):
+        fmt = UrlNormalizationFormatter()
+        phases_data: list = []
+        assert fmt.format_report([self._plan()], False, phases_data) is False
+        assert phases_data == []

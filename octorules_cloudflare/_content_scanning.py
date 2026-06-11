@@ -18,9 +18,15 @@ validate_extension, and dump_extension.
 """
 
 import logging
-from dataclasses import dataclass, field
 
 from octorules.registration import idempotent_registration
+
+from octorules_cloudflare._settings_base import (
+    SettingsChange,
+    SettingsFormatter,
+    SettingsPlan,
+)
+from octorules_cloudflare._settings_common import verify_settings_applied
 
 log = logging.getLogger(__name__)
 
@@ -28,32 +34,12 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
-@dataclass
-class ContentScanningChange:
+class ContentScanningChange(SettingsChange):
     """A single change in content scanning config."""
 
-    field: str
-    current: object
-    desired: object
 
-    @property
-    def has_changes(self) -> bool:
-        return self.current != self.desired
-
-
-@dataclass
-class ContentScanningPlan:
+class ContentScanningPlan(SettingsPlan):
     """Plan for all content scanning changes in a zone."""
-
-    changes: list[ContentScanningChange] = field(default_factory=list)
-
-    @property
-    def has_changes(self) -> bool:
-        return any(c.has_changes for c in self.changes)
-
-    @property
-    def total_changes(self) -> int:
-        return sum(1 for c in self.changes if c.has_changes)
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +149,12 @@ def _apply_content_scanning(zp, plans, scope, provider):
 
             if change.field == "enabled":
                 provider.update_content_scanning_enabled(scope, change.desired)
+                verify_settings_applied(
+                    provider.get_content_scanning,
+                    scope,
+                    {"enabled": change.desired},
+                    "cloudflare_content_scanning",
+                )
                 synced.append("cloudflare_content_scanning:enabled")
 
             elif change.field == "custom_expressions":
@@ -234,112 +226,16 @@ def _dump_content_scanning(scope, provider, out_dir):
 # ---------------------------------------------------------------------------
 # Format extension
 # ---------------------------------------------------------------------------
-class ContentScanningFormatter:
+class ContentScanningFormatter(SettingsFormatter):
     """Formats content scanning diffs for plan output."""
 
-    def format_text(self, plans: list, use_color: bool) -> list[str]:
-        from octorules._color import Pen
-
-        p = Pen(use_color)
-        lines: list[str] = []
-        for plan in plans:
-            if not isinstance(plan, ContentScanningPlan) or not plan.has_changes:
-                continue
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                label = f"content_scanning.{change.field}"
-                line = f"  ~ {label}: {change.current!r} -> {change.desired!r}"
-                lines.append(p.warning(line))
-        return lines
-
-    def format_json(self, plans: list) -> list[dict]:
-        result: list[dict] = []
-        for plan in plans:
-            if not isinstance(plan, ContentScanningPlan) or not plan.has_changes:
-                continue
-            changes = []
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                changes.append(
-                    {
-                        "field": change.field,
-                        "current": change.current,
-                        "desired": change.desired,
-                    }
-                )
-            if changes:
-                result.append({"changes": changes})
-        return result
-
-    def format_markdown(
-        self, plans: list, pending_diffs: list[list[tuple[str, object, object]]]
-    ) -> list[str]:
-        from octorules.formatter import _md_escape
-
-        lines: list[str] = []
-        for plan in plans:
-            if not isinstance(plan, ContentScanningPlan) or not plan.has_changes:
-                continue
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                label = _md_escape(f"content_scanning.{change.field}")
-                cur = _md_escape(repr(change.current))
-                des = _md_escape(repr(change.desired))
-                lines.append(f"| ~ | {label} | | {cur} -> {des} |")
-        return lines
-
-    def format_html(self, plans: list, lines: list[str]) -> tuple[int, int, int, int]:
-        from html import escape as html_escape
-
-        from octorules.formatter import _HTML_TABLE_HEADER, _html_summary_row
-
-        total_modifies = 0
-        for plan in plans:
-            if not isinstance(plan, ContentScanningPlan) or not plan.has_changes:
-                continue
-            lines.extend(_HTML_TABLE_HEADER)
-            plan_modifies = 0
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                plan_modifies += 1
-                label = html_escape(f"content_scanning.{change.field}")
-                cur = html_escape(repr(change.current))
-                des = html_escape(repr(change.desired))
-                lines.append("  <tr>")
-                lines.append("    <td>Modify</td>")
-                lines.append(f"    <td>{label}</td>")
-                lines.append(f"    <td>{cur} &rarr; {des}</td>")
-                lines.append("  </tr>")
-            lines.extend(_html_summary_row(0, 0, plan_modifies, 0))
-            lines.append("</table>")
-            total_modifies += plan_modifies
-        return 0, 0, total_modifies, 0
-
-    def format_report(self, plans: list, zone_has_drift: bool, phases_data: list[dict]) -> bool:
-        total_modifies = 0
-        for plan in plans:
-            if not isinstance(plan, ContentScanningPlan) or not plan.has_changes:
-                continue
-            total_modifies += sum(1 for c in plan.changes if c.has_changes)
-        if total_modifies:
-            zone_has_drift = True
-            phases_data.append(
-                {
-                    "phase": "content_scanning",
-                    "provider_id": "cloudflare_content_scanning",
-                    "status": "drifted",
-                    "yaml_rules": 0,
-                    "live_rules": 0,
-                    "adds": 0,
-                    "removes": 0,
-                    "modifies": total_modifies,
-                }
-            )
-        return zone_has_drift
+    def __init__(self) -> None:
+        super().__init__(
+            plan_type=ContentScanningPlan,
+            prefix="content_scanning",
+            phase="content_scanning",
+            provider_id="cloudflare_content_scanning",
+        )
 
 
 # ---------------------------------------------------------------------------

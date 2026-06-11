@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-06-11
+
+### Added
+- Post-apply read-back for the settings extensions: values Cloudflare
+  accepts but does not store now warn at sync time instead of
+  resurfacing as a diff on every plan.
+
+### Changed
+- **CF420** rejects the graduated security levels (`low`, `medium`,
+  `high`) in Configuration Rules; Cloudflare only accepts them
+  zone-wide.
+- **CF501** now enforces the documented Enterprise quotas (300 rules
+  per phase, 1,000 WAF custom rules) and covers rate limiting rules
+  on every plan tier.
+
+### Removed
+- **CF017**: superseded by **CF224**, which enforces the same 4,096
+  character cap on the normalized expression the API actually
+  receives. `# octorules:disable=CF017` suppressions are now inert.
+
+### Fixed
+- Settings fields not exposed on a zone (plan/product gated) are now
+  skipped and reported as plan notes instead of planning an
+  un-closable Modify on every run.
+- The read-only `using_latest_model` field is no longer diffed.
+
 ## [0.8.9] - 2026-06-02
 
 ### Fixed

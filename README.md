@@ -259,12 +259,12 @@ Each policy entry requires:
 
 | Range | Category | Rules |
 |-------|----------|-------|
-| CF001–CF027 | Structure & parse | 27 |
+| CF001–CF027 | Structure, parse & phase | 26 |
 | CF100–CF105 | Cross-rule ordering | 6 |
-| CF200–CF223 | Action validation | 24 |
+| CF200–CF224 | Action validation | 25 |
 | CF300–CF309 | Expression, function & type | 10 |
 | CF400–CF478 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 45 |
-| CF500–CF549 | Plan limits, style & value constraints | 42 |
+| CF500–CF550 | Plan limits, style & value constraints | 43 |
 
 See [docs/lint/README.md](docs/lint/README.md) for the full rule reference.
 

@@ -15,9 +15,19 @@ apply_extension, format_extension, validate_extension, and dump_extension.
 """
 
 import logging
-from dataclasses import dataclass, field
 
 from octorules.registration import idempotent_registration
+
+from octorules_cloudflare._settings_base import (
+    SettingsChange,
+    SettingsFormatter,
+    SettingsPlan,
+)
+from octorules_cloudflare._settings_common import (
+    partition_unsupported,
+    verify_settings_applied,
+    warn_unsupported,
+)
 
 log = logging.getLogger(__name__)
 
@@ -44,32 +54,12 @@ _MAX_CHALLENGE_PASSAGE = 86400
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
-@dataclass
-class ZoneSecurityChange:
+class ZoneSecurityChange(SettingsChange):
     """A single field change in zone security settings."""
 
-    field: str
-    current: object
-    desired: object
 
-    @property
-    def has_changes(self) -> bool:
-        return self.current != self.desired
-
-
-@dataclass
-class ZoneSecurityPlan:
+class ZoneSecurityPlan(SettingsPlan):
     """Plan for all zone security setting changes in a zone."""
-
-    changes: list[ZoneSecurityChange] = field(default_factory=list)
-
-    @property
-    def has_changes(self) -> bool:
-        return any(c.has_changes for c in self.changes)
-
-    @property
-    def total_changes(self) -> int:
-        return sum(1 for c in self.changes if c.has_changes)
 
 
 # ---------------------------------------------------------------------------
@@ -102,13 +92,14 @@ def diff_zone_security(current: dict, desired: dict) -> ZoneSecurityPlan:
 
     Only diffs keys present in *desired* (partial update semantics).
     """
+    desired, unsupported = partition_unsupported(current, desired)
     changes: list[ZoneSecurityChange] = []
     for key in sorted(desired.keys()):
         cur = current.get(key)
         des = desired.get(key)
         if cur != des:
             changes.append(ZoneSecurityChange(field=key, current=cur, desired=des))
-    return ZoneSecurityPlan(changes=changes)
+    return ZoneSecurityPlan(changes=changes, unsupported=unsupported)
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +139,9 @@ def _finalize_zone_security(zp, all_desired, scope, provider, ctx):
 
     current, desired = ctx
     plan = diff_zone_security(current, desired)
-    if plan.has_changes:
+    if plan.unsupported:
+        warn_unsupported("cloudflare_zone_security", scope, plan.unsupported)
+    if plan.has_changes or plan.unsupported:
         zp.extension_plans.setdefault("cloudflare_zone_security", []).append(plan)
 
 
@@ -163,6 +156,12 @@ def _apply_zone_security(zp, plans, scope, provider):
         desired_values = {c.field: c.desired for c in plan.changes if c.has_changes}
         if desired_values:
             provider.update_zone_security_settings(scope, desired_values)
+            verify_settings_applied(
+                provider.get_zone_security_settings,
+                scope,
+                desired_values,
+                "cloudflare_zone_security",
+            )
             synced.append("cloudflare_zone_security")
 
     return synced, None
@@ -229,112 +228,16 @@ def _dump_zone_security(scope, provider, out_dir):
 # ---------------------------------------------------------------------------
 # Format extension
 # ---------------------------------------------------------------------------
-class ZoneSecurityFormatter:
+class ZoneSecurityFormatter(SettingsFormatter):
     """Formats zone security setting diffs for plan output."""
 
-    def format_text(self, plans: list, use_color: bool) -> list[str]:
-        from octorules._color import Pen
-
-        p = Pen(use_color)
-        lines: list[str] = []
-        for plan in plans:
-            if not isinstance(plan, ZoneSecurityPlan) or not plan.has_changes:
-                continue
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                label = f"zone_security.{change.field}"
-                line = f"  ~ {label}: {change.current!r} -> {change.desired!r}"
-                lines.append(p.warning(line))
-        return lines
-
-    def format_json(self, plans: list) -> list[dict]:
-        result: list[dict] = []
-        for plan in plans:
-            if not isinstance(plan, ZoneSecurityPlan) or not plan.has_changes:
-                continue
-            changes = []
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                changes.append(
-                    {
-                        "field": change.field,
-                        "current": change.current,
-                        "desired": change.desired,
-                    }
-                )
-            if changes:
-                result.append({"changes": changes})
-        return result
-
-    def format_markdown(
-        self, plans: list, pending_diffs: list[list[tuple[str, object, object]]]
-    ) -> list[str]:
-        from octorules.formatter import _md_escape
-
-        lines: list[str] = []
-        for plan in plans:
-            if not isinstance(plan, ZoneSecurityPlan) or not plan.has_changes:
-                continue
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                label = _md_escape(f"zone_security.{change.field}")
-                cur = _md_escape(repr(change.current))
-                des = _md_escape(repr(change.desired))
-                lines.append(f"| ~ | {label} | | {cur} -> {des} |")
-        return lines
-
-    def format_html(self, plans: list, lines: list[str]) -> tuple[int, int, int, int]:
-        from html import escape as html_escape
-
-        from octorules.formatter import _HTML_TABLE_HEADER, _html_summary_row
-
-        total_modifies = 0
-        for plan in plans:
-            if not isinstance(plan, ZoneSecurityPlan) or not plan.has_changes:
-                continue
-            lines.extend(_HTML_TABLE_HEADER)
-            plan_modifies = 0
-            for change in plan.changes:
-                if not change.has_changes:
-                    continue
-                plan_modifies += 1
-                label = html_escape(f"zone_security.{change.field}")
-                cur = html_escape(repr(change.current))
-                des = html_escape(repr(change.desired))
-                lines.append("  <tr>")
-                lines.append("    <td>Modify</td>")
-                lines.append(f"    <td>{label}</td>")
-                lines.append(f"    <td>{cur} &rarr; {des}</td>")
-                lines.append("  </tr>")
-            lines.extend(_html_summary_row(0, 0, plan_modifies, 0))
-            lines.append("</table>")
-            total_modifies += plan_modifies
-        return 0, 0, total_modifies, 0
-
-    def format_report(self, plans: list, zone_has_drift: bool, phases_data: list[dict]) -> bool:
-        total_modifies = 0
-        for plan in plans:
-            if not isinstance(plan, ZoneSecurityPlan) or not plan.has_changes:
-                continue
-            total_modifies += sum(1 for c in plan.changes if c.has_changes)
-        if total_modifies:
-            zone_has_drift = True
-            phases_data.append(
-                {
-                    "phase": "zone_security",
-                    "provider_id": "cloudflare_zone_security",
-                    "status": "drifted",
-                    "yaml_rules": 0,
-                    "live_rules": 0,
-                    "adds": 0,
-                    "removes": 0,
-                    "modifies": total_modifies,
-                }
-            )
-        return zone_has_drift
+    def __init__(self) -> None:
+        super().__init__(
+            plan_type=ZoneSecurityPlan,
+            prefix="zone_security",
+            phase="zone_security",
+            provider_id="cloudflare_zone_security",
+        )
 
 
 # ---------------------------------------------------------------------------

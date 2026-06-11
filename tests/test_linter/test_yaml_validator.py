@@ -165,23 +165,14 @@ class TestAlwaysTrueFalse:
 
 
 class TestExpressionLength:
-    def test_cf017_too_long(self):
-        long_expr = "x" * 4097
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": long_expr}]})
-        m015 = [r for r in ctx.results if r.rule_id == "CF017"]
-        assert len(m015) == 1
-        assert "4097" in m015[0].message
-
-    def test_cf017_at_limit_ok(self):
-        expr = "x" * 4096
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": expr}]})
-        m015 = [r for r in ctx.results if r.rule_id == "CF017"]
-        assert len(m015) == 0
-
-    def test_cf017_short_ok(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": 'http.host eq "a.com"'}]})
-        m015 = [r for r in ctx.results if r.rule_id == "CF017"]
-        assert len(m015) == 0
+    def test_yaml_stage_does_not_check_expression_length(self):
+        # CF017 (raw-length check) was retired: it measured the raw YAML
+        # string, so a multi-line block scalar whose normalized form fits
+        # the 4096-char API cap still errored. CF224 (action_validator)
+        # owns the cap and measures the normalized form the API receives.
+        long_raw = 'http.host eq "a.com" or\n' * 200  # raw >> 4096
+        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": long_raw}]})
+        assert not [r for r in ctx.results if r.rule_id == "CF017"]
 
 
 class TestPhaseFilter:

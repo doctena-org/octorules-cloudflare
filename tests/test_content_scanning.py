@@ -1,5 +1,6 @@
 """Tests for content scanning extension and provider methods."""
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -655,3 +656,18 @@ class TestProviderSyncContentScanningExpressions:
             zone_id="zone-123",
             body=[{"payload": "new"}],
         )
+
+
+class TestReadBackVerification:
+    def test_enable_warns_when_toggle_does_not_take(self, caplog):
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_content_scanning.return_value = {"enabled": False}
+        plan = ContentScanningPlan(changes=[ContentScanningChange("enabled", False, True)])
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            synced, error = _apply_content_scanning(
+                MagicMock(), [plan], Scope(zone_id="z1", label="example.com"), provider
+            )
+        assert error is None
+        assert "cloudflare_content_scanning:enabled" in synced
+        assert "enabled" in caplog.text
+        assert "reads back" in caplog.text

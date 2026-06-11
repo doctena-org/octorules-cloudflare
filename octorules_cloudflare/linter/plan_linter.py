@@ -25,6 +25,7 @@ _RULE_LIMITS: dict[str, dict[str, int]] = {
         "cache_rules": 10,
         "compression_rules": 10,
         "waf_custom_rules": 5,
+        "rate_limiting_rules": 1,
     },
     "pro": {
         "redirect_rules": 25,
@@ -36,6 +37,7 @@ _RULE_LIMITS: dict[str, dict[str, int]] = {
         "cache_rules": 25,
         "compression_rules": 25,
         "waf_custom_rules": 20,
+        "rate_limiting_rules": 2,
     },
     "business": {
         "redirect_rules": 50,
@@ -47,8 +49,25 @@ _RULE_LIMITS: dict[str, dict[str, int]] = {
         "cache_rules": 50,
         "compression_rules": 50,
         "waf_custom_rules": 100,
+        "rate_limiting_rules": 5,
     },
-    # Enterprise has no hard limits (or very high limits)
+    # Enterprise limits per Cloudflare's product docs ("Availability" tables)
+    # and the 2025-02-12 changelog that raised the rules-engine phases from
+    # 125 to 300. Enterprise contracts can negotiate higher quotas; CF501 is
+    # WARNING severity, so a negotiated-higher zone just suppresses or
+    # ignores the finding.
+    "enterprise": {
+        "redirect_rules": 300,
+        "url_rewrite_rules": 300,
+        "request_header_rules": 300,
+        "response_header_rules": 300,
+        "config_rules": 300,
+        "origin_rules": 300,
+        "cache_rules": 300,
+        "compression_rules": 300,
+        "waf_custom_rules": 1000,
+        "rate_limiting_rules": 100,
+    },
 }
 
 # Plans where regex is available in expressions

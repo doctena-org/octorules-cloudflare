@@ -254,16 +254,23 @@ ACTION_SCHEMAS: dict[str, ActionSchema] = {
 
 # --- Specific enum values for config rules ---
 
-VALID_SECURITY_LEVELS = frozenset(
+# Security level (challenge aggressiveness) has two distinct valid sets:
+#  * Zone-wide baseline (cloudflare_zone_security) accepts all six graduated
+#    levels — see _zone_security._VALID_SECURITY_LEVELS.
+#  * Configuration Rules (http_config_settings) only accept the three on/off
+#    style values below. Cloudflare's API rejects the graduated levels
+#    (low/medium/high) in a config rule; CF420 flags them.
+VALID_CONFIG_SECURITY_LEVELS = frozenset(
     {
         "off",
         "essentially_off",
-        "low",
-        "medium",
-        "high",
         "under_attack",
     }
 )
+
+# Graduated levels that are valid only as a zone-wide baseline, never in a
+# Configuration Rule. CF420 uses this to emit a targeted diagnostic.
+ZONE_ONLY_SECURITY_LEVELS = frozenset({"low", "medium", "high"})
 
 VALID_SSL_VALUES = frozenset(
     {

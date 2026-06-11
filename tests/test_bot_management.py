@@ -1,5 +1,6 @@
 """Tests for Cloudflare bot management settings normalization and extension hooks."""
 
+import logging
 from unittest.mock import MagicMock
 
 from cloudflare import Cloudflare
@@ -189,21 +190,136 @@ class TestDiffBotManagement:
         assert len(plan.changes) == 1
         assert plan.changes[0].field == "fight_mode"
 
-    def test_new_field(self):
-        """Desired has a field not in current."""
+    def test_new_field_is_unsupported(self):
+        """A field absent from a non-empty live response is plan/product
+        gated — it becomes an `unsupported` note, never a phantom Modify
+        that apply could never close."""
         current = {"fight_mode": True}
         desired = {"fight_mode": True, "ai_bots_protection": "block"}
         plan = diff_bot_management(current, desired)
-        assert plan.has_changes
-        assert plan.changes[0].field == "ai_bots_protection"
-        assert plan.changes[0].current is None
-        assert plan.changes[0].desired == "block"
+        assert not plan.has_changes
+        assert plan.changes == []
+        assert plan.unsupported == ["ai_bots_protection"]
 
     def test_multiple_changes(self):
         current = {"enable_js": False, "fight_mode": False}
         desired = {"enable_js": True, "fight_mode": True}
         plan = diff_bot_management(current, desired)
         assert plan.total_changes == 2
+
+
+class TestUnsupportedFields:
+    """Fields declared in YAML that the zone's live config never returns."""
+
+    def test_phantom_modify_suppressed(self):
+        # A zone running Super Bot Fight Mode never returns fight_mode;
+        # `fight_mode: false` in YAML used to plan as `None -> False` on
+        # every run, a Modify the update call could never make converge.
+        current = {"enable_js": False, "ai_bots_protection": "disabled"}
+        desired = {"fight_mode": False, "enable_js": False}
+        plan = diff_bot_management(current, desired)
+        assert not plan.has_changes
+        assert plan.unsupported == ["fight_mode"]
+
+    def test_truthy_desired_is_also_unsupported(self):
+        # Even a truthy value can't converge if the zone doesn't expose
+        # the field — it must surface as a note, not a perpetual Modify.
+        current = {"enable_js": False}
+        desired = {"fight_mode": True, "enable_js": True}
+        plan = diff_bot_management(current, desired)
+        assert plan.total_changes == 1
+        assert plan.changes[0].field == "enable_js"
+        assert plan.unsupported == ["fight_mode"]
+
+    def test_empty_current_keeps_legacy_diff(self):
+        # An empty live read (fetch failure) means field support is
+        # unknown: everything stays diffable so apply can recover.
+        desired = {"fight_mode": False, "enable_js": True}
+        plan = diff_bot_management({}, desired)
+        assert plan.total_changes == 2
+        assert plan.unsupported == []
+
+    def test_finalize_appends_plan_for_unsupported_only(self):
+        zp = MagicMock()
+        zp.extension_plans = {}
+        current = {"enable_js": False}
+        desired = {"fight_mode": False, "enable_js": False}
+        _finalize_bot_management(zp, {}, _scope(), MagicMock(), (current, desired))
+        plan = zp.extension_plans["cloudflare_bot_management"][0]
+        assert not plan.has_changes
+        assert plan.unsupported == ["fight_mode"]
+
+    def test_finalize_warns_for_unsupported(self, caplog):
+        # Plan output only renders zones with actual changes, so the
+        # warning is the guaranteed signal for notes-only zones.
+        zp = MagicMock()
+        zp.extension_plans = {}
+        current = {"enable_js": False}
+        desired = {"fight_mode": False, "enable_js": False}
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            _finalize_bot_management(zp, {}, _scope(), MagicMock(), (current, desired))
+        assert "fight_mode" in caplog.text
+        assert "not exposed on zone" in caplog.text
+
+    def test_format_text_renders_note(self):
+        fmt = BotManagementFormatter()
+        plan = BotManagementPlan(changes=[], unsupported=["fight_mode"])
+        lines = fmt.format_text([plan], use_color=False)
+        assert len(lines) == 1
+        assert "fight_mode" in lines[0]
+        assert "not exposed" in lines[0]
+        assert "~" not in lines[0]
+
+    def test_format_markdown_renders_note(self):
+        fmt = BotManagementFormatter()
+        plan = BotManagementPlan(changes=[], unsupported=["fight_mode"])
+        lines = fmt.format_markdown([plan], [])
+        assert len(lines) == 1
+        assert "not exposed on this zone" in lines[0]
+
+    def test_format_json_includes_unsupported(self):
+        fmt = BotManagementFormatter()
+        plan = BotManagementPlan(
+            changes=[BotManagementChange("enable_js", False, True)],
+            unsupported=["fight_mode"],
+        )
+        result = fmt.format_json([plan])
+        assert result == [
+            {
+                "changes": [{"field": "enable_js", "current": False, "desired": True}],
+                "unsupported": ["fight_mode"],
+            }
+        ]
+
+    def test_read_only_field_mismatch_is_not_a_change(self):
+        # using_latest_model is returned by the API but excluded from the
+        # PATCH body (read-only), so diffing it would plan a Modify that
+        # apply can never make converge — e.g. when Cloudflare ships a new
+        # detection model and the zone briefly reports False.
+        current = {"using_latest_model": False, "enable_js": False}
+        desired = {"using_latest_model": True, "enable_js": False}
+        plan = diff_bot_management(current, desired)
+        assert not plan.has_changes
+        assert plan.unsupported == []
+
+    def test_format_html_renders_note(self):
+        fmt = BotManagementFormatter()
+        plan = BotManagementPlan(changes=[], unsupported=["fight_mode"])
+        lines: list[str] = []
+        _adds, _removes, modifies, _others = fmt.format_html([plan], lines)
+        assert modifies == 0
+        html = "\n".join(lines)
+        assert "<td>Note</td>" in html
+        assert "bot_management.fight_mode" in html
+        assert "not exposed on this zone" in html
+
+    def test_format_report_unsupported_is_not_drift(self):
+        fmt = BotManagementFormatter()
+        plan = BotManagementPlan(changes=[], unsupported=["fight_mode"])
+        phases_data: list = []
+        drift = fmt.format_report([plan], False, phases_data)
+        assert drift is False
+        assert phases_data == []
 
 
 # ---------------------------------------------------------------------------
@@ -327,6 +443,39 @@ class TestApplyHook:
         payload = call_args[0][1]
         assert payload["fight_mode"] is True
         assert payload["ai_bots_protection"] == "block"
+
+    def test_apply_warns_when_value_does_not_take(self, caplog):
+        provider = MagicMock(spec=CloudflareProvider)
+        # Cloudflare "accepted" the update but the value did not stick.
+        provider.get_bot_management.return_value = {"fight_mode": False}
+        plan = BotManagementPlan(changes=[BotManagementChange("fight_mode", False, True)])
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            synced, error = _apply_bot_management(MagicMock(), [plan], _scope(), provider)
+        assert error is None
+        assert synced == ["cloudflare_bot_management"]
+        provider.get_bot_management.assert_called_once()
+        assert "fight_mode" in caplog.text
+        assert "reads back" in caplog.text
+
+    def test_apply_no_warning_when_value_takes(self, caplog):
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_bot_management.return_value = {"fight_mode": True}
+        plan = BotManagementPlan(changes=[BotManagementChange("fight_mode", False, True)])
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            _apply_bot_management(MagicMock(), [plan], _scope(), provider)
+        assert caplog.text == ""
+
+    def test_apply_read_back_failure_does_not_fail_apply(self, caplog):
+        from octorules.provider.exceptions import ProviderError
+
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_bot_management.side_effect = ProviderError("boom")
+        plan = BotManagementPlan(changes=[BotManagementChange("fight_mode", False, True)])
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            synced, error = _apply_bot_management(MagicMock(), [plan], _scope(), provider)
+        assert error is None
+        assert synced == ["cloudflare_bot_management"]
+        assert "skipping verification" in caplog.text
 
     def test_no_changes_skipped(self):
         provider = MagicMock(spec=CloudflareProvider)

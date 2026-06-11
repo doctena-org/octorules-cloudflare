@@ -37,7 +37,6 @@ CF015 = RuleMeta(
 CF016 = RuleMeta(
     "CF016", "structure", "Expression is always false (rule never matches)", Severity.WARNING
 )
-CF017 = RuleMeta("CF017", "structure", "Expression exceeds 4,096 character limit", Severity.ERROR)
 CF018 = RuleMeta("CF018", "structure", "Rule is disabled (enabled: false)", Severity.INFO)
 CF027 = RuleMeta("CF027", "structure", "Expression has leading/trailing whitespace", Severity.INFO)
 

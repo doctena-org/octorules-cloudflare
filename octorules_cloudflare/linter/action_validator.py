@@ -14,6 +14,7 @@ from typing import Any
 from octorules.linter.engine import LintContext, LintResult, Severity
 from octorules.phases import Phase
 
+from octorules_cloudflare.linter._constants import MAX_EXPRESSION_LENGTH
 from octorules_cloudflare.linter.schemas.actions import (
     ACTION_SCHEMAS,
     MAX_CHARACTERISTICS,
@@ -22,18 +23,19 @@ from octorules_cloudflare.linter.schemas.actions import (
     VALID_BLOCK_RESPONSE_STATUS_CODES,
     VALID_BROWSER_TTL_MODES,
     VALID_COMPRESSION_ALGORITHMS,
+    VALID_CONFIG_SECURITY_LEVELS,
     VALID_EDGE_TTL_MODES,
     VALID_POLISH_VALUES,
     VALID_RATE_LIMIT_CHARACTERISTICS,
     VALID_RATE_LIMIT_PERIODS,
     VALID_REDIRECT_STATUS_CODES,
-    VALID_SECURITY_LEVELS,
     VALID_SENSITIVITY_LEVELS,
     VALID_SERVE_ERROR_CONTENT_TYPES,
     VALID_SKIP_PHASES,
     VALID_SKIP_PRODUCTS,
     VALID_SKIP_RULESET_VALUES,
     VALID_SSL_VALUES,
+    ZONE_ONLY_SECURITY_LEVELS,
 )
 
 RULE_IDS = frozenset(
@@ -100,14 +102,10 @@ RULE_IDS = frozenset(
 
 _VALID_HEADER_OPERATIONS = frozenset({"set", "remove", "add"})
 
-# CF224: Cloudflare's Rulesets API rejects a rule expression longer than 4096
-# characters with API error 20127 ("expression size N exceeded maximum 4096").
-# CF measures the canonical (whitespace-normalized) form — the same form
-# octorules sends — so we measure the normalized length. 4096 is the maximum
-# *allowed* (the error fires when the size strictly exceeds it), so the cap is
-# breached at 4097+. A stored-list reference (e.g. `ip.src in $my_list`) stays
-# short, which is the intended remediation.
-_MAX_EXPRESSION_LENGTH = 4096
+# CF224 measures the normalized expression length against
+# MAX_EXPRESSION_LENGTH (see _constants.py for the API grounding). A
+# stored-list reference (e.g. `ip.src in $my_list`) stays short, which is
+# the intended remediation.
 
 # CF223: account-scope marker. Per Cloudflare's deploy-custom-ruleset docs,
 # account-level rule expressions "must use parentheses to enclose any custom
@@ -128,14 +126,14 @@ def _check_expression_length(
     if not isinstance(expression, str):
         return
     length = len(normalize_expression(expression))
-    if length > _MAX_EXPRESSION_LENGTH:
+    if length > MAX_EXPRESSION_LENGTH:
         ctx.add(
             LintResult(
                 rule_id="CF224",
                 severity=Severity.ERROR,
                 message=(
                     f"Expression is {length} characters, exceeding Cloudflare's"
-                    f" {_MAX_EXPRESSION_LENGTH}-character API cap (error 20127)."
+                    f" {MAX_EXPRESSION_LENGTH}-character API cap (error 20127)."
                     " Move large inline value lists into a stored list and"
                     " reference it (e.g. 'ip.src in $my_list')."
                 ),
@@ -595,9 +593,29 @@ def _lint_config_params(params: dict, phase_name: str, ref: str, ctx: LintContex
     """Validate config action_parameters (CF420-CF423)."""
     security_level = params.get("security_level")
     if isinstance(security_level, str):
-        if not _check_enum(
+        if security_level in ZONE_ONLY_SECURITY_LEVELS:
+            # CF420: graduated levels are a zone-wide baseline only — the
+            # Configuration Rules API rejects them. Emit a targeted message
+            # instead of the generic "must be one of" so the distinction is
+            # clear (these are real security levels, just not valid here).
+            ctx.add(
+                LintResult(
+                    rule_id="CF420",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"security_level {security_level!r} is not valid in a Configuration"
+                        " Rule. Graduated levels (low, medium, high) can only be set"
+                        " zone-wide; Configuration Rules accept only: essentially_off, off,"
+                        " under_attack"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="action_parameters.security_level",
+                )
+            )
+        elif not _check_enum(
             security_level,
-            VALID_SECURITY_LEVELS,
+            VALID_CONFIG_SECURITY_LEVELS,
             rule_id="CF420",
             label="security_level",
             field_path="action_parameters.security_level",

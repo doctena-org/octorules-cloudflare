@@ -1,5 +1,6 @@
 """Tests for leaked credential check extension and provider methods."""
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -644,3 +645,18 @@ class TestProviderSyncLeakedCredentialDetections:
         mock_cf_client.leaked_credential_checks.detections.create.assert_not_called()
         mock_cf_client.leaked_credential_checks.detections.update.assert_not_called()
         mock_cf_client.leaked_credential_checks.detections.delete.assert_not_called()
+
+
+class TestReadBackVerification:
+    def test_enable_warns_when_toggle_does_not_take(self, caplog):
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_leaked_credential_check.return_value = {"enabled": False}
+        plan = LeakedCredentialPlan(changes=[LeakedCredentialChange("enabled", False, True)])
+        with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
+            synced, error = _apply_leaked_credentials(
+                MagicMock(), [plan], Scope(zone_id="z1", label="example.com"), provider
+            )
+        assert error is None
+        assert "cloudflare_leaked_credential_check:enabled" in synced
+        assert "enabled" in caplog.text
+        assert "reads back" in caplog.text

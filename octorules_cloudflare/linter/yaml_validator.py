@@ -36,16 +36,12 @@ RULE_IDS = frozenset(
         "CF014",
         "CF015",
         "CF016",
-        "CF017",
         "CF018",
     }
 )
 
 # Maximum recommended description length
 _MAX_DESCRIPTION_LENGTH = 500
-
-# Maximum expression length (Cloudflare API limit)
-_MAX_EXPRESSION_LENGTH = 4096
 
 
 def lint_yaml_structure(rules_data: dict[str, Any], ctx: LintContext) -> None:
@@ -209,21 +205,6 @@ def _check_rule_fields(phase_name: str, rule: dict, index: int, ctx: LintContext
                     message="Invalid 'expression' (must be a non-empty string)",
                     phase=phase_name,
                     ref=ref_label,
-                )
-            )
-        elif len(expr) > _MAX_EXPRESSION_LENGTH:
-            # CF017: expression exceeds character limit
-            ctx.add(
-                LintResult(
-                    rule_id="CF017",
-                    severity=Severity.ERROR,
-                    message=(
-                        f"Expression is {len(expr)} chars"
-                        f" (Cloudflare limit: {_MAX_EXPRESSION_LENGTH})"
-                    ),
-                    phase=phase_name,
-                    ref=ref_label,
-                    field="expression",
                 )
             )
 

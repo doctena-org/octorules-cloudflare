@@ -4,7 +4,7 @@ Validates the `custom_rulesets` section for structural correctness. Checks requi
 
 Individual rules inside custom rulesets are also validated through the standard per-rule checks (expression analysis, action validation, etc.) using the `waf_custom_rules` phase schema.
 
-## Category T — Custom Ruleset Validation (4 rules)
+## Category T — Custom Ruleset Validation (5 rules)
 
 ### CF022 — Missing required field
 

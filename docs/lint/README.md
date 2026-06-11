@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **150 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **155 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -66,8 +66,8 @@ Suppressed findings are excluded from the report but counted in the summary line
 
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
-| 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF027 | 17 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF549 | 110 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF027 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF550 | 119 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF478 | 9 | [stage2d-lists.md](stage2d-lists.md) |
@@ -79,11 +79,11 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF Range | Category | Rules |
 |----------|----------|-------|
 | CF001–CF002 | Parse / syntax errors | 2 |
-| CF003–CF027 | Structure | 17 |
+| CF003–CF018, CF027 | Structure | 16 |
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF105 | Cross-rule | 6 |
-| CF200–CF223 | Action validation | 24 |
+| CF200–CF224 | Action validation | 25 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
 | CF400–CF408 | Rate limiting | 9 |
@@ -96,7 +96,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF470–CF478 | List validation | 9 |
 | CF500–CF502 | Plan/entitlement | 3 |
 | CF510–CF518 | Best practice / style | 9 |
-| CF520–CF549 | Value constraints | 30 |
+| CF520–CF550 | Value constraints | 31 |
 
 ---
 
@@ -209,7 +209,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 
 **Transform expressions** — In transform phases (`url_rewrite_rules`, `request_header_rules`, `response_header_rules`), `action_parameters` can contain `expression` fields that use function-call syntax (e.g., `concat(...)`, `regex_replace(...)`). These are *different* from the rule's match `expression` — they define how values are computed, not whether the rule fires. The linter validates these via [CF444](stage2-per-rule.md#cf444--expression-parse-error-in-transform-action_parameters).
 
-**Expression language** — All phases use the same [Cloudflare Rules Language](https://developers.cloudflare.com/ruleset-engine/rules-language/) (wirefilter syntax). Expressions have a 4,096 character limit ([CF017](stage1-yaml-structure.md#cf017--expression-exceeds-4096-character-limit)) and a 64 regex pattern limit per rule ([CF502](stage3-plan-tier.md#cf502--expression-exceeds-64-regex-pattern-limit)). The `matches` operator (regex) is not available on the Free plan ([CF500](stage3-plan-tier.md#cf500--regex-operator-not-available-on-free-plan)).
+**Expression language** — All phases use the same [Cloudflare Rules Language](https://developers.cloudflare.com/ruleset-engine/rules-language/) (wirefilter syntax). Expressions have a 4,096 character limit on their normalized form ([CF224](stage2-per-rule.md#cf224--expression-exceeds-4096-char-cloudflare-api-cap)) and a 64 regex pattern limit per rule ([CF502](stage3-plan-tier.md#cf502--expression-exceeds-64-regex-pattern-limit)). The `matches` operator (regex) is not available on the Free plan ([CF500](stage3-plan-tier.md#cf500--regex-operator-not-available-on-free-plan)).
 
 **Rule count limits** — Each phase has per-plan rule count limits. The linter checks these via [CF501](stage3-plan-tier.md#cf501--rule-count-exceeds-plan-limit-for-phase).
 
@@ -235,8 +235,8 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF014](stage1-yaml-structure.md#cf014--cloudflare-phase-identifier-used-instead-of-friendly-name) | CF phase identifier used instead of friendly name | WARNING |
 | [CF015](stage1-yaml-structure.md#cf015--expression-is-always-true-catch-all) | Expression is always true (catch-all) | WARNING |
 | [CF016](stage1-yaml-structure.md#cf016--expression-is-always-false-dead-rule) | Expression is always false (dead rule) | WARNING |
-| [CF017](stage1-yaml-structure.md#cf017--expression-exceeds-4096-character-limit) | Expression exceeds 4,096 character limit | ERROR |
 | [CF018](stage1-yaml-structure.md#cf018--rule-is-disabled) | Rule is disabled (enabled: false) | INFO |
+| [CF027](stage1-yaml-structure.md#cf027--expression-has-leading-trailing-whitespace) | Expression has leading/trailing whitespace | INFO |
 | [CF200](stage2-per-rule.md#cf200--invalid-action-for-phase) | Invalid action for phase | ERROR |
 | [CF201](stage2-per-rule.md#cf201--missing-required-action) | Missing required action | ERROR |
 | [CF202](stage2-per-rule.md#cf202--missing-required-action_parameters) | Missing required action_parameters | ERROR |
@@ -261,6 +261,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF221](stage2-per-rule.md#cf221--invalid-content_type-in-serve_error-response) | Invalid content_type in serve_error response | ERROR |
 | [CF222](stage2-per-rule.md#cf222--skip-ruleset-value-must-be-current) | Skip ruleset value must be "current" | ERROR |
 | [CF223](stage2-per-rule.md#cf223--skip-action-invalid-in-account-scoped-waf_custom_rules) | Skip action invalid in account-scoped waf_custom_rules | ERROR |
+| [CF224](stage2-per-rule.md#cf224--expression-exceeds-4096-char-cloudflare-api-cap) | Expression exceeds 4096-char Cloudflare API cap | ERROR |
 | [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |
@@ -332,6 +333,11 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF543](stage2-per-rule.md#cf543--substring-index-out-of-bounds-or-inverted) | substring() index out of bounds or inverted | WARNING |
 | [CF544](stage2-per-rule.md#cf544--lookup_json-path-should-start-with-) | lookup_json path should start with / | WARNING |
 | [CF545](stage2-per-rule.md#cf545--bit_slice-offset-or-size-out-of-range) | bit_slice offset or size out of range | WARNING |
+| [CF546](stage2-per-rule.md#cf546--suspicious-regex-unescaped-literal-in-field-context) | Suspicious regex: unescaped literal in field-context | WARNING |
+| [CF547](stage2-per-rule.md#cf547--empty-inline-list-in-always-false) | Empty inline list 'in {}' (always false) | WARNING |
+| [CF548](stage2-per-rule.md#cf548--overly-permissive-regex-pattern) | Overly permissive regex pattern (matches every value) | WARNING |
+| [CF549](stage2-per-rule.md#cf549--regex-pattern-is-fully-anchored-literal) | Regex pattern is fully-anchored literal — can be simplified | INFO |
+| [CF550](stage2-per-rule.md#cf550--percent-encoded-literal-on-decoded-uri-field) | Percent-encoded literal on decoded URI field | WARNING |
 | [CF500](stage3-plan-tier.md#cf500--regex-operator-not-available-on-free-plan) | Regex not available on Free plan | WARNING |
 | [CF501](stage3-plan-tier.md#cf501--rule-count-exceeds-plan-limit-for-phase) | Rule count exceeds plan limit | WARNING |
 | [CF502](stage3-plan-tier.md#cf502--expression-exceeds-64-regex-pattern-limit) | Expression exceeds 64 regex limit | WARNING |
@@ -341,6 +347,9 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF513](stage2-per-rule.md#cf513--negated-comparison-can-be-simplified) | Negated comparison can be simplified | INFO |
 | [CF514](stage2-per-rule.md#cf514--illogical-condition) | Illogical condition | WARNING |
 | [CF515](stage2-per-rule.md#cf515--regex-pattern-uses-literal-escapes) | Regex literal escapes | INFO |
+| [CF516](stage2-per-rule.md#cf516--mixed-operator-notation) | Mixed operator notation (English and C-like) | INFO |
+| [CF517](stage2-per-rule.md#cf517--mixed-and-or-without-explicit-parentheses) | Mixed "and"/"or" without explicit parentheses | INFO |
+| [CF518](stage2-per-rule.md#cf518--inline-list-exceeds-readability-threshold) | Inline list exceeds readability threshold | INFO |
 | [CF460](stage2b-page-shield.md#cf460--missing-required-field) | Missing required Page Shield field | ERROR |
 | [CF461](stage2b-page-shield.md#cf461--invalid-action) | Invalid Page Shield action | ERROR |
 | [CF462](stage2b-page-shield.md#cf462--invalid-field-type) | Invalid Page Shield field type | ERROR |

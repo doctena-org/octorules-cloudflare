@@ -216,15 +216,13 @@ Triggers when the expression is `false`, `(false)`, or `((false))`. Flags rules 
 
 Fix: Remove the rule or fix the expression.
 
-### CF017 — Expression exceeds 4,096 character limit
+### CF017 — Retired
 
-| Severity | Category |
-|----------|----------|
-| ERROR | structure |
-
-Triggers when the expression string is longer than 4,096 characters (the Cloudflare API limit).
-
-Fix: Simplify the expression or split the rule into multiple rules.
+CF017 measured the *raw* YAML string length, so a multi-line block scalar
+whose normalized form fit Cloudflare's 4,096-character cap still errored.
+[CF224](stage2-per-rule.md#cf224--expression-exceeds-4096-char-cloudflare-api-cap)
+owns the cap and measures the normalized form the API receives. Remove any
+`# octorules:disable=CF017` suppressions — they are inert.
 
 ### CF018 — Rule is disabled
 
