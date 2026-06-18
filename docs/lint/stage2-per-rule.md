@@ -457,6 +457,25 @@ waf_custom_rules:
     action: block
 ```
 
+### CF225 — Incompatible rate limit characteristics
+
+**Severity:** ERROR
+
+A rate-limiting rule's `characteristics` cannot contain both `ip.src` (IP) and `cf.unique_visitor_id` (IP with NAT support) — Cloudflare documents the two as mutually exclusive and rejects a rule that lists both.
+
+```yaml
+rate_limit:
+  - ref: throttle
+    expression: 'http.request.uri.path eq "/login"'
+    action: block
+    ratelimit:
+      characteristics: ["ip.src", "cf.unique_visitor_id"]   # rejected — mutually exclusive
+      period: 60
+      requests_per_period: 100
+```
+
+**Fix:** Keep one of the two. Use `cf.unique_visitor_id` when you need NAT-aware counting, or `ip.src` for plain per-IP counting — not both.
+
 ---
 
 ## Category D — Rate Limiting (9 rules)
@@ -552,6 +571,26 @@ The number of `characteristics` exceeds the plan tier limit (Free/Pro: 1, Busine
 `score_per_period` must be between 1 and 10,000,000.
 
 **Fix:** Set a value within the valid range.
+
+### CF409 — mitigation_timeout must be 0 with challenge action on non-Enterprise plan
+
+**Severity:** ERROR
+
+On Free, Pro, and Business plans a rate-limiting rule cannot select a mitigation duration when its action is a challenge (`managed_challenge`, `js_challenge`, or `challenge`) — Cloudflare requires `mitigation_timeout` to be `0` (request throttling) for those actions, and rejects any other value. Only Enterprise can pair a challenge action with a non-zero duration. The rule fires only when the configured plan tier is Free, Pro, or Business.
+
+```yaml
+rate_limit:
+  - ref: throttle-login
+    expression: 'http.request.uri.path eq "/login"'
+    action: managed_challenge
+    ratelimit:
+      characteristics: ["ip.src"]
+      period: 60
+      requests_per_period: 20
+      mitigation_timeout: 600     # rejected on Free/Pro/Business — must be 0
+```
+
+**Fix:** Set `mitigation_timeout: 0` for the challenge action, or upgrade to Enterprise if a duration is required.
 
 ---
 
@@ -716,7 +755,7 @@ The redirect `target_url.value` does not start with `http://`, `https://`, or `/
 
 ---
 
-## Category L — Transform Rules (6 rules)
+## Category L — Transform Rules (8 rules)
 
 ### CF440 — Empty header name in transform
 
@@ -848,6 +887,56 @@ request_header_rules:
 ```
 
 Fix: Remove the `value` or `expression` field — only specify the header name and `operation: remove`.
+
+### CF447 — Transform modifies a reserved header
+
+| Severity | Category |
+|----------|----------|
+| ERROR | transform |
+
+Cloudflare forbids modifying certain request headers in transform rules, and rejects the rule if you try. Applies to **request** header transforms:
+
+- Headers named `cf-*` or `x-cf-*` cannot be set, modified, or removed — the only exception is removing `cf-connecting-ip`.
+- The `cookie` header cannot be set or modified (it can be removed).
+- Headers that identify the visitor IP/protocol — `x-forwarded-for`, `true-client-ip`, `x-real-ip`, `x-forwarded-proto` — cannot have their value set or modified (they can be removed).
+
+```yaml
+request_header_rules:
+  - ref: spoof
+    expression: (true)
+    action: rewrite
+    action_parameters:
+      headers:
+        X-Forwarded-For:
+          operation: set        # rejected — visitor-IP header is immutable
+          value: "203.0.113.1"
+```
+
+Fix: Don't set/modify reserved headers. If you need to strip one (e.g. `cookie`, `x-forwarded-for`), use `operation: remove` where Cloudflare permits it.
+
+> Note: the documented visitor-IP list is non-exhaustive ("such as …"); this rule checks the four named headers. Cloudflare may reject other IP-identifying headers it doesn't enumerate.
+
+### CF448 — Invalid header name
+
+| Severity | Category |
+|----------|----------|
+| ERROR | transform |
+
+A transform header name may contain only letters, digits, hyphen, and underscore (`^[A-Za-z0-9_-]+$`) — for both request and response header transforms. Cloudflare rejects names with other characters.
+
+```yaml
+response_header_rules:
+  - ref: bad
+    expression: (true)
+    action: rewrite
+    action_parameters:
+      headers:
+        "X Spaced Header":      # rejected — space is not allowed
+          operation: set
+          value: "1"
+```
+
+Fix: Use only `A-Z a-z 0-9 - _` in the header name.
 
 ---
 

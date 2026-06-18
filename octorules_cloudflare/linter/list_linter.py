@@ -5,15 +5,33 @@ Validates the structural correctness and item validity of lists
 """
 
 import ipaddress
+import re
 from typing import Any
 
 from octorules.linter.engine import LintContext, LintResult, Severity
 
 RULE_IDS = frozenset(
-    {"CF470", "CF471", "CF472", "CF473", "CF474", "CF475", "CF476", "CF477", "CF478"}
+    {
+        "CF470",
+        "CF471",
+        "CF472",
+        "CF473",
+        "CF474",
+        "CF475",
+        "CF476",
+        "CF477",
+        "CF478",
+        "CF479",
+        "CF480",
+    }
 )
 
 _VALID_KINDS = frozenset({"ip", "asn", "hostname", "redirect"})
+
+# Cloudflare list-name constraint: only lowercase letters, digits, and
+# underscore, max 50 chars (https://developers.cloudflare.com/waf/tools/lists/).
+_LIST_NAME_RE = re.compile(r"^[a-z0-9_]+$")
+_LIST_NAME_MAX_LEN = 50
 
 # Required item field per list kind
 _ITEM_FIELD_BY_KIND: dict[str, str] = {
@@ -61,6 +79,36 @@ def lint_lists(rules_data: dict[str, Any], ctx: LintContext) -> None:
             )
         else:
             seen_names.add(name)
+
+        # CF480: name format and length (applies to any non-empty string name,
+        # independent of the duplicate check above).
+        if isinstance(name, str) and name:
+            if len(name) > _LIST_NAME_MAX_LEN:
+                ctx.add(
+                    LintResult(
+                        rule_id="CF480",
+                        severity=Severity.ERROR,
+                        message=(
+                            f"List name {name!r} exceeds the maximum length of"
+                            f" {_LIST_NAME_MAX_LEN} characters"
+                        ),
+                        phase="lists",
+                        ref=name_label,
+                    )
+                )
+            if not _LIST_NAME_RE.match(name):
+                ctx.add(
+                    LintResult(
+                        rule_id="CF480",
+                        severity=Severity.ERROR,
+                        message=(
+                            f"List name {name!r} is invalid: use only lowercase letters,"
+                            " digits, and underscore (must match ^[a-z0-9_]+$)"
+                        ),
+                        phase="lists",
+                        ref=name_label,
+                    )
+                )
 
         # CF471: Missing or invalid kind
         kind = entry.get("kind")
@@ -284,12 +332,28 @@ def _lint_hostname_item(
 def _lint_redirect_item(
     val: Any, index: int, name_label: str, seen: set[str], ctx: LintContext
 ) -> None:
-    """CF475: Duplicate redirect source."""
+    """CF475: Duplicate redirect source. CF479: source_url with a query string."""
     if not isinstance(val, dict):
         return
     source = val.get("source_url", "")
     if not isinstance(source, str) or not source:
         return
+    # CF479: Cloudflare rejects a Bulk Redirect whose matching (source) URL
+    # contains a query string (API error 10053). Query matching is controlled
+    # by the separate preserve_query_string parameter, not the source_url.
+    if "?" in source:
+        ctx.add(
+            LintResult(
+                rule_id="CF479",
+                severity=Severity.ERROR,
+                message=(
+                    f"Redirect source_url {source!r} at index {index} in list {name_label!r}"
+                    " must not contain a query string (use preserve_query_string instead)"
+                ),
+                phase="lists",
+                ref=name_label,
+            )
+        )
     if source in seen:
         ctx.add(
             LintResult(

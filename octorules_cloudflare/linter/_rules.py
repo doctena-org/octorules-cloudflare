@@ -86,6 +86,12 @@ CF224 = RuleMeta(
     "Expression exceeds 4096-char Cloudflare API cap",
     Severity.ERROR,
 )
+CF225 = RuleMeta(
+    "CF225",
+    "action",
+    "Incompatible rate limit characteristics (ip.src + cf.unique_visitor_id)",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)
@@ -99,6 +105,12 @@ CF406 = RuleMeta(
 )
 CF407 = RuleMeta("CF407", "rate_limit", "requests_per_period outside valid range", Severity.ERROR)
 CF408 = RuleMeta("CF408", "rate_limit", "score_per_period outside valid range", Severity.ERROR)
+CF409 = RuleMeta(
+    "CF409",
+    "rate_limit",
+    "mitigation_timeout must be 0 with challenge action on non-Enterprise plan",
+    Severity.ERROR,
+)
 
 # Category I — Cache Rule Specific
 CF410 = RuleMeta("CF410", "cache", "Invalid TTL mode value", Severity.ERROR)
@@ -139,6 +151,18 @@ CF446 = RuleMeta(
     "transform",
     "Header 'remove' operation should not include value or expression",
     Severity.WARNING,
+)
+CF447 = RuleMeta(
+    "CF447",
+    "transform",
+    "Transform modifies a header Cloudflare reserves (cf-*/cookie/visitor-IP)",
+    Severity.ERROR,
+)
+CF448 = RuleMeta(
+    "CF448",
+    "transform",
+    "Invalid header name (only letters, digits, hyphen, underscore)",
+    Severity.ERROR,
 )
 
 # Category N — Origin Rule Specific
@@ -310,6 +334,8 @@ CF475 = RuleMeta("CF475", "list", "Duplicate item in list", Severity.WARNING)
 CF476 = RuleMeta("CF476", "list", "List exceeds maximum item count (10,000)", Severity.WARNING)
 CF477 = RuleMeta("CF477", "list", "IP address has host bits set", Severity.WARNING)
 CF478 = RuleMeta("CF478", "list", "Overlapping IP/CIDR entries in list", Severity.WARNING)
+CF479 = RuleMeta("CF479", "list", "Redirect source_url contains a query string", Severity.ERROR)
+CF480 = RuleMeta("CF480", "list", "Invalid list name (format or length)", Severity.ERROR)
 
 # Collect all rule metas for registration
 CF_RULE_METAS: list[RuleMeta] = [obj for obj in globals().values() if isinstance(obj, RuleMeta)]

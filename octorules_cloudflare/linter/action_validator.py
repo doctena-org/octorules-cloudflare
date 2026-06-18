@@ -38,6 +38,23 @@ from octorules_cloudflare.linter.schemas.actions import (
     ZONE_ONLY_SECURITY_LEVELS,
 )
 
+# CF409: challenge actions that cannot carry a mitigation duration on
+# non-Enterprise plans, and the tiers the restriction applies to.
+_CHALLENGE_ACTIONS = frozenset({"managed_challenge", "js_challenge", "challenge"})
+_CHALLENGE_TIMEOUT_TIERS = frozenset({"free", "pro", "business"})
+
+# CF448: transform-rule header names accept only these characters
+# (https://developers.cloudflare.com/rules/transform/request-header-modification/reference/header-format/).
+_HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+# CF447: request headers Cloudflare forbids modifying in transform rules
+# (https://developers.cloudflare.com/rules/transform/request-header-modification/).
+# Headers commonly used to identify the visitor IP/protocol: their value
+# cannot be set/modified (removal is allowed).
+_IMMUTABLE_IP_HEADERS = frozenset(
+    {"x-forwarded-for", "true-client-ip", "x-real-ip", "x-forwarded-proto"}
+)
+
 RULE_IDS = frozenset(
     {
         "CF200",
@@ -87,6 +104,8 @@ RULE_IDS = frozenset(
         "CF444",
         "CF445",
         "CF446",
+        "CF447",
+        "CF448",
         "CF450",
         "CF451",
         "CF452",
@@ -97,6 +116,8 @@ RULE_IDS = frozenset(
         "CF222",
         "CF223",
         "CF224",
+        "CF225",
+        "CF409",
     }
 )
 
@@ -243,7 +264,7 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
     # action_params-is-None early return) so a rule with `ratelimit:` set
     # and no `action_parameters` is still linted.
     if phase_name == "rate_limiting_rules" and action not in ("execute", "skip"):
-        _lint_rate_limit_params(rule.get("ratelimit"), phase_name, ref, ctx)
+        _lint_rate_limit_params(rule.get("ratelimit"), action, phase_name, ref, ctx)
 
     if action_params is None:
         return
@@ -689,8 +710,10 @@ def _lint_config_params(params: dict, phase_name: str, ref: str, ctx: LintContex
         )
 
 
-def _lint_rate_limit_params(ratelimit: object, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate the rule-level ``ratelimit:`` block (CF400-CF408, CF213, CF406).
+def _lint_rate_limit_params(
+    ratelimit: object, action: object, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """Validate the rule-level ``ratelimit:`` block (CF400-CF408, CF213, CF406, CF409).
 
     The Cloudflare API places rate-limit configuration in a top-level
     ``ratelimit`` rule field (sibling of ``action_parameters``) — see
@@ -813,6 +836,24 @@ def _lint_rate_limit_params(ratelimit: object, phase_name: str, ref: str, ctx: L
                 )
             )
 
+        # CF225: 'ip.src' (IP) and 'cf.unique_visitor_id' (IP with NAT support)
+        # are mutually exclusive in a single rate-limiting rule; Cloudflare
+        # rejects a rule that lists both.
+        if "ip.src" in characteristics and "cf.unique_visitor_id" in characteristics:
+            ctx.add(
+                LintResult(
+                    rule_id="CF225",
+                    severity=Severity.ERROR,
+                    message=(
+                        "Rate limit characteristics 'ip.src' and 'cf.unique_visitor_id'"
+                        " are mutually exclusive (IP vs IP with NAT support)"
+                    ),
+                    phase=phase_name,
+                    ref=ref,
+                    field="ratelimit.characteristics",
+                )
+            )
+
     # CF403: mitigation_timeout > period
     mitigation_timeout = params.get("mitigation_timeout")
     if (
@@ -825,6 +866,31 @@ def _lint_rate_limit_params(ratelimit: object, phase_name: str, ref: str, ctx: L
                 rule_id="CF403",
                 severity=Severity.WARNING,
                 message=(f"mitigation_timeout ({mitigation_timeout}s) exceeds period ({period}s)"),
+                phase=phase_name,
+                ref=ref,
+                field="ratelimit.mitigation_timeout",
+            )
+        )
+
+    # CF409: Free/Pro/Business plans cannot select a duration with a challenge
+    # action — mitigation_timeout must be 0 when the action is managed_challenge,
+    # js_challenge, or challenge. Enterprise may use any value. Only fires on a
+    # known non-Enterprise tier (mirrors CF406's tier gating).
+    if (
+        ctx.plan_tier in _CHALLENGE_TIMEOUT_TIERS
+        and action in _CHALLENGE_ACTIONS
+        and isinstance(mitigation_timeout, int)
+        and not isinstance(mitigation_timeout, bool)
+        and mitigation_timeout != 0
+    ):
+        ctx.add(
+            LintResult(
+                rule_id="CF409",
+                severity=Severity.ERROR,
+                message=(
+                    f"mitigation_timeout must be 0 with a challenge action ({action})"
+                    f" on the {ctx.plan_tier!r} plan; only Enterprise can set a duration"
+                ),
                 phase=phase_name,
                 ref=ref,
                 field="ratelimit.mitigation_timeout",
@@ -928,8 +994,76 @@ def _lint_origin_params(params: dict, phase_name: str, ref: str, ctx: LintContex
             )
 
 
+def _check_restricted_header(
+    header_name: str, op: object, phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF447: Cloudflare forbids modifying certain request headers in transforms.
+
+    Only applies to request-header transforms. The ``cf-``/``x-cf-`` headers
+    cannot be touched at all (except removing ``cf-connecting-ip``); ``cookie``
+    and the visitor-IP headers cannot be set/modified but can be removed.
+    """
+    if (
+        phase_name != "request_header_rules"
+        or not isinstance(op, str)
+        or not isinstance(header_name, str)
+    ):
+        return
+    name = header_name.lower()
+
+    if name.startswith("cf-") or name.startswith("x-cf-"):
+        if name == "cf-connecting-ip" and op == "remove":
+            return
+        ctx.add(
+            LintResult(
+                rule_id="CF447",
+                severity=Severity.ERROR,
+                message=(
+                    f"Header {header_name!r} cannot be modified or removed —"
+                    " Cloudflare reserves 'cf-'/'x-cf-' request headers"
+                    " (only 'cf-connecting-ip' may be removed)"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field=f"action_parameters.headers.{header_name}",
+            )
+        )
+        return
+
+    if name == "cookie" and op in ("set", "add"):
+        ctx.add(
+            LintResult(
+                rule_id="CF447",
+                severity=Severity.ERROR,
+                message=(
+                    "The 'cookie' request header cannot be set or modified (it can only be removed)"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field=f"action_parameters.headers.{header_name}",
+            )
+        )
+        return
+
+    if name in _IMMUTABLE_IP_HEADERS and op in ("set", "add"):
+        ctx.add(
+            LintResult(
+                rule_id="CF447",
+                severity=Severity.ERROR,
+                message=(
+                    f"Header {header_name!r} cannot be modified — Cloudflare"
+                    " reserves headers that identify the visitor IP/protocol"
+                    " (it can be removed, not set)"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field=f"action_parameters.headers.{header_name}",
+            )
+        )
+
+
 def _lint_transform_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate transform action_parameters (CF440-CF445, CF207)."""
+    """Validate transform action_parameters (CF440-CF448, CF207)."""
     # Check URI transforms
     uri = params.get("uri")
     if isinstance(uri, dict):
@@ -957,19 +1091,38 @@ def _lint_transform_params(params: dict, phase_name: str, ref: str, ctx: LintCon
     headers = params.get("headers")
     if isinstance(headers, dict):
         for header_name, header_val in headers.items():
-            # CF440: empty header name
-            if not header_name or not header_name.strip():
+            # CF440: empty or non-string header name
+            if not isinstance(header_name, str) or not header_name.strip():
                 ctx.add(
                     LintResult(
                         rule_id="CF440",
                         severity=Severity.ERROR,
-                        message="Empty header name in transform",
+                        message="Empty or invalid header name in transform",
                         phase=phase_name,
                         ref=ref,
                         field="action_parameters.headers",
                     )
                 )
+            # CF448: header name charset (letters, digits, hyphen, underscore)
+            elif isinstance(header_name, str) and not _HEADER_NAME_RE.match(header_name):
+                ctx.add(
+                    LintResult(
+                        rule_id="CF448",
+                        severity=Severity.ERROR,
+                        message=(
+                            f"Header name {header_name!r} is invalid: use only letters,"
+                            " digits, hyphen, and underscore (^[A-Za-z0-9_-]+$)"
+                        ),
+                        phase=phase_name,
+                        ref=ref,
+                        field=f"action_parameters.headers.{header_name}",
+                    )
+                )
             if isinstance(header_val, dict):
+                # CF447: header is one Cloudflare forbids modifying (request only)
+                _check_restricted_header(
+                    header_name, header_val.get("operation"), phase_name, ref, ctx
+                )
                 # CF441: missing operation
                 if "operation" not in header_val:
                     ctx.add(

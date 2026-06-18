@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-06-18
+
+### Added
+- **CF225** (ERROR): a rate-limiting rule cannot use both `ip.src` and
+  `cf.unique_visitor_id` characteristics — Cloudflare documents them as
+  mutually exclusive (IP vs IP with NAT support) and rejects rules that
+  set both.
+- **CF409** (ERROR): on Free/Pro/Business plans a rate-limiting rule
+  using a challenge action (`managed_challenge`, `js_challenge`,
+  `challenge`) must set `mitigation_timeout` to 0 — those tiers cannot
+  pair a challenge with a duration. Only fires when the plan tier is
+  Free, Pro, or Business.
+- **CF479** (ERROR): a redirect list's `source_url` (matching URL) must
+  not contain a query string. Cloudflare rejects such Bulk Redirects at
+  deploy time with API error 10053; query matching is controlled by
+  `preserve_query_string`. Catches at lint time what previously only
+  surfaced on the post-merge deploy.
+- **CF447** (ERROR): a request-header transform cannot modify headers
+  Cloudflare reserves — `cf-*`/`x-cf-*` (only `cf-connecting-ip` may be
+  removed), `cookie` (removable, not settable), and the visitor-IP
+  headers `x-forwarded-for` / `true-client-ip` / `x-real-ip` /
+  `x-forwarded-proto` (removable, not settable).
+- **CF448** (ERROR): a transform header name may contain only letters,
+  digits, hyphen, and underscore (`^[A-Za-z0-9_-]+$`), for request and
+  response header rules.
+- **CF480** (ERROR): a list name must match `^[a-z0-9_]+$` and be at
+  most 50 characters, per Cloudflare's list naming rules. Previously
+  only a missing/duplicate name was checked.
+
+### Fixed
+- The linter no longer crashes on a non-string header name in a
+  transform rule (e.g. a numeric YAML key); it now reports CF440.
+
 ## [0.9.0] - 2026-06-11
 
 ### Added

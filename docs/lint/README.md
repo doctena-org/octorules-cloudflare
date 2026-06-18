@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **155 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **161 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -70,7 +70,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF550 | 119 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
-| 2d. List validation | List structure, item validity, duplicates, count | CF470–CF478 | 9 | [stage2d-lists.md](stage2d-lists.md) |
+| 2d. List validation | List structure, item validity, duplicates, count | CF470–CF480 | 11 | [stage2d-lists.md](stage2d-lists.md) |
 | 3. Plan-tier limits | Regex availability, rule count limits | CF500–CF502 | 3 | [stage3-plan-tier.md](stage3-plan-tier.md) |
 | 4. Cross-rule analysis | Duplicates, unreachable rules, list references | CF100–CF105 | 6 | [stage4-cross-rule.md](stage4-cross-rule.md) |
 
@@ -83,17 +83,17 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF105 | Cross-rule | 6 |
-| CF200–CF224 | Action validation | 25 |
+| CF200–CF225 | Action validation | 26 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
-| CF400–CF408 | Rate limiting | 9 |
+| CF400–CF409 | Rate limiting | 10 |
 | CF410–CF414 | Cache rules | 5 |
 | CF420–CF424 | Config rules | 5 |
 | CF430–CF432 | Redirect rules | 3 |
-| CF440–CF446 | Transform rules | 7 |
+| CF440–CF448 | Transform rules | 9 |
 | CF450–CF452 | Origin rules | 3 |
 | CF460–CF463 | Page Shield structure | 4 |
-| CF470–CF478 | List validation | 9 |
+| CF470–CF480 | List validation | 11 |
 | CF500–CF502 | Plan/entitlement | 3 |
 | CF510–CF518 | Best practice / style | 9 |
 | CF520–CF550 | Value constraints | 31 |
@@ -236,7 +236,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF015](stage1-yaml-structure.md#cf015--expression-is-always-true-catch-all) | Expression is always true (catch-all) | WARNING |
 | [CF016](stage1-yaml-structure.md#cf016--expression-is-always-false-dead-rule) | Expression is always false (dead rule) | WARNING |
 | [CF018](stage1-yaml-structure.md#cf018--rule-is-disabled) | Rule is disabled (enabled: false) | INFO |
-| [CF027](stage1-yaml-structure.md#cf027--expression-has-leading-trailing-whitespace) | Expression has leading/trailing whitespace | INFO |
+| [CF027](stage1-yaml-structure.md#cf027--expression-has-leadingtrailing-whitespace) | Expression has leading/trailing whitespace | INFO |
 | [CF200](stage2-per-rule.md#cf200--invalid-action-for-phase) | Invalid action for phase | ERROR |
 | [CF201](stage2-per-rule.md#cf201--missing-required-action) | Missing required action | ERROR |
 | [CF202](stage2-per-rule.md#cf202--missing-required-action_parameters) | Missing required action_parameters | ERROR |
@@ -262,6 +262,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF222](stage2-per-rule.md#cf222--skip-ruleset-value-must-be-current) | Skip ruleset value must be "current" | ERROR |
 | [CF223](stage2-per-rule.md#cf223--skip-action-invalid-in-account-scoped-waf_custom_rules) | Skip action invalid in account-scoped waf_custom_rules | ERROR |
 | [CF224](stage2-per-rule.md#cf224--expression-exceeds-4096-char-cloudflare-api-cap) | Expression exceeds 4096-char Cloudflare API cap | ERROR |
+| [CF225](stage2-per-rule.md#cf225--incompatible-rate-limit-characteristics) | Incompatible rate limit characteristics | ERROR |
 | [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |
@@ -271,6 +272,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF406](stage2-per-rule.md#cf406--too-many-rate-limit-characteristics-for-plan-tier) | Too many rate limit characteristics for plan tier | ERROR |
 | [CF407](stage2-per-rule.md#cf407--requests_per_period-outside-valid-range) | requests_per_period outside valid range | ERROR |
 | [CF408](stage2-per-rule.md#cf408--score_per_period-outside-valid-range) | score_per_period outside valid range | ERROR |
+| [CF409](stage2-per-rule.md#cf409--mitigation_timeout-must-be-0-with-challenge-action-on-non-enterprise-plan) | mitigation_timeout must be 0 with challenge action on non-Enterprise plan | ERROR |
 | [CF410](stage2-per-rule.md#cf410--invalid-ttl-mode-value) | Invalid TTL mode value | ERROR |
 | [CF411](stage2-per-rule.md#cf411--missing-ttl-with-override-mode) | Missing TTL with override mode | ERROR |
 | [CF412](stage2-per-rule.md#cf412--negative-ttl-value) | Negative TTL value | ERROR |
@@ -291,6 +293,8 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF444](stage2-per-rule.md#cf444--expression-parse-error-in-transform-action_parameters) | Expression parse error in transform action_parameters | WARNING |
 | [CF445](stage2-per-rule.md#cf445--request-headers-do-not-support-add-operation) | Request headers do not support add operation | ERROR |
 | [CF446](stage2-per-rule.md#cf446--header-remove-operation-should-not-include-value-or-expression) | Header 'remove' operation should not include value or expression | WARNING |
+| [CF447](stage2-per-rule.md#cf447--transform-modifies-a-reserved-header) | Transform modifies a header Cloudflare reserves | ERROR |
+| [CF448](stage2-per-rule.md#cf448--invalid-header-name) | Invalid header name (charset) | ERROR |
 | [CF450](stage2-per-rule.md#cf450--port-number-out-of-range) | Port number out of range (1-65535) | ERROR |
 | [CF451](stage2-per-rule.md#cf451--origin-weight-outside-valid-range) | Origin weight outside valid range (0.0-1.0) | ERROR |
 | [CF452](stage2-per-rule.md#cf452--origin-route-missing-required-fields) | Origin route missing required fields | ERROR |
@@ -306,7 +310,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF306](stage2-per-rule.md#cf306--function-source-argument-must-be-field) | Function source argument must be field | WARNING |
 | [CF307](stage2-per-rule.md#cf307--operator-type-incompatibility) | Operator-type incompatibility | ERROR |
 | [CF308](stage2-per-rule.md#cf308--unknown-field-name-in-expression) | Unknown field name in expression | WARNING |
-| [CF309](stage2-per-rule.md#cf309--array-star-unpacking-on-multiple-arrays) | Array [*] unpacking on multiple arrays | WARNING |
+| [CF309](stage2-per-rule.md#cf309--array--unpacking-on-multiple-arrays) | Array [*] unpacking on multiple arrays | WARNING |
 | [CF520](stage2-per-rule.md#cf520--http-method-should-be-uppercase) | HTTP method should be uppercase | WARNING |
 | [CF521](stage2-per-rule.md#cf521--uri-path-should-start-with-) | URI path should start with / | WARNING |
 | [CF522](stage2-per-rule.md#cf522--regex-anchor-in-literal-value) | Regex anchor in literal value | WARNING |
@@ -333,11 +337,11 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF543](stage2-per-rule.md#cf543--substring-index-out-of-bounds-or-inverted) | substring() index out of bounds or inverted | WARNING |
 | [CF544](stage2-per-rule.md#cf544--lookup_json-path-should-start-with-) | lookup_json path should start with / | WARNING |
 | [CF545](stage2-per-rule.md#cf545--bit_slice-offset-or-size-out-of-range) | bit_slice offset or size out of range | WARNING |
-| [CF546](stage2-per-rule.md#cf546--suspicious-regex-unescaped-literal-in-field-context) | Suspicious regex: unescaped literal in field-context | WARNING |
-| [CF547](stage2-per-rule.md#cf547--empty-inline-list-in-always-false) | Empty inline list 'in {}' (always false) | WARNING |
-| [CF548](stage2-per-rule.md#cf548--overly-permissive-regex-pattern) | Overly permissive regex pattern (matches every value) | WARNING |
-| [CF549](stage2-per-rule.md#cf549--regex-pattern-is-fully-anchored-literal) | Regex pattern is fully-anchored literal — can be simplified | INFO |
-| [CF550](stage2-per-rule.md#cf550--percent-encoded-literal-on-decoded-uri-field) | Percent-encoded literal on decoded URI field | WARNING |
+| [CF546](stage2-per-rule.md#cf546--suspicious-regex-field-context-heuristics) | Suspicious regex: unescaped literal in field-context | WARNING |
+| [CF547](stage2-per-rule.md#cf547--empty-inline-list-in--always-false) | Empty inline list 'in {}' (always false) | WARNING |
+| [CF548](stage2-per-rule.md#cf548--overly-permissive-regex-pattern-matches-every-value) | Overly permissive regex pattern (matches every value) | WARNING |
+| [CF549](stage2-per-rule.md#cf549--regex-pattern-is-a-fully-anchored-literal-use-eq-instead) | Regex pattern is fully-anchored literal — can be simplified | INFO |
+| [CF550](stage2-per-rule.md#cf550--percent-encoded-literal-value-on-decoded-uri-field) | Percent-encoded literal on decoded URI field | WARNING |
 | [CF500](stage3-plan-tier.md#cf500--regex-operator-not-available-on-free-plan) | Regex not available on Free plan | WARNING |
 | [CF501](stage3-plan-tier.md#cf501--rule-count-exceeds-plan-limit-for-phase) | Rule count exceeds plan limit | WARNING |
 | [CF502](stage3-plan-tier.md#cf502--expression-exceeds-64-regex-pattern-limit) | Expression exceeds 64 regex limit | WARNING |
@@ -348,7 +352,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF514](stage2-per-rule.md#cf514--illogical-condition) | Illogical condition | WARNING |
 | [CF515](stage2-per-rule.md#cf515--regex-pattern-uses-literal-escapes) | Regex literal escapes | INFO |
 | [CF516](stage2-per-rule.md#cf516--mixed-operator-notation) | Mixed operator notation (English and C-like) | INFO |
-| [CF517](stage2-per-rule.md#cf517--mixed-and-or-without-explicit-parentheses) | Mixed "and"/"or" without explicit parentheses | INFO |
+| [CF517](stage2-per-rule.md#cf517--mixed-andor-without-explicit-parentheses) | Mixed "and"/"or" without explicit parentheses | INFO |
 | [CF518](stage2-per-rule.md#cf518--inline-list-exceeds-readability-threshold) | Inline list exceeds readability threshold | INFO |
 | [CF460](stage2b-page-shield.md#cf460--missing-required-field) | Missing required Page Shield field | ERROR |
 | [CF461](stage2b-page-shield.md#cf461--invalid-action) | Invalid Page Shield action | ERROR |
@@ -366,11 +370,13 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF473](stage2d-lists.md#cf473--invalid-ip-address-in-ip-list) | Invalid IP address in IP list | ERROR |
 | [CF474](stage2d-lists.md#cf474--invalid-asn-value-in-asn-list) | Invalid ASN value in ASN list | ERROR |
 | [CF475](stage2d-lists.md#cf475--duplicate-items-within-list) | Duplicate items within list | WARNING |
-| [CF476](stage2d-lists.md#cf476--list-exceeds-maximum-item-count-10000) | List exceeds maximum item count (10,000) | WARNING |
+| [CF476](stage2d-lists.md#cf476--list-exceeds-maximum-item-count) | List exceeds maximum item count (10,000) | WARNING |
 | [CF477](stage2d-lists.md#cf477--ip-address-has-host-bits-set) | IP address has host bits set | WARNING |
 | [CF478](stage2d-lists.md#cf478--overlapping-ipcidr-entries-in-list) | Overlapping IP/CIDR entries in list | WARNING |
+| [CF479](stage2d-lists.md#cf479--redirect-source_url-contains-a-query-string) | Redirect source_url contains a query string | ERROR |
+| [CF480](stage2d-lists.md#cf480--invalid-list-name) | Invalid list name (format or length) | ERROR |
 | [CF022](stage2b-custom-rulesets.md#cf022--missing-required-field) | Missing required custom ruleset field | ERROR |
 | [CF023](stage2b-custom-rulesets.md#cf023--invalid-id-format) | Invalid custom ruleset id format | WARNING |
 | [CF024](stage2b-custom-rulesets.md#cf024--duplicate-ref-within-custom-ruleset) | Duplicate ref within custom ruleset | ERROR |
 | [CF025](stage2b-custom-rulesets.md#cf025--duplicate-ref-across-custom-rulesets) | Duplicate ref across custom rulesets | WARNING |
-| [CF026](stage2b-custom-rulesets.md#cf026--custom-ruleset-exceeds-maximum-rule-count-1000) | Custom ruleset exceeds maximum rule count (1,000) | WARNING |
+| [CF026](stage2b-custom-rulesets.md#cf026--custom-ruleset-exceeds-maximum-rule-count) | Custom ruleset exceeds maximum rule count (1,000) | WARNING |

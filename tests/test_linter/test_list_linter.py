@@ -28,6 +28,18 @@ class TestListStructure:
         )
         assert_lint(ctx, "CF470")
 
+    def test_cf480_invalid_name_format(self):
+        ctx = _lint({"lists": [{"name": "My-List", "kind": "ip", "items": []}]})
+        assert_lint(ctx, "CF480")
+
+    def test_cf480_name_too_long(self):
+        ctx = _lint({"lists": [{"name": "a" * 51, "kind": "ip", "items": []}]})
+        assert_lint(ctx, "CF480")
+
+    def test_cf480_valid_name_ok(self):
+        ctx = _lint({"lists": [{"name": "doctena_legacy_301", "kind": "ip", "items": []}]})
+        assert_no_lint(ctx, "CF480")
+
     def test_cf471_missing_kind(self):
         ctx = _lint({"lists": [{"name": "mylist", "items": []}]})
         assert_lint(ctx, "CF471")
@@ -193,6 +205,48 @@ class TestRedirectListItems:
             }
         )
         assert_lint(ctx, "CF475")
+
+    def test_cf479_query_string_in_source(self):
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "redirects",
+                        "kind": "redirect",
+                        "items": [
+                            {
+                                "redirect": {
+                                    "source_url": "example.com/old?ref=email",
+                                    "target_url": "https://example.com/new",
+                                }
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
+        assert_lint(ctx, "CF479")
+
+    def test_cf479_clean_source_does_not_fire(self):
+        ctx = _lint(
+            {
+                "lists": [
+                    {
+                        "name": "redirects",
+                        "kind": "redirect",
+                        "items": [
+                            {
+                                "redirect": {
+                                    "source_url": "example.com/old",
+                                    "target_url": "https://example.com/new?utm=x",
+                                }
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
+        assert_no_lint(ctx, "CF479")
 
 
 class TestCF476ListItemCount:

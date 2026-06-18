@@ -1321,6 +1321,104 @@ class TestL005HeaderRemoveSpuriousValue:
         assert "CF446" not in _ids(ctx)
 
 
+class TestCF447RestrictedHeaders:
+    def _rule(self, header, op, value="x"):
+        hv = {"operation": op}
+        if op != "remove":
+            hv["value"] = value
+        return {
+            "ref": "t",
+            "expression": "true",
+            "action": "rewrite",
+            "action_parameters": {"headers": {header: hv}},
+        }
+
+    def test_cf447_cf_prefix_set_rejected(self):
+        ctx = _lint_rule(self._rule("cf-custom", "set"), "request_header_rules")
+        assert "CF447" in _ids(ctx)
+
+    def test_cf447_x_cf_prefix_remove_rejected(self):
+        ctx = _lint_rule(self._rule("x-cf-foo", "remove"), "request_header_rules")
+        assert "CF447" in _ids(ctx)
+
+    def test_cf447_cf_connecting_ip_remove_ok(self):
+        ctx = _lint_rule(self._rule("cf-connecting-ip", "remove"), "request_header_rules")
+        assert "CF447" not in _ids(ctx)
+
+    def test_cf447_cf_connecting_ip_set_rejected(self):
+        ctx = _lint_rule(self._rule("cf-connecting-ip", "set"), "request_header_rules")
+        assert "CF447" in _ids(ctx)
+
+    def test_cf447_cookie_set_rejected(self):
+        ctx = _lint_rule(self._rule("cookie", "set"), "request_header_rules")
+        assert "CF447" in _ids(ctx)
+
+    def test_cf447_cookie_remove_ok(self):
+        ctx = _lint_rule(self._rule("cookie", "remove"), "request_header_rules")
+        assert "CF447" not in _ids(ctx)
+
+    def test_cf447_xff_set_rejected(self):
+        ctx = _lint_rule(self._rule("X-Forwarded-For", "set"), "request_header_rules")
+        assert "CF447" in _ids(ctx)
+
+    def test_cf447_xff_remove_ok(self):
+        ctx = _lint_rule(self._rule("X-Forwarded-For", "remove"), "request_header_rules")
+        assert "CF447" not in _ids(ctx)
+
+    def test_cf447_custom_x_true_client_ip_ok(self):
+        # X-True-Client-IP != the reserved true-client-ip; must not false-fire.
+        ctx = _lint_rule(self._rule("X-True-Client-IP", "set"), "request_header_rules")
+        assert "CF447" not in _ids(ctx)
+
+    def test_cf447_response_phase_unaffected(self):
+        # The cf-*/cookie/IP restrictions are request-side only.
+        ctx = _lint_rule(self._rule("cf-custom", "set"), "response_header_rules")
+        assert "CF447" not in _ids(ctx)
+
+
+class TestNonStringHeaderName:
+    def test_non_string_header_key_does_not_crash(self):
+        # A non-string YAML header key (e.g. 123:) must produce CF440, not crash.
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {"headers": {123: {"operation": "set", "value": "x"}}},
+            },
+            "request_header_rules",
+        )
+        assert "CF440" in _ids(ctx)
+
+
+class TestCF448HeaderNameCharset:
+    def test_cf448_space_in_name_rejected(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {"headers": {"X Spaced": {"operation": "set", "value": "1"}}},
+            },
+            "response_header_rules",
+        )
+        assert "CF448" in _ids(ctx)
+
+    def test_cf448_valid_name_ok(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "rewrite",
+                "action_parameters": {
+                    "headers": {"X-My_Header-1": {"operation": "set", "value": "1"}}
+                },
+            },
+            "response_header_rules",
+        )
+        assert "CF448" not in _ids(ctx)
+
+
 class TestL006TransformExpressionLinting:
     @_needs_wirefilter
     def test_cf444_invalid_uri_path_expression(self):
@@ -1688,6 +1786,111 @@ class TestC014RateLimitCharacteristics:
             "rate_limiting_rules",
         )
         assert "CF213" not in _ids(ctx)
+
+    def test_cf225_incompatible_characteristics(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 100,
+                    "characteristics": ["ip.src", "cf.unique_visitor_id"],
+                },
+            },
+            "rate_limiting_rules",
+        )
+        assert "CF225" in _ids(ctx)
+
+    def test_cf225_either_alone_ok(self):
+        for char in ("ip.src", "cf.unique_visitor_id"):
+            ctx = _lint_rule(
+                {
+                    "ref": "t",
+                    "expression": "true",
+                    "action": "block",
+                    "ratelimit": {
+                        "period": 60,
+                        "requests_per_period": 100,
+                        "characteristics": [char, "cf.colo.id"],
+                    },
+                },
+                "rate_limiting_rules",
+            )
+            assert "CF225" not in _ids(ctx)
+
+    def test_cf409_challenge_with_duration_on_business(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "managed_challenge",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 20,
+                    "characteristics": ["ip.src"],
+                    "mitigation_timeout": 600,
+                },
+            },
+            "rate_limiting_rules",
+            plan_tier="business",
+        )
+        assert "CF409" in _ids(ctx)
+
+    def test_cf409_zero_timeout_ok_on_business(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "js_challenge",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 20,
+                    "characteristics": ["ip.src"],
+                    "mitigation_timeout": 0,
+                },
+            },
+            "rate_limiting_rules",
+            plan_tier="business",
+        )
+        assert "CF409" not in _ids(ctx)
+
+    def test_cf409_enterprise_may_set_duration(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "managed_challenge",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 20,
+                    "characteristics": ["ip.src"],
+                    "mitigation_timeout": 60,
+                },
+            },
+            "rate_limiting_rules",
+            plan_tier="enterprise",
+        )
+        assert "CF409" not in _ids(ctx)
+
+    def test_cf409_non_challenge_action_unaffected(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 20,
+                    "characteristics": ["ip.src"],
+                    "mitigation_timeout": 60,
+                },
+            },
+            "rate_limiting_rules",
+            plan_tier="business",
+        )
+        assert "CF409" not in _ids(ctx)
 
     def test_cf213_header_reference_ok(self):
         ctx = _lint_rule(

@@ -166,3 +166,42 @@ lists:
 ```
 
 Fix: Remove the narrower entry (it's already covered by the broader one) or consolidate into a single range.
+
+### CF479 — Redirect source_url contains a query string
+
+| Severity | Category |
+|----------|----------|
+| ERROR | list |
+
+Triggers when a redirect list item's `source_url` (the matching URL) contains a query string. Cloudflare rejects such a Bulk Redirect at deploy time with API error 10053 (`matching url cannot have a query string`). Query-string matching is controlled by the separate `preserve_query_string` parameter, not by putting `?...` in the source URL.
+
+```yaml
+lists:
+  - name: doctena_legacy_301
+    kind: redirect
+    items:
+      - redirect:
+          source_url: "example.com/old?ref=email"   # rejected — query string in matching URL
+          target_url: "https://example.com/new"
+          status_code: 301
+```
+
+Fix: Drop the query string from `source_url` (match on the path only) and, if you need query behaviour preserved on the redirect, set `preserve_query_string: true`.
+
+### CF480 — Invalid list name
+
+| Severity | Category |
+|----------|----------|
+| ERROR | list |
+
+Triggers when a list `name` violates Cloudflare's naming rules: it must match `^[a-z0-9_]+$` (only lowercase letters, digits, and underscore) and be at most 50 characters. Cloudflare rejects list creation otherwise.
+
+```yaml
+lists:
+  - name: My-Block-List        # rejected — uppercase and hyphen
+    kind: ip
+    items:
+      - ip: "203.0.113.0/24"
+```
+
+Fix: Use a name like `my_block_list` — lowercase, digits, and underscore only, ≤50 characters.
