@@ -118,7 +118,18 @@ class TestPluginRegistration:
             sdk_cls = sdk_map.get(action_name)
             if sdk_cls is None:
                 continue
-            sdk_keys = set(sdk_cls.model_fields.keys())
+
+            # Handle Union types (e.g. serve_error has multiple variants).
+            # Collect all fields from all union members.
+
+            sdk_keys = set()
+            if hasattr(sdk_cls, "model_fields"):
+                sdk_keys = set(sdk_cls.model_fields.keys())
+            elif hasattr(sdk_cls, "__args__"):  # Union type
+                for union_member in sdk_cls.__args__:
+                    if hasattr(union_member, "model_fields"):
+                        sdk_keys.update(union_member.model_fields.keys())
+
             linter_keys = schema.allowed_parameter_keys
 
             in_linter_not_sdk = linter_keys - sdk_keys

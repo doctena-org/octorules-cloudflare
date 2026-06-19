@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-06-19
+
+### Changed
+- Require Cloudflare SDK 5.x (`cloudflare>=5.4,<6.0`); support for SDK 4.x is
+  dropped. The linter schema is synced to the 5.x `action_parameters` models,
+  registering new `set_cache_settings` parameters (`shared_dictionary`,
+  `strip_etags`, `strip_last_modified`, `strip_set_cookie`), `set_config`
+  parameters (`content_converter`, `disable_pay_per_crawl`,
+  `redirects_for_ai_training`, `request_body_buffering`,
+  `response_body_buffering`), `skip` parameter (`phase`), and `serve_error`
+  parameter (`asset_name`).
+
 ## [0.10.0] - 2026-06-18
 
 ### Added
