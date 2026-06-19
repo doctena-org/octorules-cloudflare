@@ -124,6 +124,43 @@ class TestActionValidity:
         )
         assert "CF203" not in _ids(ctx)
 
+    @pytest.mark.parametrize(
+        ("action", "phase", "params"),
+        [
+            (
+                "set_cache_settings",
+                "cache_rules",
+                {
+                    "shared_dictionary": {},
+                    "strip_etags": True,
+                    "strip_last_modified": True,
+                    "strip_set_cookie": True,
+                },
+            ),
+            (
+                "set_config",
+                "config_rules",
+                {
+                    "content_converter": True,
+                    "disable_pay_per_crawl": True,
+                    "redirects_for_ai_training": True,
+                    "request_body_buffering": "standard",
+                    "response_body_buffering": "standard",
+                },
+            ),
+            ("skip", "waf_custom_rules", {"phase": "current"}),
+            ("serve_error", "custom_error_rules", {"asset_name": "custom_error_page"}),
+        ],
+    )
+    def test_cf203_accepts_sdk_5x_action_params(self, action, phase, params):
+        """action_parameters added for the Cloudflare SDK 5.x bump are recognized
+        by the linter and do not trip CF203 ("Unknown action_parameters key")."""
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "true", "action": action, "action_parameters": params},
+            phase,
+        )
+        assert "CF203" not in _ids(ctx)
+
 
 class TestCF223SkipInAccountScope:
     """Skip action in account-scoped waf_custom_rules is rejected by CF API

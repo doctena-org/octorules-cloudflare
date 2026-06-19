@@ -43,6 +43,10 @@ SET_CACHE_SETTINGS_SCHEMA = ActionSchema(
             "origin_cache_control",
             "additional_cacheable_ports",
             "read_timeout",
+            "shared_dictionary",
+            "strip_etags",
+            "strip_last_modified",
+            "strip_set_cookie",
         }
     ),
 )
@@ -68,6 +72,11 @@ SET_CONFIG_SCHEMA = ActionSchema(
             "server_side_excludes",
             "ssl",
             "sxg",
+            "content_converter",
+            "disable_pay_per_crawl",
+            "redirects_for_ai_training",
+            "request_body_buffering",
+            "response_body_buffering",
         }
     ),
 )
@@ -95,6 +104,7 @@ SERVE_ERROR_SCHEMA = ActionSchema(
             "content",
             "content_type",
             "status_code",
+            "asset_name",
         }
     ),
 )
@@ -129,6 +139,7 @@ SKIP_SCHEMA = ActionSchema(
             "rules",
             "phases",
             "products",
+            "phase",
         }
     ),
 )
