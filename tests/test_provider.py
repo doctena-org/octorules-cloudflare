@@ -77,6 +77,31 @@ class TestRuleToDict:
         result = _to_dict(rule)
         assert result == {"ref": "r1", "expression": "true"}
 
+    def test_model_dump_uses_api_aliases(self):
+        """_to_dict must emit Cloudflare API field names (by_alias=True), not the
+        SDK's Python-safe aliases, so rules with reserved-word keys round-trip to
+        the same shape as the desired config instead of churning. Regression:
+        set_cache_settings status_code_ttl showed a perpetual no-op MODIFY because
+        model_dump() emitted 'from_' while the config (and CF API) use 'from'.
+        """
+        from cloudflare.types.rulesets.set_cache_settings_rule import ActionParameters
+
+        ap = ActionParameters.model_validate(
+            {
+                "cache": True,
+                "edge_ttl": {
+                    "mode": "override_origin",
+                    "default": 86400,
+                    "status_code_ttl": [
+                        {"status_code_range": {"from": 400, "to": 599}, "value": -1}
+                    ],
+                },
+            }
+        )
+        rng = _to_dict(ap)["edge_ttl"]["status_code_ttl"][0]["status_code_range"]
+        assert rng == {"from": 400, "to": 599}
+        assert "from_" not in rng
+
 
 class TestCloudflareProvider:
     def test_get_phase_rules(self, mock_cf_client):

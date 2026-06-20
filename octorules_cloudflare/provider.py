@@ -993,12 +993,22 @@ def _to_dict(obj: object) -> dict:
     The SDK returns Pydantic-like model objects.  This handles all
     variants: ``model_dump``, ``to_dict``, and ``dict()`` fallback.
 
+    ``by_alias=True`` is required: the SDK aliases Cloudflare API field
+    names that are Python-illegal to attribute-safe forms (``from`` ->
+    ``from_``, ``max-age`` -> ``max_age``, ``no-store`` -> ``no_store``,
+    ``list`` -> ``rule_list``, ...).  Dumping without aliases yields the
+    Python names, which never match the API names used in the desired
+    config, so affected rules (e.g. ``set_cache_settings`` with a
+    ``status_code_ttl`` ``status_code_range.from``) would show a perpetual
+    no-op MODIFY in every plan.  Dumping by alias keeps the read path on
+    the canonical API names.
+
     Raises ``ProviderError`` if none of the methods succeed.
     """
     if isinstance(obj, dict):
         return obj
     if hasattr(obj, "model_dump"):
-        return obj.model_dump(exclude_none=True)
+        return obj.model_dump(by_alias=True, exclude_none=True)
     if hasattr(obj, "to_dict"):
         return obj.to_dict()
     try:

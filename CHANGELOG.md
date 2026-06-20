@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] - 2026-06-20
+
+### Fixed
+- Rules using SDK-aliased `action_parameters` keys — notably
+  `set_cache_settings` with `status_code_ttl` — no longer show a perpetual
+  no-op `MODIFY` in `plan`/`sync`.
+
 ## [0.11.0] - 2026-06-19
 
 ### Changed
