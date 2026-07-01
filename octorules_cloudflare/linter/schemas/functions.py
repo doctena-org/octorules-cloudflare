@@ -3,8 +3,8 @@
 Defines all known functions, their argument types, return types,
 and phase restrictions.
 
-The registry is populated at import time from wirefilter + overlay.toml if
-wirefilter is installed, or from schemas.json (frozen fallback) otherwise.
+The registry is populated at import time from octorules-wirefilter (a required
+dependency) merged with overlay.toml metadata.
 
 Source: https://developers.cloudflare.com/ruleset-engine/rules-language/functions/
 """

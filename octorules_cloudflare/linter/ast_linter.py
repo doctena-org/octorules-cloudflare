@@ -296,11 +296,10 @@ def lint_expressions(
     ref = ref_override or rule.get("ref", "")
     phase_name = phase.friendly_name
 
-    # Parse the filter expression using the default scheme — filter
-    # expressions always use http.request.uri.path as a field, even in
-    # transform phases.  The transform scheme (where it's a function) is
-    # only needed for action_parameters expressions.
-    info = parse_expression(expr)
+    # Parse the filter expression with the phase's field scheme.  HTTP phases
+    # use the default scheme (http.request.uri.path is a field even in
+    # transform phases); account-level Magic Transit phases use the L4 scheme.
+    info = parse_expression(expr, phase=phase_name)
 
     # CF001: Surface wirefilter parse errors (unknown fields, bad syntax, etc.)
     if info.parse_error:

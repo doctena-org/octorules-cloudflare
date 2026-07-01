@@ -3,8 +3,6 @@
 from unittest.mock import patch
 
 from octorules_cloudflare.linter.schemas._registry import (
-    _build_from_wirefilter,
-    _load_fallback,
     _load_overlay,
     load_managed_list_kinds,
     load_managed_lists,
@@ -56,46 +54,11 @@ class TestLoadSchema:
             assert "name" in func, f"Function missing 'name': {func}"
 
 
-class TestLoadFallback:
-    def test_returns_valid_schema(self):
-        result = _load_fallback()
-        assert isinstance(result, dict)
-        assert "fields" in result
-        assert "functions" in result
-        assert len(result["fields"]) > 0
-        assert len(result["functions"]) > 0
-
-
 class TestErrorPaths:
-    def test_load_schema_falls_back_when_wirefilter_unavailable(self):
-        """load_schema() uses schemas.json when wirefilter import fails."""
-        _target = "octorules_cloudflare.linter.schemas._registry._build_from_wirefilter"
-        with patch(_target, return_value=None):
-            result = load_schema()
-        assert "fields" in result
-        assert "functions" in result
-
-    def test_build_from_wirefilter_returns_none_without_wirefilter(self):
-        """_build_from_wirefilter() returns None when octorules_wirefilter is missing."""
-        with patch.dict("sys.modules", {"octorules_wirefilter": None}):
-            result = _build_from_wirefilter()
-        assert result is None
-
     def test_load_overlay_returns_dict(self):
         result = _load_overlay()
         assert isinstance(result, dict)
         assert "fields" in result or "managed_lists" in result
-
-    def test_load_fallback_matches_wirefilter_fields(self):
-        """Fallback schemas.json should contain the same fields as wirefilter."""
-        fallback = _load_fallback()
-        wirefilter = load_schema()
-        fallback_names = {f["name"] for f in fallback["fields"]}
-        wirefilter_names = {f["name"] for f in wirefilter["fields"]}
-        # Fallback may lag behind wirefilter, but should not contain unknown fields
-        assert fallback_names <= wirefilter_names, (
-            f"Fallback has fields not in wirefilter: {fallback_names - wirefilter_names}"
-        )
 
     def test_load_managed_list_kinds_empty_overlay(self):
         """Returns empty dict when overlay has no managed_lists section."""

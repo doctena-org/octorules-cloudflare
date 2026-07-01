@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-07-01
+
+### Added
+- Magic Transit / Layer-4 phases are now linted: packet-field expressions
+  (`ip.proto`, `tcp.*`, `udp.*`) validate against the wirefilter Layer-4 scheme
+  instead of raising spurious unknown-field and parse errors.
+
+### Changed
+- `octorules-wirefilter` is now a required dependency (previously the optional
+  `[wirefilter]` extra). The bundled `schemas.json` field snapshot is removed —
+  the field and function registry is always built from wirefilter at import.
+  `pip install octorules-cloudflare` now installs wirefilter; the `[wirefilter]`
+  extra is kept as a no-op for compatibility.
+
 ## [0.11.1] - 2026-06-20
 
 ### Fixed

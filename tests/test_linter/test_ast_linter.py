@@ -1475,7 +1475,7 @@ class TestA002DepthExceeded:
         from octorules_cloudflare.linter.expression_bridge import ExpressionInfo
 
         fake_info = ExpressionInfo(raw="deeply nested", depth_exceeded=True)
-        monkeypatch.setattr(ast_linter, "parse_expression", lambda expr: fake_info)
+        monkeypatch.setattr(ast_linter, "parse_expression", lambda expr, phase=None: fake_info)
         ctx = _lint("deeply nested")
         assert "CF002" in _ids(ctx)
 
@@ -1484,7 +1484,7 @@ class TestA002DepthExceeded:
         from octorules_cloudflare.linter.expression_bridge import ExpressionInfo
 
         fake_info = ExpressionInfo(raw="simple", depth_exceeded=False)
-        monkeypatch.setattr(ast_linter, "parse_expression", lambda expr: fake_info)
+        monkeypatch.setattr(ast_linter, "parse_expression", lambda expr, phase=None: fake_info)
         ctx = _lint("simple")
         assert "CF002" not in _ids(ctx)
 

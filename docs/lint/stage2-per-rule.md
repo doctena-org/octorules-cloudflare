@@ -12,7 +12,7 @@ Runs four sub-checks for each rule in each phase: action validation, expression 
 
 Triggers when the wirefilter FFI parser rejects the rule's expression. Catches unknown fields, invalid syntax, type mismatches, unbalanced parentheses, and other errors that Cloudflare would reject.
 
-Requires the optional `octorules[wirefilter]` package. Standalone `true`/`false` expressions are handled before wirefilter and will not trigger this rule. Value expressions in `action_parameters` (e.g. `regex_replace(...)`) are also excluded since wirefilter only parses boolean filter expressions.
+Standalone `true`/`false` expressions are handled before wirefilter and will not trigger this rule. Value expressions in `action_parameters` (e.g. `regex_replace(...)`) are also excluded since wirefilter only parses boolean filter expressions.
 
 ```yaml
 waf_custom_rules:
@@ -29,8 +29,6 @@ Fix: Correct the expression syntax.
 | WARNING | parse |
 
 Triggers when the wirefilter parser reports that expression nesting depth exceeds 100 levels. Extremely deeply nested expressions may cause performance issues at the Cloudflare edge.
-
-Requires the optional `octorules[wirefilter]` package.
 
 Fix: Simplify the expression to reduce nesting depth. Break complex logic into multiple rules if needed.
 

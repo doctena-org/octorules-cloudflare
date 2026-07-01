@@ -3,8 +3,8 @@
 Each field has a name, type, and set of phases where it's available.
 Used for expression analysis: type checking, phase restrictions, value validation.
 
-The registry is populated at import time from wirefilter + overlay.toml if
-wirefilter is installed, or from schemas.json (frozen fallback) otherwise.
+The registry is populated at import time from octorules-wirefilter (a required
+dependency) merged with overlay.toml metadata.
 """
 
 from dataclasses import dataclass
@@ -66,6 +66,8 @@ def _load_fields() -> None:
             kwargs["requires_plan"] = entry["requires_plan"]
         if entry.get("is_response"):
             kwargs["is_response"] = True
+        if entry.get("phases"):
+            kwargs["phases"] = frozenset(entry["phases"])
         _f(entry["name"], _TYPE_MAP[entry["type"]], **kwargs)
 
 

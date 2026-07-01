@@ -9,8 +9,50 @@ from octorules_cloudflare.linter.expression_bridge import (
     ExpressionInfo,
     _parse_with_regex,
     _parse_with_wirefilter,
+    _scheme_for_phase,
     parse_expression,
 )
+
+
+class TestMagicFirewallScheme:
+    """Per-phase scheme selection: Magic Transit (L4) phases validate against
+    the packet-level scheme, not the HTTP scheme (and vice-versa)."""
+
+    def test_scheme_for_phase_maps_l4_phases(self):
+        for p in [
+            "network_ddos_rules",
+            "network_firewall_rules",
+            "network_firewall_managed",
+            "network_firewall_ratelimit",
+            "network_firewall_ids",
+        ]:
+            assert _scheme_for_phase(p) == "magic_firewall"
+
+    def test_scheme_for_phase_defaults_for_http(self):
+        assert _scheme_for_phase("waf_custom_rules") is None
+        assert _scheme_for_phase(None) is None
+
+    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="needs wirefilter FFI")
+    def test_l4_expression_valid_on_magic_phase(self):
+        info = parse_expression(
+            'ip.proto eq "tcp" && tcp.dstport in {22 3389}',
+            phase="network_firewall_rules",
+        )
+        assert info.parse_error == ""
+        assert "ip.proto" in info.fields_used
+        assert "tcp.dstport" in info.fields_used
+
+    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="needs wirefilter FFI")
+    def test_l4_field_rejected_on_http_phase(self):
+        # ip.proto is not in the HTTP scheme — must still be flagged there.
+        info = parse_expression('ip.proto eq "tcp"', phase="waf_custom_rules")
+        assert info.parse_error
+
+    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="needs wirefilter FFI")
+    def test_http_field_rejected_on_magic_phase(self):
+        # http.host is not in the L4 scheme.
+        info = parse_expression('http.host eq "x"', phase="network_firewall_rules")
+        assert info.parse_error
 
 
 class TestRegexParser:
@@ -260,7 +302,7 @@ class TestWirefilterFFICrashFallback:
     def test_ffi_crash_falls_back_to_regex(self, monkeypatch):
         """When the FFI call raises, fall back to regex and preserve error."""
 
-        def _boom(expr, phase=None):
+        def _boom(expr, scheme=None):
             raise RuntimeError("segfault in FFI")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _boom)
@@ -275,7 +317,7 @@ class TestWirefilterFFICrashFallback:
     def test_ffi_crash_logs_warning(self, monkeypatch, caplog):
         """FFI crash should produce a warning log with exc_info."""
 
-        def _boom(expr, phase=None):
+        def _boom(expr, scheme=None):
             raise ValueError("bad input")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _boom)
@@ -289,7 +331,7 @@ class TestWirefilterFFICrashFallback:
     def test_wirefilter_error_dict_falls_back_to_regex(self, monkeypatch):
         """When wirefilter returns {error: ...}, fall back to regex with parse_error."""
 
-        def _return_error(expr, phase=None):
+        def _return_error(expr, scheme=None):
             return {"error": "unknown field `bogus`"}
 
         _attr = "octorules_cloudflare.linter.expression_bridge._wf_parse"
@@ -317,7 +359,7 @@ class TestParseErrorType:
         assert info.parse_error == ""
 
     def test_wirefilter_parse_error_type(self, monkeypatch):
-        def _return_error(expr, phase=None):
+        def _return_error(expr, scheme=None):
             return {"error": "unknown field `bogus`"}
 
         _attr = "octorules_cloudflare.linter.expression_bridge._wf_parse"
@@ -326,7 +368,7 @@ class TestParseErrorType:
         assert info.parse_error_type == "wirefilter_parse"
 
     def test_wirefilter_crash_type(self, monkeypatch):
-        def _boom(expr, phase=None):
+        def _boom(expr, scheme=None):
             raise RuntimeError("boom")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _boom)
@@ -413,7 +455,7 @@ class TestWirefilterCrashFallbackViaPublicAPI:
             "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE", True
         )
 
-        def _crash(expr, phase=None):
+        def _crash(expr, scheme=None):
             raise RuntimeError("simulated FFI segfault")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _crash)
@@ -432,7 +474,7 @@ class TestWirefilterCrashFallbackViaPublicAPI:
             "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE", True
         )
 
-        def _crash(expr, phase=None):
+        def _crash(expr, scheme=None):
             raise RuntimeError("simulated FFI segfault")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _crash)

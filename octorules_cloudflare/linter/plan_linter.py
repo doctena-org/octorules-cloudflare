@@ -112,7 +112,7 @@ def lint_plan_tier(rules_data: dict[str, Any], ctx: LintContext) -> None:
                 expr = rule.get("expression", "")
                 if not isinstance(expr, str):
                     continue
-                info = parse_expression(expr)
+                info = parse_expression(expr, phase=phase_name)
                 if info.has_regex:
                     ref = rule.get("ref", "")
                     ctx.add(

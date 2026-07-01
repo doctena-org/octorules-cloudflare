@@ -11,6 +11,8 @@ import logging
 import re
 from dataclasses import dataclass, field, replace
 
+from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
+
 log = logging.getLogger(__name__)
 
 # Try to import the optional wirefilter FFI bindings
@@ -137,10 +139,12 @@ _IPV6_CANDIDATE_PATTERN = re.compile(
 _SET_LITERAL_PATTERN = re.compile(r"\{([^}]*)\}")
 
 # Cache for parsed expressions — avoids repeated FFI calls across linter passes.
-# Keyed on (normalized_expr, expect_parse_error, wirefilter_available).
+# Keyed on (normalized_expr, expect_parse_error, wirefilter_available, scheme) —
+# scheme is part of the key because the same expression can be valid under one
+# scheme and rejected under another.
 # Bounded to prevent unbounded growth in long-running processes.
 _PARSE_CACHE_MAX_SIZE = 2048
-_parse_cache: dict[tuple[str, bool, bool], ExpressionInfo] = {}
+_parse_cache: dict[tuple[str, bool, bool, str | None], ExpressionInfo] = {}
 
 
 def _clear_parse_cache() -> None:
@@ -149,6 +153,18 @@ def _clear_parse_cache() -> None:
     Intended for tests that monkeypatch wirefilter internals.
     """
     _parse_cache.clear()
+
+
+def _scheme_for_phase(phase: str | None) -> str | None:
+    """Return the wirefilter scheme selector for *phase* (None = default HTTP).
+
+    Magic Transit / Layer-4 phases use the packet-level ``magic_firewall``
+    scheme; every other phase uses the default HTTP scheme.  octorules-cloudflare
+    owns this mapping — the phase set is defined once in the schema registry
+    (:data:`...schemas._registry.MAGIC_FIREWALL_PHASES`) and shared with the
+    field-metadata layer; wirefilter just exposes the named schemes.
+    """
+    return "magic_firewall" if phase in MAGIC_FIREWALL_PHASES else None
 
 
 def parse_expression(
@@ -163,13 +179,11 @@ def parse_expression(
     ``expect_parse_error`` mode.
 
     Uses wirefilter FFI when available, falls back to regex analysis.
-    The *phase* parameter is accepted for API compatibility but currently
-    unused — all expressions are parsed against the default wirefilter
-    scheme where ``http.request.uri.path`` is a field.  Cloudflare's
-    transform-phase function-call syntax (where ``http.request.uri.path``
-    is callable) is not used in practice and would require a scheme that
-    registers the name as both field and function, which wirefilter
-    doesn't support.
+    The *phase* parameter selects the wirefilter field scheme: the
+    account-level Magic Transit / Layer-4 phases (see
+    :data:`_MAGIC_FIREWALL_PHASES`) are validated against the packet-level
+    ``magic_firewall`` scheme; every other phase uses the default HTTP
+    scheme (where ``http.request.uri.path`` is a field).
 
     Set *expect_parse_error* when the expression is known to be a value
     expression (e.g. ``regex_replace(...)`` in action_parameters) that
@@ -179,8 +193,9 @@ def parse_expression(
     from octorules.expression import normalize_expression
 
     expr = normalize_expression(expr)
+    scheme = _scheme_for_phase(phase)
 
-    cache_key = (expr, expect_parse_error, WIREFILTER_AVAILABLE)
+    cache_key = (expr, expect_parse_error, WIREFILTER_AVAILABLE, scheme)
     cached = _parse_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -190,7 +205,7 @@ def parse_expression(
     if expr.strip("() ").lower() in ("true", "false"):
         result = ExpressionInfo(raw=expr)
     elif WIREFILTER_AVAILABLE:
-        result = _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error)
+        result = _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error, scheme=scheme)
     else:
         result = replace(_parse_with_regex(expr), parse_error_type="regex_fallback")
 
@@ -200,8 +215,10 @@ def parse_expression(
     return result
 
 
-def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> ExpressionInfo:
-    """Parse using the wirefilter FFI bindings (default scheme).
+def _parse_with_wirefilter(
+    expr: str, *, expect_parse_error: bool = False, scheme: str | None = None
+) -> ExpressionInfo:
+    """Parse using the wirefilter FFI bindings against the selected scheme.
 
     On parse failure, falls back to regex extraction so the linter's
     semantic rules (CF307, CF300, etc.) still fire on the expression.
@@ -218,7 +235,7 @@ def _parse_with_wirefilter(expr: str, *, expect_parse_error: bool = False) -> Ex
     records the authoritative wirefilter rejection.
     """
     try:
-        result = _wf_parse(expr)
+        result = _wf_parse(expr, scheme=scheme)
         if isinstance(result, dict):
             if "error" in result:
                 # Wirefilter rejected the expression — fall back to regex

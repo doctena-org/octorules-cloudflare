@@ -52,7 +52,7 @@ def lint_phase_restrictions(
     ref = ref_override or rule.get("ref", "")
     phase_name = phase.friendly_name
 
-    info = parse_expression(expr)
+    info = parse_expression(expr, phase=phase_name)
 
     for field_name in info.fields_used:
         # CF019: Response field in request-only phase

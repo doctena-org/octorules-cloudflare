@@ -65,6 +65,15 @@ forwarded to the provider):
 | `safety.update_threshold` | `30.0` | Max % of rules that can be updated |
 | `safety.min_existing` | `3` | Min rules before thresholds apply |
 
+## Examples
+
+The [`examples/`](examples/) directory contains a working single-provider
+`config.yaml` plus rules files: `rules/example.com.yaml` (zone-level) and
+`rules/example-account.yaml` (account-level, including the five Magic Transit /
+Layer-4 phases, whose packet-level expressions are validated against
+octorules-wirefilter's L4 scheme). Together they exercise every supported phase
+and key. Copy them as a starting point.
+
 ## Supported features
 
 | Feature | Status |
@@ -276,13 +285,13 @@ cd octorules-cloudflare
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
+pre-commit install
 ```
 
-The pre-commit hook auto-regenerates `schemas.json` (the frozen schema fallback
-for users without wirefilter) whenever `overlay.toml` or `pyproject.toml`
-changes. See [docs/schemas.md](docs/schemas.md) for the full schema
-architecture.
+The pre-commit hook runs ruff (check + format) and yamllint. See
+[docs/schemas.md](docs/schemas.md) for the schema architecture —
+octorules-wirefilter provides the field/function data and is a required
+dependency (there is no frozen fallback).
 
 ## License
 
