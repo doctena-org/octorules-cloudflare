@@ -32,7 +32,7 @@ def _fn(name: str, **kwargs: object) -> FunctionDef:
     return fd
 
 
-# --- Load functions from wirefilter + overlay (or frozen fallback) --- #
+# --- Load functions from wirefilter + overlay --- #
 def _load_functions() -> None:
     from octorules_cloudflare.linter.schemas._registry import load_schema
 

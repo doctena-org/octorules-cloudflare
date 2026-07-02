@@ -115,9 +115,7 @@ For the full phase reference — execution order diagram, valid actions per phas
 
 ## Expression syntax
 
-Rule expressions use [Cloudflare's ruleset expression language](https://developers.cloudflare.com/ruleset-engine/rules-language/expressions/). When [octorules-wirefilter](https://github.com/doctena-org/octorules-wirefilter) is installed (included automatically with `octorules-cloudflare`), expressions are parsed by Cloudflare's actual wirefilter engine, providing authoritative type checking, field validation, and syntax verification. Without it, a regex-based fallback parser extracts fields, functions, operators, and literals but cannot perform type checking.
-
-The linter logs which parser is active at startup (`Expression parser: wirefilter` or `Expression parser: regex fallback`).
+Rule expressions use [Cloudflare's ruleset expression language](https://developers.cloudflare.com/ruleset-engine/rules-language/expressions/). Expressions are parsed by Cloudflare's actual wirefilter engine via [octorules-wirefilter](https://github.com/doctena-org/octorules-wirefilter) — a required dependency, installed automatically with `octorules-cloudflare` — providing authoritative type checking, field validation, and syntax verification.
 
 > **Rule-level metadata:** All Cloudflare rules support the `octorules:` key for per-rule metadata — `ignored: true` to skip a rule during plan/sync, and `included`/`excluded` to restrict rules to specific providers. See [octorules core docs](https://github.com/doctena-org/octorules#rule-level-metadata) for syntax and examples.
 
@@ -264,15 +262,15 @@ Each policy entry requires:
 
 ## Linting
 
-155 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+161 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|
 | CF001–CF027 | Structure, parse & phase | 26 |
 | CF100–CF105 | Cross-rule ordering | 6 |
-| CF200–CF224 | Action validation | 25 |
+| CF200–CF225 | Action validation | 26 |
 | CF300–CF309 | Expression, function & type | 10 |
-| CF400–CF478 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 45 |
+| CF400–CF480 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 50 |
 | CF500–CF550 | Plan limits, style & value constraints | 43 |
 
 See [docs/lint/README.md](docs/lint/README.md) for the full rule reference.

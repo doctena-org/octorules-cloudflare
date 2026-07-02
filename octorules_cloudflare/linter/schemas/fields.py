@@ -55,7 +55,7 @@ def _f(name: str, ftype: FieldType, **kwargs: object) -> FieldDef:
     return fd
 
 
-# --- Load fields from wirefilter + overlay (or frozen fallback) --- #
+# --- Load fields from wirefilter + overlay --- #
 def _load_fields() -> None:
     from octorules_cloudflare.linter.schemas._registry import load_schema
 

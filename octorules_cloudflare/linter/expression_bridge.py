@@ -1,9 +1,10 @@
-"""Expression bridge — wirefilter FFI integration with graceful fallback.
+"""Expression bridge — wirefilter FFI integration.
 
-When the optional octorules-wirefilter package is installed, this module
-delegates expression parsing to the actual wirefilter engine (same parser
-Cloudflare uses). When not installed, falls back to a best-effort regex
-parser that extracts fields, operators, and values from expressions.
+Expression parsing is delegated to the actual wirefilter engine (the same
+parser Cloudflare uses) via octorules-wirefilter, a required dependency.
+When wirefilter rejects an expression or the FFI call crashes, a
+best-effort regex parser extracts fields, operators, and values so the
+linter's semantic rules still have material to inspect.
 """
 
 import ipaddress
@@ -12,16 +13,9 @@ import re
 from dataclasses import dataclass, field, replace
 
 from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
+from octorules_wirefilter import parse_expression as _wf_parse
 
 log = logging.getLogger(__name__)
-
-# Try to import the optional wirefilter FFI bindings
-try:
-    from octorules_wirefilter import parse_expression as _wf_parse
-
-    WIREFILTER_AVAILABLE = True
-except ImportError:
-    WIREFILTER_AVAILABLE = False
 
 
 @dataclass(frozen=True)
@@ -36,10 +30,11 @@ class ExpressionInfo:
     regex_literals: list[str] = field(default_factory=list)
     regex_field_pairs: list[tuple[str, str]] = field(default_factory=list)
     """``(field, regex)`` pairs for ``matches`` operators against plain
-    field LHS. Empty when wirefilter is unavailable (regex fallback can't
-    reliably infer the LHS field for a regex literal). Lints that need
-    field context (e.g. flagging unescaped ``.`` in a hostname regex)
-    should iterate this and skip when empty."""
+    field LHS. Empty when the result came from regex extraction (the
+    parse-error / FFI-crash fallback can't reliably infer the LHS field
+    for a regex literal). Lints that need field context (e.g. flagging
+    unescaped ``.`` in a hostname regex) should iterate this and skip
+    when empty."""
     ip_literals: list[str] = field(default_factory=list)
     int_literals: list[int] = field(default_factory=list)
     has_regex: bool = False
@@ -51,22 +46,21 @@ class ExpressionInfo:
     parse_error_type: str = ""
     """Classifies the parse result source:
 
-    - ``""`` — success (wirefilter or regex, no error).
+    - ``""`` — success (no error).
     - ``"wirefilter_parse"`` — wirefilter rejected the expression (semantic
       error); fields are regex-extracted as fallback.
     - ``"wirefilter_crash"`` — FFI call raised an exception; fields are
       regex-extracted as fallback.
-    - ``"regex_fallback"`` — wirefilter not installed; fields are
-      regex-extracted (no error, best-effort mode).
     """
 
 
 # --- Regex patterns for best-effort expression analysis ---
 #
-# Design limitation (F6): The regex fallback is inherently less precise
-# than wirefilter. It cannot validate field names against the schema,
+# Design limitation (F6): regex extraction is inherently less precise
+# than wirefilter — it cannot validate field names against the schema,
 # check operator-field type compatibility, or detect unknown functions.
-# Install octorules-wirefilter for full semantic validation.
+# It runs only as the fallback when wirefilter rejects an expression or
+# the FFI call crashes, so the linter still has material to inspect.
 
 # Known CF fields pattern (dotted names like http.request.uri.path)
 _FIELD_PATTERN = re.compile(r"\b((?:http|ip|ssl|cf|raw)\.[a-z][a-z0-9_.]*[a-z0-9])\b")
@@ -139,12 +133,12 @@ _IPV6_CANDIDATE_PATTERN = re.compile(
 _SET_LITERAL_PATTERN = re.compile(r"\{([^}]*)\}")
 
 # Cache for parsed expressions — avoids repeated FFI calls across linter passes.
-# Keyed on (normalized_expr, expect_parse_error, wirefilter_available, scheme) —
-# scheme is part of the key because the same expression can be valid under one
-# scheme and rejected under another.
+# Keyed on (normalized_expr, expect_parse_error, scheme) — scheme is part of
+# the key because the same expression can be valid under one scheme and
+# rejected under another.
 # Bounded to prevent unbounded growth in long-running processes.
 _PARSE_CACHE_MAX_SIZE = 2048
-_parse_cache: dict[tuple[str, bool, bool, str | None], ExpressionInfo] = {}
+_parse_cache: dict[tuple[str, bool, str | None], ExpressionInfo] = {}
 
 
 def _clear_parse_cache() -> None:
@@ -178,8 +172,9 @@ def parse_expression(
     Results are cached so the same expression is parsed at most once per
     ``expect_parse_error`` mode.
 
-    Uses wirefilter FFI when available, falls back to regex analysis.
-    The *phase* parameter selects the wirefilter field scheme: the
+    Parses with the wirefilter FFI; when wirefilter rejects the expression
+    or the FFI call crashes, regex extraction backfills the linter-facing
+    fields. The *phase* parameter selects the wirefilter field scheme: the
     account-level Magic Transit / Layer-4 phases (see
     :data:`_MAGIC_FIREWALL_PHASES`) are validated against the packet-level
     ``magic_firewall`` scheme; every other phase uses the default HTTP
@@ -187,15 +182,15 @@ def parse_expression(
 
     Set *expect_parse_error* when the expression is known to be a value
     expression (e.g. ``regex_replace(...)`` in action_parameters) that
-    wirefilter cannot parse.  Fallback to regex is logged at INFO instead
-    of WARNING.
+    wirefilter cannot parse — the expected rejection is then logged as a
+    plain debug message rather than as a parse-error fallback.
     """
     from octorules.expression import normalize_expression
 
     expr = normalize_expression(expr)
     scheme = _scheme_for_phase(phase)
 
-    cache_key = (expr, expect_parse_error, WIREFILTER_AVAILABLE, scheme)
+    cache_key = (expr, expect_parse_error, scheme)
     cached = _parse_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -204,10 +199,8 @@ def parse_expression(
     # but wirefilter does not — handle them directly.
     if expr.strip("() ").lower() in ("true", "false"):
         result = ExpressionInfo(raw=expr)
-    elif WIREFILTER_AVAILABLE:
-        result = _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error, scheme=scheme)
     else:
-        result = replace(_parse_with_regex(expr), parse_error_type="regex_fallback")
+        result = _parse_with_wirefilter(expr, expect_parse_error=expect_parse_error, scheme=scheme)
 
     if len(_parse_cache) >= _PARSE_CACHE_MAX_SIZE:
         _parse_cache.clear()

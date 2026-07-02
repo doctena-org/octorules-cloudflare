@@ -157,9 +157,6 @@ _COUNTRY_CODE_PATTERN = re.compile(r"^[A-Z]{2}$")
 # Regex anchor characters
 _REGEX_ANCHORS = re.compile(r"[\^$]")
 
-# Pattern to detect method comparisons
-_METHOD_COMPARISON = re.compile(r"http\.request\.method\s+(?:eq|==|!=|ne|in)\s+")
-
 # Patterns for extracting values from 'in' sets
 _IN_SET_PATTERN = re.compile(r"\bin\s*\{([^}]+)\}")
 _QUOTED_STRING = re.compile(r'"(?:[^"\\]|\\.)*"')
@@ -1227,8 +1224,9 @@ def _check_overly_permissive_regex(
 
     Uses ``info.regex_field_pairs`` so the lint only fires when the LHS
     is a plain field (not a function call) — matches the precision
-    pattern used by CF546. Silently no-ops when wirefilter is
-    unavailable (regex fallback can't pair regex with field reliably).
+    pattern used by CF546. Silently no-ops when the expression came
+    through regex extraction (the parse-error fallback can't pair
+    regex with field reliably).
     """
     for field_name, regex in info.regex_field_pairs:
         permissive = _OVERLY_PERMISSIVE_REGEX_ANY_CONTEXT
@@ -1564,9 +1562,10 @@ def _check_suspicious_regex(
       user often meant a glob ``*`` (any segment).
 
     Uses ``info.regex_field_pairs`` (populated by wirefilter when the
-    LHS of ``matches`` is a plain field). When wirefilter is absent or
-    the LHS is a function call, the pair list is empty and the check
-    silently no-ops — the regex fallback can't infer field context
+    LHS of ``matches`` is a plain field). When the LHS is a function
+    call, or the expression came through regex extraction (the
+    parse-error fallback), the pair list is empty and the check
+    silently no-ops — regex extraction can't infer field context
     accurately enough to fire this without false positives.
     """
     for field_name, regex in info.regex_field_pairs:

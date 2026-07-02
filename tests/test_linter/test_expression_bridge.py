@@ -5,8 +5,8 @@ import logging
 import pytest
 
 from octorules_cloudflare.linter.expression_bridge import (
-    WIREFILTER_AVAILABLE,
     ExpressionInfo,
+    _clear_parse_cache,
     _parse_with_regex,
     _parse_with_wirefilter,
     _scheme_for_phase,
@@ -32,7 +32,6 @@ class TestMagicFirewallScheme:
         assert _scheme_for_phase("waf_custom_rules") is None
         assert _scheme_for_phase(None) is None
 
-    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="needs wirefilter FFI")
     def test_l4_expression_valid_on_magic_phase(self):
         info = parse_expression(
             'ip.proto eq "tcp" && tcp.dstport in {22 3389}',
@@ -42,13 +41,11 @@ class TestMagicFirewallScheme:
         assert "ip.proto" in info.fields_used
         assert "tcp.dstport" in info.fields_used
 
-    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="needs wirefilter FFI")
     def test_l4_field_rejected_on_http_phase(self):
         # ip.proto is not in the HTTP scheme — must still be flagged there.
         info = parse_expression('ip.proto eq "tcp"', phase="waf_custom_rules")
         assert info.parse_error
 
-    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="needs wirefilter FFI")
     def test_http_field_rejected_on_magic_phase(self):
         # http.host is not in the L4 scheme.
         info = parse_expression('http.host eq "x"', phase="network_firewall_rules")
@@ -210,15 +207,8 @@ class TestRawStringExtraction:
         assert info.regex_literals == []
 
 
-@pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="octorules-wirefilter not installed")
 class TestWirefilterBridge:
-    """Tests that run only when wirefilter FFI is available.
-
-    Validates the bridge layer maps Rust parse results to ExpressionInfo.
-    """
-
-    def test_wirefilter_is_available(self):
-        assert WIREFILTER_AVAILABLE
+    """Validates the bridge layer maps Rust parse results to ExpressionInfo."""
 
     def test_fields_via_wirefilter(self):
         info = parse_expression('http.host eq "example.com"')
@@ -345,14 +335,6 @@ class TestWirefilterFFICrashFallback:
 class TestParseErrorType:
     """Tests for the parse_error_type classification field."""
 
-    def test_regex_fallback_when_wirefilter_unavailable(self, monkeypatch):
-        _attr = "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE"
-        monkeypatch.setattr(_attr, False)
-        info = parse_expression('http.host eq "example.com"')
-        assert info.parse_error_type == "regex_fallback"
-        assert info.parse_error == ""
-
-    @pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="octorules-wirefilter not installed")
     def test_success_via_wirefilter(self):
         info = parse_expression('http.host eq "example.com"')
         assert info.parse_error_type == ""
@@ -446,19 +428,17 @@ class TestWirefilterCrashFallbackViaPublicAPI:
 
     Unlike TestWirefilterFFICrashFallback (which calls _parse_with_wirefilter
     directly), these tests exercise the full path through parse_expression,
-    including normalize_expression and the WIREFILTER_AVAILABLE gate.
+    including normalize_expression and the parse cache.
     """
 
     def test_wirefilter_crash_falls_back_to_regex(self, monkeypatch):
         """If wirefilter FFI raises an unexpected exception, regex fallback is used."""
-        monkeypatch.setattr(
-            "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE", True
-        )
 
         def _crash(expr, scheme=None):
             raise RuntimeError("simulated FFI segfault")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _crash)
+        _clear_parse_cache()
         info = parse_expression("ip.src eq 1.2.3.4")
         # Should return an ExpressionInfo, not crash
         assert isinstance(info, ExpressionInfo)
@@ -467,17 +447,17 @@ class TestWirefilterCrashFallbackViaPublicAPI:
         # Error metadata is preserved
         assert info.parse_error_type == "wirefilter_crash"
         assert "RuntimeError" in info.parse_error
+        _clear_parse_cache()
 
     def test_wirefilter_crash_logs_warning(self, monkeypatch, caplog):
         """Wirefilter crash is logged as a warning through the public API."""
-        monkeypatch.setattr(
-            "octorules_cloudflare.linter.expression_bridge.WIREFILTER_AVAILABLE", True
-        )
 
         def _crash(expr, scheme=None):
             raise RuntimeError("simulated FFI segfault")
 
         monkeypatch.setattr("octorules_cloudflare.linter.expression_bridge._wf_parse", _crash)
+        _clear_parse_cache()
         with caplog.at_level(logging.WARNING, logger="octorules_cloudflare"):
             parse_expression("ip.src eq 1.2.3.4")
         assert any("wirefilter" in r.message.lower() for r in caplog.records)
+        _clear_parse_cache()

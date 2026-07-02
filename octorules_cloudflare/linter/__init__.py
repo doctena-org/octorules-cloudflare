@@ -1,10 +1,6 @@
 """Cloudflare linter — registers all CF-specific lint rules and plugins."""
 
-import logging
-
 from octorules.registration import idempotent_registration
-
-log = logging.getLogger(__name__)
 
 
 @idempotent_registration
@@ -16,14 +12,6 @@ def register_cloudflare_linter() -> None:
 
     from octorules_cloudflare.linter._plugin import CF_RULE_IDS, cloudflare_lint
     from octorules_cloudflare.linter._rules import CF_RULE_METAS
-    from octorules_cloudflare.linter.expression_bridge import WIREFILTER_AVAILABLE
-
-    if WIREFILTER_AVAILABLE:
-        log.info("Expression parser: wirefilter")
-    else:
-        log.info(
-            "Expression parser: regex fallback (install octorules-wirefilter for full parsing)"
-        )
 
     register_linter(LintPlugin(name="cloudflare", lint_fn=cloudflare_lint, rule_ids=CF_RULE_IDS))
     register_rules(CF_RULE_METAS)

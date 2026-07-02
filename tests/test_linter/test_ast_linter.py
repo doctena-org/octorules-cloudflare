@@ -9,7 +9,6 @@ from octorules_cloudflare.linter.ast_linter import (
     _extract_function_call_args,
     lint_expressions,
 )
-from octorules_cloudflare.linter.expression_bridge import WIREFILTER_AVAILABLE
 
 
 def _lint(expression, phase_name="waf_custom_rules", ref="test"):
@@ -635,13 +634,17 @@ class TestIPv6BogonRanges:
         ctx = _lint("ip.src == 2606:4700::1")
         assert "CF530" not in _ids(ctx)
 
-    def test_cf530_ipv6_via_regex_fallback(self, monkeypatch):
-        """Verify CF530 fires for IPv6 even without wirefilter FFI."""
+    def test_cf530_ipv6_via_regex_extraction(self, monkeypatch):
+        """CF530 fires for IPv6 when fields come from the parse-error regex fallback."""
         from octorules_cloudflare.linter import expression_bridge
 
-        monkeypatch.setattr(expression_bridge, "WIREFILTER_AVAILABLE", False)
-        # Force regex path — ::1 is loopback
+        monkeypatch.setattr(
+            expression_bridge, "_wf_parse", lambda expr, scheme=None: {"error": "boom"}
+        )
+        expression_bridge._clear_parse_cache()
+        # Regex extraction path — ::1 is loopback
         ctx = _lint("ip.src == ::1")
+        expression_bridge._clear_parse_cache()
         assert "CF530" in _ids(ctx)
 
 
@@ -923,7 +926,6 @@ class TestG022RemoveQueryArgs:
         assert "CF541" not in _ids(ctx)
 
 
-@pytest.mark.skipif(not WIREFILTER_AVAILABLE, reason="octorules-wirefilter not installed")
 class TestA001ParseErrors:
     def test_cf001_invalid_syntax(self):
         """Incomplete expression triggers CF001 when wirefilter is available."""
@@ -938,14 +940,6 @@ class TestA001ParseErrors:
     def test_cf001_valid_expression_no_error(self):
         """Clean expression — CF001 does not fire."""
         ctx = _lint('http.host eq "example.com"')
-        assert "CF001" not in _ids(ctx)
-
-    def test_cf001_not_fired_without_wirefilter(self, monkeypatch):
-        """CF001 should not fire when wirefilter is unavailable."""
-        from octorules_cloudflare.linter import expression_bridge
-
-        monkeypatch.setattr(expression_bridge, "WIREFILTER_AVAILABLE", False)
-        ctx = _lint('http.hoost eq "x"')
         assert "CF001" not in _ids(ctx)
 
     def test_cf001_semantic_checks_still_fire(self):
@@ -1761,10 +1755,6 @@ class TestCF518LongInList:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not WIREFILTER_AVAILABLE,
-    reason="CF546 needs regex_field_pairs from wirefilter",
-)
 class TestCF546SuspiciousRegex:
     def test_unescaped_dot_in_hostname_regex_fires(self):
         ctx = _lint(r'http.host matches "api.example.com"')
@@ -1990,10 +1980,6 @@ class TestCF547EmptyInList:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not WIREFILTER_AVAILABLE,
-    reason="CF548 needs regex_field_pairs from wirefilter",
-)
 class TestCF548OverlyPermissiveRegex:
     def test_dot_alone_fires(self):
         ctx = _lint(r'http.host matches "."')
@@ -2057,10 +2043,6 @@ class TestCF548OverlyPermissiveRegex:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not WIREFILTER_AVAILABLE,
-    reason="CF549 needs regex_field_pairs from wirefilter",
-)
 class TestCF549UnnecessaryRegex:
     def test_anchored_literal_fires_with_eq_suggestion(self):
         ctx = _lint(r'http.host matches "^example$"')

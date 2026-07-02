@@ -2,7 +2,7 @@
 
 Validates the `lists` section for structural correctness and item validity. Checks list metadata (name, kind) and validates individual items based on the list kind (IP, ASN, hostname, redirect).
 
-## Category Q — List Validation (9 rules)
+## Category Q — List Validation (11 rules)
 
 ### CF470 — Missing or duplicate list name
 

@@ -34,7 +34,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (24 rules)
+## Category C — Action Validation (26 rules)
 
 ### CF200 — Invalid action for phase
 
