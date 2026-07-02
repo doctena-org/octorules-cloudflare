@@ -18,6 +18,8 @@ from octorules_cloudflare._settings_base import (
     SettingsPlan,
 )
 from octorules_cloudflare._settings_common import (
+    make_dump_hook,
+    make_prefetch_hook,
     partition_unsupported,
     verify_settings_applied,
     warn_unsupported,
@@ -106,31 +108,9 @@ def diff_url_normalization(current: dict, desired: dict) -> UrlNormalizationPlan
 # ---------------------------------------------------------------------------
 # Extension hooks
 # ---------------------------------------------------------------------------
-def _prefetch_url_normalization(all_desired, scope, provider):
-    """Prefetch: fetch current URL normalization settings."""
-    if not scope.zone_id:
-        return None
-    desired = all_desired.get("cloudflare_url_normalization")
-    if desired is None:
-        return None
-
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        current = provider.get_url_normalization(scope)
-    except ProviderAuthError:
-        if "cloudflare_url_normalization" in all_desired:
-            raise  # User explicitly declared this section -- permission is needed
-        log.debug("Skipping cloudflare_url_normalization (no permission and not in desired config)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_url_normalization: product not enabled on this zone")
-            return None
-        log.warning("Failed to fetch URL normalization settings for %s", scope.label)
-        current = {}
-
-    return (current, desired)
+_prefetch_url_normalization = make_prefetch_hook(
+    "cloudflare_url_normalization", "get_url_normalization"
+)
 
 
 def _finalize_url_normalization(zp, all_desired, scope, provider, ctx):
@@ -189,27 +169,7 @@ def _validate_url_normalization(desired, zone_name, errors, lines):
         )
 
 
-def _dump_url_normalization(scope, provider, out_dir):
-    """Export current URL normalization settings to dump output."""
-    if not scope.zone_id:
-        return None
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        settings = provider.get_url_normalization(scope)
-    except ProviderAuthError:
-        log.info("cloudflare_url_normalization: skipped (insufficient permissions)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_url_normalization: product not enabled on this zone")
-        else:
-            log.debug("cloudflare_url_normalization: %s", e)
-        return None
-
-    if settings:
-        return {"cloudflare_url_normalization": settings}
-    return None
+_dump_url_normalization = make_dump_hook("cloudflare_url_normalization", "get_url_normalization")
 
 
 # ---------------------------------------------------------------------------

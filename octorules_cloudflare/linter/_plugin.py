@@ -7,7 +7,8 @@ inline.  It is registered as a ``LintPlugin`` and called by the core engine.
 from typing import Any
 
 from octorules.linter.engine import LintContext
-from octorules.phases import KNOWN_NON_PHASE_KEYS, PHASE_BY_NAME
+from octorules.linter.helpers import iter_provider_phases
+from octorules.phases import PHASE_BY_NAME
 
 from octorules_cloudflare.linter.action_validator import RULE_IDS as _av
 from octorules_cloudflare.linter.ast_linter import RULE_IDS as _al
@@ -48,16 +49,7 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
     from octorules_cloudflare import CF_PHASE_NAMES
 
     # Stage 2: Per-phase, per-rule checks (only Cloudflare phases)
-    for phase_name, rules in rules_data.items():
-        if phase_name in KNOWN_NON_PHASE_KEYS:
-            continue
-        if phase_name not in CF_PHASE_NAMES:
-            continue
-        if ctx.phase_filter and phase_name not in ctx.phase_filter:
-            continue
-        if not isinstance(rules, list):
-            continue
-
+    for phase_name, rules in iter_provider_phases(rules_data, ctx, CF_PHASE_NAMES):
         phase = PHASE_BY_NAME[phase_name]
         for rule in rules:
             if not isinstance(rule, dict):

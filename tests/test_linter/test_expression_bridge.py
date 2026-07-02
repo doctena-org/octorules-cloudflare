@@ -2,8 +2,6 @@
 
 import logging
 
-import pytest
-
 from octorules_cloudflare.linter.expression_bridge import (
     ExpressionInfo,
     _clear_parse_cache,

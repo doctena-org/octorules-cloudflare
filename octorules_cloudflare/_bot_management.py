@@ -19,6 +19,8 @@ from octorules_cloudflare._settings_base import (
     SettingsPlan,
 )
 from octorules_cloudflare._settings_common import (
+    make_dump_hook,
+    make_prefetch_hook,
     partition_unsupported,
     verify_settings_applied,
     warn_unsupported,
@@ -135,31 +137,7 @@ def diff_bot_management(current: dict, desired: dict) -> BotManagementPlan:
 # ---------------------------------------------------------------------------
 # Extension hooks
 # ---------------------------------------------------------------------------
-def _prefetch_bot_management(all_desired, scope, provider):
-    """Prefetch: fetch current bot management settings."""
-    if not scope.zone_id:
-        return None
-    desired = all_desired.get("cloudflare_bot_management")
-    if desired is None:
-        return None
-
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        current = provider.get_bot_management(scope)
-    except ProviderAuthError:
-        if "cloudflare_bot_management" in all_desired:
-            raise  # User explicitly declared this section -- permission is needed
-        log.debug("Skipping cloudflare_bot_management (no permission and not in desired config)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_bot_management: product not enabled on this zone")
-            return None
-        log.warning("Failed to fetch bot management settings for %s", scope.label)
-        current = {}
-
-    return (current, desired)
+_prefetch_bot_management = make_prefetch_hook("cloudflare_bot_management", "get_bot_management")
 
 
 def _finalize_bot_management(zp, all_desired, scope, provider, ctx):
@@ -232,27 +210,7 @@ def _validate_bot_management(desired, zone_name, errors, lines):
         )
 
 
-def _dump_bot_management(scope, provider, out_dir):
-    """Export current bot management settings to dump output."""
-    if not scope.zone_id:
-        return None
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        settings = provider.get_bot_management(scope)
-    except ProviderAuthError:
-        log.info("cloudflare_bot_management: skipped (insufficient permissions)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_bot_management: product not enabled on this zone")
-        else:
-            log.debug("cloudflare_bot_management: %s", e)
-        return None
-
-    if settings:
-        return {"cloudflare_bot_management": settings}
-    return None
+_dump_bot_management = make_dump_hook("cloudflare_bot_management", "get_bot_management")
 
 
 # ---------------------------------------------------------------------------

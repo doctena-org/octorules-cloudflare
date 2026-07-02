@@ -12,8 +12,9 @@ import logging
 import re
 from dataclasses import dataclass, field, replace
 
-from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
 from octorules_wirefilter import parse_expression as _wf_parse
+
+from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
 
 log = logging.getLogger(__name__)
 

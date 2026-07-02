@@ -27,7 +27,11 @@ from octorules_cloudflare._settings_base import (
     SettingsFormatter,
     SettingsPlan,
 )
-from octorules_cloudflare._settings_common import verify_settings_applied
+from octorules_cloudflare._settings_common import (
+    make_dump_hook,
+    make_prefetch_hook,
+    verify_settings_applied,
+)
 
 log = logging.getLogger(__name__)
 
@@ -99,33 +103,9 @@ def diff_leaked_credentials(current: dict, desired: dict) -> LeakedCredentialPla
 # ---------------------------------------------------------------------------
 # Extension hooks
 # ---------------------------------------------------------------------------
-def _prefetch_leaked_credentials(all_desired, scope, provider):
-    """Prefetch: fetch current leaked credential check config."""
-    if not scope.zone_id:
-        return None
-    desired = all_desired.get("cloudflare_leaked_credential_check")
-    if desired is None:
-        return None
-
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        current = provider.get_leaked_credential_check(scope)
-    except ProviderAuthError:
-        if "cloudflare_leaked_credential_check" in all_desired:
-            raise  # User explicitly declared this section -- permission is needed
-        log.debug(
-            "Skipping cloudflare_leaked_credential_check (no permission and not in desired config)"
-        )
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_leaked_credential_check: product not enabled on this zone")
-            return None
-        log.warning("Failed to fetch leaked credential check config for %s", scope.label)
-        current = {}
-
-    return (current, desired)
+_prefetch_leaked_credentials = make_prefetch_hook(
+    "cloudflare_leaked_credential_check", "get_leaked_credential_check"
+)
 
 
 def _finalize_leaked_credentials(zp, all_desired, scope, provider, ctx):
@@ -205,27 +185,9 @@ def _validate_leaked_credentials(desired, zone_name, errors, lines):
                         )
 
 
-def _dump_leaked_credentials(scope, provider, out_dir):
-    """Export current leaked credential check config to dump output."""
-    if not scope.zone_id:
-        return None
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        config = provider.get_leaked_credential_check(scope)
-    except ProviderAuthError:
-        log.info("cloudflare_leaked_credential_check: skipped (insufficient permissions)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_leaked_credential_check: product not enabled on this zone")
-        else:
-            log.debug("cloudflare_leaked_credential_check: %s", e)
-        return None
-
-    if config:
-        return {"cloudflare_leaked_credential_check": config}
-    return None
+_dump_leaked_credentials = make_dump_hook(
+    "cloudflare_leaked_credential_check", "get_leaked_credential_check"
+)
 
 
 # ---------------------------------------------------------------------------

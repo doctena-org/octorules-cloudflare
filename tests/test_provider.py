@@ -1537,6 +1537,31 @@ class TestListItemsPaginationGuard:
         assert len(items) == 3
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 3
 
+    def test_malformed_body_raises_provider_error(self, mock_cf_client):
+        """Malformed response body (not a dict) raises ProviderError."""
+        import json
+
+        raw = MagicMock()
+        # Simulate body that is a list instead of dict
+        raw.http_response.text = json.dumps([{"ip": "1.1.1.1/32"}])
+        mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="expected dict"):
+            provider.get_list_items(Scope(account_id="a"), "lst-1")
+
+    def test_malformed_result_info_raises_provider_error(self, mock_cf_client):
+        """Malformed result_info (not a dict when present) raises ProviderError."""
+        import json
+
+        raw = MagicMock()
+        # Simulate result_info that is a string instead of dict
+        body = {"result": [{"ip": "1.1.1.1/32"}], "result_info": "invalid"}
+        raw.http_response.text = json.dumps(body)
+        mock_cf_client.rules.lists.items.with_raw_response.list.return_value = raw
+        provider = CloudflareProvider(token="token", client=mock_cf_client)
+        with pytest.raises(ProviderError, match="expected dict or absent"):
+            provider.get_list_items(Scope(account_id="a"), "lst-1")
+
 
 class TestFutureCancellationOnAuthError:
     """Tests that futures are cancelled when auth errors occur during parallel fetching."""

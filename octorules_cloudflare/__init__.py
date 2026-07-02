@@ -19,6 +19,8 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
       cloudflare-python ``BlockRule.ratelimit``).
     - Default ``enabled`` to ``True``.
     - Inject ``phase.default_action`` when rule has no ``action``.
+    - Inject Cloudflare's ``logging.enabled: true`` API default when the
+      ``logging`` block is absent.
 
     Returns a new dict — the original *rule* is never mutated.
     """
@@ -43,6 +45,13 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
                 f"must specify an 'action' (no default for this phase)"
             )
         rule["action"] = phase.default_action
+    if "logging" not in rule:
+        # Cloudflare's PUT API stores ``logging.enabled: true`` when the
+        # field is absent and returns it on GET; injecting the default here
+        # keeps hand-written YAML that omits ``logging`` diff-clean against
+        # the API state. Explicit ``logging.enabled: false`` (quiet skip
+        # rules) is preserved as-is and still diffs against current state.
+        rule["logging"] = {"enabled": True}
     return rule
 
 
@@ -85,6 +94,9 @@ _CF_PHASES: list[Phase] = [
         zone_level=zl,
         account_level=al,
         prepare_rule=_cf_prepare_rule,
+        # Custom-ruleset rules always need an explicit expression and action
+        # (no default-action injection on that path).
+        rule_required_fields=("expression", "action"),
     )
     for name, pid, action, zl, al in _CF_PHASE_SPECS
 ]

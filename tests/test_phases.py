@@ -312,6 +312,54 @@ class TestRenamedPhaseAlias:
         assert phase.friendly_name == "waf_managed_rules"
 
 
+class TestCfPrepareRuleLoggingDefault:
+    """Cloudflare's PUT API stores ``logging.enabled: true`` when absent —
+    the prepare hook injects that default so YAML omitting ``logging``
+    stays diff-clean against API state."""
+
+    def test_injects_logging_default_when_absent(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("redirect_rules")
+        result = _cf_prepare_rule({"ref": "r1", "expression": "true"}, phase)
+        assert result["logging"] == {"enabled": True}
+
+    def test_preserves_explicit_logging_false(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("redirect_rules")
+        rule = {"ref": "r1", "expression": "true", "logging": {"enabled": False}}
+        result = _cf_prepare_rule(rule, phase)
+        assert result["logging"] == {"enabled": False}
+
+
+class TestCustomRulesetRequiredFields:
+    """CF phases declare expression+action as required custom-ruleset rule
+    fields via Phase.rule_required_fields."""
+
+    def _entry(self, rules):
+        return {
+            "id": "rs-1",
+            "name": "My Ruleset",
+            "phase": "http_request_firewall_custom",
+            "rules": rules,
+        }
+
+    def test_missing_expression_rejected(self):
+        from octorules.planner import RuleValidationError, validate_custom_ruleset
+
+        entry = self._entry([{"ref": "r1", "action": "block"}])
+        with pytest.raises(RuleValidationError, match="missing required 'expression'"):
+            validate_custom_ruleset(entry, 0)
+
+    def test_missing_action_rejected(self):
+        from octorules.planner import RuleValidationError, validate_custom_ruleset
+
+        entry = self._entry([{"ref": "r1", "expression": "true"}])
+        with pytest.raises(RuleValidationError, match="missing required 'action'"):
+            validate_custom_ruleset(entry, 0)
+
+
 class TestCfPrepareRuleNoMutation:
     """_cf_prepare_rule should not mutate the input dict (CF7)."""
 

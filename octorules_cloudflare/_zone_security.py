@@ -24,6 +24,8 @@ from octorules_cloudflare._settings_base import (
     SettingsPlan,
 )
 from octorules_cloudflare._settings_common import (
+    make_dump_hook,
+    make_prefetch_hook,
     partition_unsupported,
     verify_settings_applied,
     warn_unsupported,
@@ -105,31 +107,9 @@ def diff_zone_security(current: dict, desired: dict) -> ZoneSecurityPlan:
 # ---------------------------------------------------------------------------
 # Extension hooks
 # ---------------------------------------------------------------------------
-def _prefetch_zone_security(all_desired, scope, provider):
-    """Prefetch: fetch current zone security settings."""
-    if not scope.zone_id:
-        return None
-    desired = all_desired.get("cloudflare_zone_security")
-    if desired is None:
-        return None
-
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        current = provider.get_zone_security_settings(scope)
-    except ProviderAuthError:
-        if "cloudflare_zone_security" in all_desired:
-            raise  # User explicitly declared this section -- permission is needed
-        log.debug("Skipping cloudflare_zone_security (no permission and not in desired config)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_zone_security: product not enabled on this zone")
-            return None
-        log.warning("Failed to fetch zone security settings for %s", scope.label)
-        current = {}
-
-    return (current, desired)
+_prefetch_zone_security = make_prefetch_hook(
+    "cloudflare_zone_security", "get_zone_security_settings"
+)
 
 
 def _finalize_zone_security(zp, all_desired, scope, provider, ctx):
@@ -202,27 +182,7 @@ def _validate_zone_security(desired, zone_name, errors, lines):
         )
 
 
-def _dump_zone_security(scope, provider, out_dir):
-    """Export current zone security settings to dump output."""
-    if not scope.zone_id:
-        return None
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        settings = provider.get_zone_security_settings(scope)
-    except ProviderAuthError:
-        log.info("cloudflare_zone_security: skipped (insufficient permissions)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_zone_security: product not enabled on this zone")
-        else:
-            log.debug("cloudflare_zone_security: %s", e)
-        return None
-
-    if settings:
-        return {"cloudflare_zone_security": settings}
-    return None
+_dump_zone_security = make_dump_hook("cloudflare_zone_security", "get_zone_security_settings")
 
 
 # ---------------------------------------------------------------------------

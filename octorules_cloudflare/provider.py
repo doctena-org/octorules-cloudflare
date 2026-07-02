@@ -500,11 +500,24 @@ class CloudflareProvider:
                 raise ProviderError(
                     f"Invalid JSON in list items response for {list_id}: {exc}"
                 ) from exc
+
+            # Validate response body is a dict
+            if not isinstance(body, dict):
+                raise ProviderError(
+                    f"Invalid list items response for {list_id}: "
+                    f"expected dict, got {type(body).__name__}"
+                )
+
             for item in body.get("result", []):
                 all_items.append(strip_api_fields(item, "list_item"))
             # Extract next cursor from result_info
             cursor = None
             result_info = body.get("result_info")
+            if result_info is not None and not isinstance(result_info, dict):
+                raise ProviderError(
+                    f"Invalid result_info in list items response for {list_id}: "
+                    f"expected dict or absent, got {type(result_info).__name__}"
+                )
             if isinstance(result_info, dict):
                 cursors = result_info.get("cursors")
                 if isinstance(cursors, dict):

@@ -26,7 +26,11 @@ from octorules_cloudflare._settings_base import (
     SettingsFormatter,
     SettingsPlan,
 )
-from octorules_cloudflare._settings_common import verify_settings_applied
+from octorules_cloudflare._settings_common import (
+    make_dump_hook,
+    make_prefetch_hook,
+    verify_settings_applied,
+)
 
 log = logging.getLogger(__name__)
 
@@ -97,31 +101,9 @@ def diff_content_scanning(current: dict, desired: dict) -> ContentScanningPlan:
 # ---------------------------------------------------------------------------
 # Extension hooks
 # ---------------------------------------------------------------------------
-def _prefetch_content_scanning(all_desired, scope, provider):
-    """Prefetch: fetch current content scanning config."""
-    if not scope.zone_id:
-        return None
-    desired = all_desired.get("cloudflare_content_scanning")
-    if desired is None:
-        return None
-
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        current = provider.get_content_scanning(scope)
-    except ProviderAuthError:
-        if "cloudflare_content_scanning" in all_desired:
-            raise  # User explicitly declared this section -- permission is needed
-        log.debug("Skipping cloudflare_content_scanning (no permission and not in desired config)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_content_scanning: product not enabled on this zone")
-            return None
-        log.warning("Failed to fetch content scanning config for %s", scope.label)
-        current = {}
-
-    return (current, desired)
+_prefetch_content_scanning = make_prefetch_hook(
+    "cloudflare_content_scanning", "get_content_scanning"
+)
 
 
 def _finalize_content_scanning(zp, all_desired, scope, provider, ctx):
@@ -200,27 +182,7 @@ def _validate_content_scanning(desired, zone_name, errors, lines):
                     )
 
 
-def _dump_content_scanning(scope, provider, out_dir):
-    """Export current content scanning config to dump output."""
-    if not scope.zone_id:
-        return None
-    from octorules.provider.exceptions import ProviderAuthError, ProviderError
-
-    try:
-        config = provider.get_content_scanning(scope)
-    except ProviderAuthError:
-        log.info("cloudflare_content_scanning: skipped (insufficient permissions)")
-        return None
-    except ProviderError as e:
-        if "not been enabled" in str(e) or "not enabled" in str(e):
-            log.debug("cloudflare_content_scanning: product not enabled on this zone")
-        else:
-            log.debug("cloudflare_content_scanning: %s", e)
-        return None
-
-    if config:
-        return {"cloudflare_content_scanning": config}
-    return None
+_dump_content_scanning = make_dump_hook("cloudflare_content_scanning", "get_content_scanning")
 
 
 # ---------------------------------------------------------------------------

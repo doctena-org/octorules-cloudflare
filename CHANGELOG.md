@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.12.1] - 2026-07-02
 
 ### Changed
-- `SUPPORTS_PAGE_SHIELD` is now defined in `octorules_cloudflare.page_shield`
-  rather than imported from octorules core, making this package compatible
-  with octorules >= 0.30.0 (which removes the constant from core). Older
-  core releases (>= 0.27.0) keep working unchanged.
+- Requires octorules >= 0.30.0. Cloudflare-specific behavior moved here
+  from core: the `SUPPORTS_PAGE_SHIELD` constant, the
+  `logging: {enabled: true}` rule default, and the custom-ruleset
+  required-field declarations. Plans, diffs, and applies are unchanged.
+- Malformed list-API responses now raise `ProviderError` instead of
+  silently truncating pagination.
 
 ## [0.12.0] - 2026-07-01
 

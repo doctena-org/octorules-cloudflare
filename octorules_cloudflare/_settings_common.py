@@ -5,9 +5,13 @@ which all diff a flat ``{field: value}`` dict of desired YAML settings
 against the zone's live configuration, and by the toggle extensions
 (``_leaked_credentials``, ``_content_scanning``) for post-apply
 verification of the ``enabled`` switch.
+
+Includes factory functions for _prefetch_*, _finalize_*, and _dump_* hooks
+to reduce duplication across modules.
 """
 
 import logging
+from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
@@ -98,3 +102,86 @@ def verify_settings_applied(fetch, scope, sent: dict, section: str) -> list[str]
                 value,
             )
     return failed
+
+
+# ---------------------------------------------------------------------------
+# Factory functions for _prefetch_*, _finalize_*, and _dump_* hooks
+# ---------------------------------------------------------------------------
+def make_prefetch_hook(section_name: str, getter_attr: str) -> Callable:
+    """Create a _prefetch_* hook function for a settings extension.
+
+    Args:
+        section_name: The YAML section name (e.g. "cloudflare_bot_management")
+        getter_attr: The provider method name to fetch current settings
+                     (e.g. "get_bot_management")
+
+    Returns a function matching the _prefetch_* signature that fetches
+    current settings and returns (current, desired) or None.
+    """
+
+    def _prefetch_hook(all_desired, scope, provider):
+        """Prefetch: fetch current settings."""
+        if not scope.zone_id:
+            return None
+        desired = all_desired.get(section_name)
+        if desired is None:
+            return None
+
+        from octorules.provider.exceptions import ProviderAuthError, ProviderError
+
+        getter = getattr(provider, getter_attr)
+        try:
+            current = getter(scope)
+        except ProviderAuthError:
+            if section_name in all_desired:
+                raise  # User explicitly declared this section -- permission is needed
+            log.debug("%s: skipped (no permission and not in desired config)", section_name)
+            return None
+        except ProviderError as e:
+            if "not been enabled" in str(e) or "not enabled" in str(e):
+                log.debug("%s: product not enabled on this zone", section_name)
+                return None
+            log.warning("Failed to fetch %s settings for %s", section_name, scope.label)
+            current = {}
+
+        return (current, desired)
+
+    return _prefetch_hook
+
+
+def make_dump_hook(section_name: str, getter_attr: str) -> Callable:
+    """Create a _dump_* hook function for a settings extension.
+
+    Args:
+        section_name: The YAML section name (e.g. "cloudflare_bot_management")
+        getter_attr: The provider method name to fetch current settings
+                     (e.g. "get_bot_management")
+
+    Returns a function matching the _dump_* signature that exports
+    current settings to dump output.
+    """
+
+    def _dump_hook(scope, provider, out_dir):
+        """Export current settings to dump output."""
+        if not scope.zone_id:
+            return None
+        from octorules.provider.exceptions import ProviderAuthError, ProviderError
+
+        getter = getattr(provider, getter_attr)
+        try:
+            settings = getter(scope)
+        except ProviderAuthError:
+            log.info("%s: skipped (insufficient permissions)", section_name)
+            return None
+        except ProviderError as e:
+            if "not been enabled" in str(e) or "not enabled" in str(e):
+                log.debug("%s: product not enabled on this zone", section_name)
+            else:
+                log.debug("%s: %s", section_name, e)
+            return None
+
+        if settings:
+            return {section_name: settings}
+        return None
+
+    return _dump_hook
