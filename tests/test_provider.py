@@ -1742,10 +1742,11 @@ class TestSupports:
         from octorules.provider.base import (
             SUPPORTS_CUSTOM_RULESETS,
             SUPPORTS_LISTS,
-            SUPPORTS_PAGE_SHIELD,
             SUPPORTS_ZONE_DISCOVERY,
             provider_supports,
         )
+
+        from octorules_cloudflare.page_shield import SUPPORTS_PAGE_SHIELD
 
         prov = CloudflareProvider.__new__(CloudflareProvider)
         assert provider_supports(prov, SUPPORTS_CUSTOM_RULESETS)

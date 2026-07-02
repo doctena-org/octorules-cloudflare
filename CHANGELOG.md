@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.1] - 2026-07-02
+
+### Changed
+- `SUPPORTS_PAGE_SHIELD` is now defined in `octorules_cloudflare.page_shield`
+  rather than imported from octorules core, making this package compatible
+  with octorules >= 0.30.0 (which removes the constant from core). Older
+  core releases (>= 0.27.0) keep working unchanged.
+
 ## [0.12.0] - 2026-07-01
 
 ### Added

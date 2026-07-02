@@ -29,7 +29,6 @@ from octorules.planner import (
     _normalize_value,
 )
 from octorules.provider.base import (
-    SUPPORTS_PAGE_SHIELD,
     BaseProvider,
     Scope,
     provider_supports,
@@ -39,6 +38,11 @@ from octorules.provider.utils import format_api_error as _format_api_error
 from octorules.registration import idempotent_registration
 
 log = logging.getLogger(__name__)
+
+# CF-only feature-negotiation constant; the value must match the
+# "page_shield" entry in ``CloudflareProvider.SUPPORTS``. Multi-provider
+# constants (SUPPORTS_CUSTOM_RULESETS, SUPPORTS_LISTS, ...) stay in core.
+SUPPORTS_PAGE_SHIELD = "page_shield"
 
 
 # ---------------------------------------------------------------------------
