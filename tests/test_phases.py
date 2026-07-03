@@ -313,24 +313,71 @@ class TestRenamedPhaseAlias:
 
 
 class TestCfPrepareRuleLoggingDefault:
-    """Cloudflare's PUT API stores ``logging.enabled: true`` when absent —
-    the prepare hook injects that default so YAML omitting ``logging``
-    stays diff-clean against API state."""
+    """Rule-level ``logging`` exists only on skip-action rules; Cloudflare
+    stores ``enabled: true`` when absent and echoes it on GET. The prepare
+    hook injects that default for skip rules ONLY — injecting it anywhere
+    else creates a field the API never returns, and every plan would show
+    a spurious ``+ logging`` MODIFY on every non-skip rule."""
 
-    def test_injects_logging_default_when_absent(self):
+    def test_injects_logging_default_on_skip_rules(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("waf_custom_rules")
+        rule = {"ref": "r1", "expression": "true", "action": "skip"}
+        result = _cf_prepare_rule(rule, phase)
+        assert result["logging"] == {"enabled": True}
+
+    def test_preserves_explicit_logging_false_on_skip_rules(self):
+        from octorules_cloudflare import _cf_prepare_rule
+
+        phase = get_phase("waf_custom_rules")
+        rule = {
+            "ref": "r1",
+            "expression": "true",
+            "action": "skip",
+            "logging": {"enabled": False},
+        }
+        result = _cf_prepare_rule(rule, phase)
+        assert result["logging"] == {"enabled": False}
+
+    def test_no_injection_for_non_skip_actions(self):
         from octorules_cloudflare import _cf_prepare_rule
 
         phase = get_phase("redirect_rules")
         result = _cf_prepare_rule({"ref": "r1", "expression": "true"}, phase)
-        assert result["logging"] == {"enabled": True}
+        assert "logging" not in result
 
-    def test_preserves_explicit_logging_false(self):
-        from octorules_cloudflare import _cf_prepare_rule
+    def test_non_skip_rule_diffs_clean_without_logging(self):
+        """A non-skip rule whose YAML omits ``logging`` and whose API state
+        has no ``logging`` either must not produce a MODIFY — Cloudflare
+        never returns the field for non-skip actions."""
+        from octorules.planner import diff_phase
 
         phase = get_phase("redirect_rules")
-        rule = {"ref": "r1", "expression": "true", "logging": {"enabled": False}}
-        result = _cf_prepare_rule(rule, phase)
-        assert result["logging"] == {"enabled": False}
+        desired = [{"ref": "r1", "expression": "true", "action": "redirect", "enabled": True}]
+        current = [{"ref": "r1", "expression": "true", "action": "redirect", "enabled": True}]
+        plan = diff_phase(phase, desired, current)
+        assert not plan.has_changes
+
+    def test_skip_rule_diffs_clean_against_echoed_logging(self):
+        """A skip rule whose YAML omits ``logging`` must diff clean against
+        API state carrying the echoed ``logging: enabled: true`` — Cloudflare
+        stores and returns that default for skip rules."""
+        from octorules.planner import diff_phase
+
+        phase = get_phase("waf_custom_rules")
+        desired = [{"ref": "r1", "expression": "true", "action": "skip", "enabled": True}]
+        current = [
+            {
+                "ref": "r1",
+                "expression": "true",
+                "action": "skip",
+                "enabled": True,
+                "logging": {"enabled": True},
+            }
+        ]
+        plan = diff_phase(phase, desired, current)
+        assert not plan.has_changes
 
 
 class TestCustomRulesetRequiredFields:

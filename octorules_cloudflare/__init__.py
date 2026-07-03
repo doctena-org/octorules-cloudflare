@@ -19,8 +19,8 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
       cloudflare-python ``BlockRule.ratelimit``).
     - Default ``enabled`` to ``True``.
     - Inject ``phase.default_action`` when rule has no ``action``.
-    - Inject Cloudflare's ``logging.enabled: true`` API default when the
-      ``logging`` block is absent.
+    - Inject Cloudflare's ``logging.enabled: true`` API default on
+      ``skip``-action rules when the ``logging`` block is absent.
 
     Returns a new dict — the original *rule* is never mutated.
     """
@@ -45,12 +45,15 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
                 f"must specify an 'action' (no default for this phase)"
             )
         rule["action"] = phase.default_action
-    if "logging" not in rule:
-        # Cloudflare's PUT API stores ``logging.enabled: true`` when the
-        # field is absent and returns it on GET; injecting the default here
-        # keeps hand-written YAML that omits ``logging`` diff-clean against
-        # the API state. Explicit ``logging.enabled: false`` (quiet skip
-        # rules) is preserved as-is and still diffs against current state.
+    if rule.get("action") == "skip" and "logging" not in rule:
+        # Rule-level ``logging`` exists only on skip-action rules: for those,
+        # Cloudflare stores ``enabled: true`` when the field is absent from
+        # the PUT body and echoes it on GET, so injecting the default keeps
+        # YAML that omits ``logging`` diff-clean against API state. For every
+        # other action the API never returns the field — injecting there
+        # creates a desired-side-only value and a perpetual no-op MODIFY.
+        # Explicit ``logging.enabled: false`` (quiet skip rules) is
+        # preserved as-is and still diffs against current state.
         rule["logging"] = {"enabled": True}
     return rule
 
