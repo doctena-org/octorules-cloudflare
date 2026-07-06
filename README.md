@@ -74,6 +74,10 @@ Layer-4 phases, whose packet-level expressions are validated against
 octorules-wirefilter's L4 scheme). Together they exercise every supported phase
 and key. Copy them as a starting point.
 
+All Cloudflare sections (phases, settings, lists, and policies) can nest under
+a single `cloudflare:` block; the flat spelling (top-level keys) is still supported
+but deprecated.
+
 ## Supported features
 
 | Feature | Status |
@@ -111,7 +115,7 @@ Phases marked as both Zone and Account work at either scope. Account-only phases
 
 For the full phase reference — execution order diagram, valid actions per phase, field/function availability, and key behaviors — see [docs/lint/README.md](docs/lint/README.md).
 
-> **Note:** `waf_managed_exceptions` was renamed to `waf_managed_rules`. The old name still works as an alias but is deprecated — update your YAML files to use the new name.
+> **Note:** `waf_managed_exceptions` was renamed to `waf_managed_rules` and the old name is **no longer accepted**. Rename it in your YAML files *before* upgrading — plan and sync skip unknown sections with only a log warning, so a stale key would silently leave its managed-WAF rules unmanaged. `octorules lint` flags the old name as an error (CF010).
 
 ## Expression syntax
 

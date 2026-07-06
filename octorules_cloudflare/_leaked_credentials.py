@@ -20,13 +20,13 @@ validate_extension, and dump_extension.
 
 import logging
 
-from octorules.registration import idempotent_registration
-
-from octorules_cloudflare._settings_base import (
+from octorules.extensions import (
     SettingsChange,
     SettingsFormatter,
     SettingsPlan,
 )
+from octorules.registration import idempotent_registration
+
 from octorules_cloudflare._settings_common import (
     make_dump_hook,
     make_prefetch_hook,

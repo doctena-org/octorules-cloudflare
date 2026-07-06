@@ -10,9 +10,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from octorules.commands._helpers import _apply_parallel
 from octorules.expression import normalize_expression
 from octorules.extensions import (
+    make_synthetic_phase,
     register_apply_extension,
     register_dump_extension,
     register_format_extension,
@@ -25,8 +25,7 @@ from octorules.planner import (
     RuleChange,
     RuleValidationError,
     ZonePlan,
-    _make_synthetic_phase,
-    _normalize_value,
+    normalize_value,
 )
 from octorules.provider.base import (
     BaseProvider,
@@ -34,6 +33,7 @@ from octorules.provider.base import (
     provider_supports,
 )
 from octorules.provider.exceptions import ProviderAuthError, ProviderError
+from octorules.provider.utils import apply_parallel
 from octorules.provider.utils import format_api_error as _format_api_error
 from octorules.registration import idempotent_registration
 
@@ -163,7 +163,7 @@ _PAGE_SHIELD_DIFF_FIELDS = ("action", "expression", "enabled", "value")
 
 def _make_page_shield_phase(description: str) -> Phase:
     """Create a synthetic Phase for a page shield policy."""
-    return _make_synthetic_phase(
+    return make_synthetic_phase(
         "page_shield",
         description,
         "page_shield_policies",
@@ -182,7 +182,7 @@ def normalize_page_shield_policy(policy: dict) -> dict:
         if k == "value" and isinstance(v, str):
             result[k] = normalize_csp_value(v)
         else:
-            result[k] = _normalize_value(v, key=k)
+            result[k] = normalize_value(v, key=k)
     return result
 
 
@@ -198,8 +198,8 @@ def _diff_fields(desired: dict, current: dict, fields: tuple[str, ...]) -> list[
             d_cmp = normalize_csp_value(d_val) if isinstance(d_val, str) else d_val
             c_cmp = normalize_csp_value(c_val) if isinstance(c_val, str) else c_val
         else:
-            d_cmp = _normalize_value(d_val, key=fname)
-            c_cmp = _normalize_value(c_val, key=fname)
+            d_cmp = normalize_value(d_val, key=fname)
+            c_cmp = normalize_value(c_val, key=fname)
         if d_cmp != c_cmp:
             change = RuleChange(
                 change_type=ChangeType.MODIFY,
@@ -442,7 +442,7 @@ def _apply_page_shield(
         create_tasks.append((full_label, create_fn))
 
     if create_tasks:
-        create_synced, create_error = _apply_parallel(create_tasks, max_w)
+        create_synced, create_error = apply_parallel(create_tasks, max_w)
         synced.extend(create_synced)
         if create_error:
             return synced, create_error
@@ -479,7 +479,7 @@ def _apply_page_shield(
         update_tasks.append((full_label, update_fn))
 
     if update_tasks:
-        update_synced, update_error = _apply_parallel(update_tasks, max_w)
+        update_synced, update_error = apply_parallel(update_tasks, max_w)
         synced.extend(update_synced)
         if update_error:
             return synced, update_error
@@ -500,7 +500,7 @@ def _apply_page_shield(
         delete_tasks.append((full_label, del_fn))
 
     if delete_tasks:
-        del_synced, del_error = _apply_parallel(delete_tasks, max_w)
+        del_synced, del_error = apply_parallel(delete_tasks, max_w)
         synced.extend(del_synced)
         if del_error:
             return synced, del_error
@@ -538,7 +538,7 @@ def _validate_page_shield(
 # ---------------------------------------------------------------------------
 def _clean_page_shield_policies(policies: list[dict]) -> list[dict]:
     """Clean and format page shield policies for YAML dump output."""
-    from octorules.dumper import _literalize, _LiteralStr, _strip_trailing_whitespace
+    from octorules.dumper import literalize
 
     psp_api_fields = get_api_fields("page_shield_policy")
     policies_list = []
@@ -548,9 +548,9 @@ def _clean_page_shield_policies(policies: list[dict]) -> list[dict]:
             if k in psp_api_fields:
                 continue
             if k == "value" and isinstance(v, str) and len(v) > 80:
-                cleaned[k] = _LiteralStr(_strip_trailing_whitespace(format_csp_value(v)))
+                cleaned[k] = literalize(format_csp_value(v), block=True)
             else:
-                cleaned[k] = _literalize(v)
+                cleaned[k] = literalize(v)
         policies_list.append(cleaned)
     return policies_list
 
@@ -608,7 +608,7 @@ class PageShieldFormatter:
         return lines
 
     def format_json(self, plans: list) -> list[dict]:
-        from octorules.formatter import _change_to_dict
+        from octorules.formatter import change_to_dict
 
         result = []
         for psp in plans:
@@ -619,7 +619,7 @@ class PageShieldFormatter:
             }
             if psp.policy_id:
                 entry["policy_id"] = psp.policy_id
-            psp_changes = [_change_to_dict(c) for c in psp.changes]
+            psp_changes = [change_to_dict(c) for c in psp.changes]
             if psp_changes:
                 entry["changes"] = psp_changes
             result.append(entry)
@@ -628,26 +628,26 @@ class PageShieldFormatter:
     def format_markdown(
         self, plans: list, pending_diffs: list[list[tuple[str, object, object]]]
     ) -> list[str]:
-        from octorules.formatter import _md_change_row, _md_escape
+        from octorules.formatter import md_change_row, md_escape
 
         lines: list[str] = []
         for psp in plans:
             phase_label = f"page_shield:{psp.description}"
             if psp.create:
-                lines.append(f"| + | {_md_escape(phase_label)} | | create policy |")
+                lines.append(f"| + | {md_escape(phase_label)} | | create policy |")
             if psp.delete:
-                lines.append(f"| - | {_md_escape(phase_label)} | | delete policy |")
+                lines.append(f"| - | {md_escape(phase_label)} | | delete policy |")
             for c in psp.changes:
-                lines.append(_md_change_row(c, phase_label, pending_diffs, has_reorder=False))
+                lines.append(md_change_row(c, phase_label, pending_diffs, has_reorder=False))
         return lines
 
     def format_html(self, plans: list, lines: list[str]) -> tuple[int, int, int, int]:
         from html import escape as html_escape
 
         from octorules.formatter import (
-            _HTML_TABLE_HEADER,
-            _html_render_changes,
-            _html_summary_row,
+            HTML_TABLE_HEADER,
+            html_render_changes,
+            html_summary_row,
         )
 
         e = html_escape
@@ -655,7 +655,7 @@ class PageShieldFormatter:
 
         for psp in plans:
             lines.append(f"<h3>page_shield: {e(psp.description)}</h3>")
-            lines.extend(_HTML_TABLE_HEADER)
+            lines.extend(HTML_TABLE_HEADER)
 
             psp_creates = psp_removes = psp_modifies = 0
 
@@ -674,11 +674,11 @@ class PageShieldFormatter:
                 lines.append("    <td>delete policy</td>")
                 lines.append("  </tr>")
 
-            c_creates, c_removes, c_modifies, _ = _html_render_changes(psp.changes, lines)
+            c_creates, c_removes, c_modifies, _ = html_render_changes(psp.changes, lines)
             psp_creates += c_creates
             psp_removes += c_removes
             psp_modifies += c_modifies
-            lines.extend(_html_summary_row(psp_creates, psp_removes, psp_modifies, 0))
+            lines.extend(html_summary_row(psp_creates, psp_removes, psp_modifies, 0))
             lines.append("</table>")
 
             total_creates += psp_creates

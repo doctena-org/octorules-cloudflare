@@ -141,7 +141,10 @@ class TestPageShieldPoliciesCLI:
         result = cmd_dump(sample_config, ["example.com"], None)
         assert result == 0
         dumped = sample_config.rules_dir / "example.com.yaml"
-        data = yaml.safe_load(dumped.read_text())
+        # Dump emits the nested format; normalize back to the flat view.
+        from octorules.config import normalize_zone_format
+
+        data = normalize_zone_format(yaml.safe_load(dumped.read_text()), source="dumped")
         assert "page_shield_policies" in data
         assert data["page_shield_policies"][0]["description"] == "CSP on all"
 

@@ -92,6 +92,7 @@ def _fmt_scope(scope: Scope) -> str:
 class CloudflareProvider:
     """Wraps the Cloudflare Python SDK for ruleset phase operations."""
 
+    NAMESPACE = "cloudflare"
     SUPPORTS = frozenset({"custom_rulesets", "lists", "page_shield", "zone_discovery"})
 
     def __init__(

@@ -43,6 +43,14 @@ RULE_IDS = frozenset(
 # Maximum recommended description length
 _MAX_DESCRIPTION_LENGTH = 500
 
+# Phase keys whose rename aliases have been REMOVED from the registry: the
+# planner no longer resolves them, so plan/sync skip the section with only
+# a log warning — for a managed-WAF section that silently unmanages it.
+# Lint keeps flagging these as errors until v2.
+_REMOVED_PHASE_ALIASES: dict[str, str] = {
+    "waf_managed_exceptions": "waf_managed_rules",
+}
+
 
 def lint_yaml_structure(rules_data: dict[str, Any], ctx: LintContext) -> None:
     """Run all Category M structural checks on a zone rules file."""
@@ -65,6 +73,22 @@ def _check_top_level_keys(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
     for key in sorted(rules_data.keys()):
         if key in KNOWN_NON_PHASE_KEYS:
+            continue
+        if key in _REMOVED_PHASE_ALIASES:
+            new_name = _REMOVED_PHASE_ALIASES[key]
+            ctx.add(
+                LintResult(
+                    rule_id="CF010",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"Phase {key!r} has been renamed to {new_name!r} and the old"
+                        " name is no longer accepted — plan and sync ignore this"
+                        " section until it is renamed"
+                    ),
+                    phase=key,
+                    suggestion=f"Rename to {new_name!r}",
+                )
+            )
             continue
         if key in PHASE_BY_NAME and key not in CF_PHASE_NAMES and key not in RENAMED_PHASES:
             continue  # phase owned by another provider — not our business

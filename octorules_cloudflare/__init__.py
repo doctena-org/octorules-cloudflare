@@ -113,6 +113,49 @@ register_phases(_CF_PHASES)
 for _key in ("custom_rulesets", "lists", "page_shield_policies"):
     register_non_phase_key(_key)
 
+# Register namespace for nested zone-file format (cloudflare: block).
+# Maps bare nested key names to canonical flat keys.
+from octorules.phases import register_namespace  # noqa: E402
+
+_CLOUDFLARE_NAMESPACE_MAPPING = {
+    # Phases (already bare — no transformation needed)
+    "redirect_rules": "redirect_rules",
+    "url_rewrite_rules": "url_rewrite_rules",
+    "request_header_rules": "request_header_rules",
+    "response_header_rules": "response_header_rules",
+    "config_rules": "config_rules",
+    "origin_rules": "origin_rules",
+    "cache_rules": "cache_rules",
+    "compression_rules": "compression_rules",
+    "custom_error_rules": "custom_error_rules",
+    "waf_custom_rules": "waf_custom_rules",
+    "waf_managed_rules": "waf_managed_rules",
+    "rate_limiting_rules": "rate_limiting_rules",
+    "bot_fight_rules": "bot_fight_rules",
+    "sensitive_data_detection": "sensitive_data_detection",
+    "http_ddos_rules": "http_ddos_rules",
+    "bulk_redirect_rules": "bulk_redirect_rules",
+    "log_custom_fields": "log_custom_fields",
+    "network_ddos_rules": "network_ddos_rules",
+    "network_firewall_rules": "network_firewall_rules",
+    "network_firewall_managed": "network_firewall_managed",
+    "network_firewall_ratelimit": "network_firewall_ratelimit",
+    "network_firewall_ids": "network_firewall_ids",
+    "url_normalization": "url_normalization",
+    # Non-phase sections
+    "custom_rulesets": "custom_rulesets",
+    "lists": "lists",
+    "page_shield_policies": "page_shield_policies",
+    # Settings (drop cloudflare_ prefix)
+    "bot_management": "cloudflare_bot_management",
+    "zone_security": "cloudflare_zone_security",
+    "leaked_credential_check": "cloudflare_leaked_credential_check",
+    "content_scanning": "cloudflare_content_scanning",
+    # EXCEPTION: url_normalization_settings (because url_normalization is a phase)
+    "url_normalization_settings": "cloudflare_url_normalization",
+}
+register_namespace("cloudflare", _CLOUDFLARE_NAMESPACE_MAPPING)
+
 # Auto-register CF-specific lint rules and the lint plugin.
 register_cloudflare_linter()
 

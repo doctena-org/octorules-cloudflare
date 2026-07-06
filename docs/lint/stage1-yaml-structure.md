@@ -118,16 +118,19 @@ redirecr_rules:            # typo
 
 Fix: Use the correct phase name (e.g., `redirect_rules`).
 
-### CF010 — Deprecated phase name
+### CF010 — Renamed phase name
 
 | Severity | Category |
 |----------|----------|
-| WARNING | structure |
+| ERROR (removed names) / WARNING (registry aliases) | structure |
 
-Triggers when using a deprecated phase alias.
+Triggers when using an old phase name. For names whose rename alias has
+been removed — currently `waf_managed_exceptions` — this is an ERROR:
+plan and sync no longer resolve the old key and skip the section
+entirely, which would silently unmanage its rules.
 
 ```yaml
-waf_managed_exceptions:    # renamed to waf_managed_rules
+waf_managed_exceptions:    # renamed to waf_managed_rules; no longer accepted
   - ref: my-rule
     expression: 'true'
 ```

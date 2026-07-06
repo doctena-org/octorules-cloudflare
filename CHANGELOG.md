@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Zone files can nest all Cloudflare sections under a single `cloudflare:` block;
+  the flat spelling is deprecated.
+
+### Removed
+- The `waf_managed_exceptions` phase alias. **Rename to
+  `waf_managed_rules` before upgrading** — a stale section is skipped
+  with only a log warning, silently unmanaging its rules. Lint flags
+  the old name as an error (CF010).
+- The empty `[wirefilter]` extra (wirefilter is a base dependency since
+  0.12.0).
+
+### Changed
+- Minimum `octorules` dependency: `>=0.32.0` (settings extensions and
+  Page Shield use its public API; no output changes).
+
 ## [0.12.2] - 2026-07-02
 
 ### Fixed

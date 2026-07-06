@@ -1,11 +1,12 @@
 """Tests for the shared flat-settings data model and formatter base."""
 
-from octorules_cloudflare._bot_management import BotManagementPlan
-from octorules_cloudflare._content_scanning import ContentScanningFormatter
-from octorules_cloudflare._settings_base import (
+from octorules.extensions import (
     SettingsChange,
     SettingsPlan,
 )
+
+from octorules_cloudflare._bot_management import BotManagementPlan
+from octorules_cloudflare._content_scanning import ContentScanningFormatter
 
 
 class TestSettingsPlanDefaults:

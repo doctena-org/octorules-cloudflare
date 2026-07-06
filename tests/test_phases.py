@@ -289,27 +289,23 @@ class TestAllFriendlyNamesIncludesNewPhases:
         assert name in ALL_FRIENDLY_NAMES
 
 
-class TestRenamedPhaseAlias:
-    def test_alias_resolves_to_same_phase(self):
-        """waf_managed_exceptions alias should resolve to waf_managed_rules."""
-        alias_phase = PHASE_BY_NAME["waf_managed_exceptions"]
-        canonical_phase = get_phase("waf_managed_rules")
-        assert alias_phase is canonical_phase
+class TestRemovedPhaseAlias:
+    """The waf_managed_exceptions -> waf_managed_rules alias has been
+    removed: the old name no longer resolves anywhere in the registry
+    (CF010 flags it as an error at lint time instead)."""
 
-    def test_alias_not_in_phases_list(self):
-        """The alias should not appear in the PHASES list itself."""
-        names = [p.friendly_name for p in PHASES]
-        assert "waf_managed_exceptions" not in names
-
-    def test_alias_not_in_all_friendly_names(self):
-        """ALL_FRIENDLY_NAMES should only have canonical names."""
+    def test_old_name_not_in_registry(self):
+        assert "waf_managed_exceptions" not in PHASE_BY_NAME
         assert "waf_managed_exceptions" not in ALL_FRIENDLY_NAMES
-        assert "waf_managed_rules" in ALL_FRIENDLY_NAMES
 
-    def test_get_phase_with_alias(self):
-        """get_phase should work with the alias name."""
-        phase = get_phase("waf_managed_exceptions")
-        assert phase.friendly_name == "waf_managed_rules"
+    def test_get_phase_raises_for_old_name(self):
+        with pytest.raises(KeyError):
+            get_phase("waf_managed_exceptions")
+
+    def test_canonical_name_still_registered(self):
+        phase = get_phase("waf_managed_rules")
+        assert phase.provider_id == "http_request_firewall_managed"
+        assert "waf_managed_rules" in ALL_FRIENDLY_NAMES
 
 
 class TestCfPrepareRuleLoggingDefault:
@@ -489,10 +485,10 @@ class TestPhaseConsistency:
         for p in PHASES:
             assert p.friendly_name in PHASE_BY_NAME
 
-    def test_phase_by_name_alias_count(self):
-        """PHASE_BY_NAME should have one extra entry for the waf_managed_exceptions alias."""
-        # +1 for the waf_managed_exceptions -> waf_managed_rules alias
-        assert len(PHASE_BY_NAME) >= len(PHASES) + 1
+    def test_phase_by_name_has_no_cf_aliases(self):
+        """CF registers no phase aliases — PHASE_BY_NAME carries exactly
+        one entry per registered phase (any extras would be aliases)."""
+        assert len(PHASE_BY_NAME) >= len(PHASES)
 
 
 class TestGetPhaseByNewProviderIds:
