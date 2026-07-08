@@ -15,9 +15,10 @@ Triggers when the wirefilter FFI parser rejects the rule's expression. Catches u
 Standalone `true`/`false` expressions are handled before wirefilter and will not trigger this rule. Value expressions in `action_parameters` (e.g. `regex_replace(...)`) are also excluded since wirefilter only parses boolean filter expressions.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: bad-syntax
-    expression: 'http.host eq'   # incomplete expression
+    expression: http.host eq
 ```
 
 Fix: Correct the expression syntax.
@@ -45,10 +46,11 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 Triggers when the rule's `action` is not in the set of valid actions for its phase.
 
 ```yaml
-cache_rules:
+cloudflare:
+  cache_rules:
   - ref: my-rule
     expression: 'true'
-    action: block           # block is not valid for cache_rules
+    action: block
 ```
 
 Fix: Use a valid action for the phase, or omit `action` if the phase has a default.
@@ -62,10 +64,10 @@ Fix: Use a valid action for the phase, or omit `action` if the phase has a defau
 Triggers when `action` is not specified and the phase has no default action (e.g., `waf_custom_rules`, `rate_limiting_rules`).
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: my-rule
     expression: 'true'
-    # missing action — waf_custom_rules has no default
 ```
 
 Fix: Add an explicit `action` (e.g., `block`, `challenge`, `log`).
@@ -79,10 +81,10 @@ Fix: Add an explicit `action` (e.g., `block`, `challenge`, `log`).
 Triggers when the action's schema requires parameters but none are provided.
 
 ```yaml
-redirect_rules:
+cloudflare:
+  redirect_rules:
   - ref: my-redirect
     expression: 'true'
-    # missing action_parameters — redirect requires from_value
 ```
 
 Fix: Add the required `action_parameters`.
@@ -164,11 +166,12 @@ Fix: Remove `action_parameters` for this action.
 Triggers when the `content` field in a `serve_error` action's parameters exceeds 10,240 bytes (UTF-8 encoded).
 
 ```yaml
-custom_error_rules:
+cloudflare:
+  custom_error_rules:
   - ref: error-page
     expression: 'true'
     action_parameters:
-      content: "<html>... very large HTML ...</html>"   # >10KB
+      content: <html>... very large HTML ...</html>
       status_code: 503
 ```
 
@@ -183,13 +186,14 @@ Fix: Reduce the content size to under 10KB. Consider linking to external assets 
 Triggers when a `skip` action's `phases` list contains an unrecognized Cloudflare phase identifier.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: skip-rule
     action: skip
     action_parameters:
       phases:
-        - http_request_firewall_custom
-        - bogus_phase                     # not a valid CF phase
+      - http_request_firewall_custom
+      - bogus_phase
 ```
 
 Fix: Use valid Cloudflare phase identifiers (e.g. `http_request_firewall_custom`, `http_ratelimit`, `http_request_firewall_managed`).
@@ -203,13 +207,14 @@ Fix: Use valid Cloudflare phase identifiers (e.g. `http_request_firewall_custom`
 Triggers when a `skip` action's `products` list contains an unrecognized product name.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: skip-rule
     action: skip
     action_parameters:
       products:
-        - waf
-        - bogus_product                   # not a valid product
+      - waf
+      - bogus_product
 ```
 
 Fix: Use valid product names: `bic`, `hot`, `rateLimit`, `securityLevel`, `uaBlock`, `waf`, `zoneLockdown`.
@@ -223,13 +228,14 @@ Fix: Use valid product names: `bic`, `hot`, `rateLimit`, `securityLevel`, `uaBlo
 Triggers when a `compress_response` action's `algorithms` list contains an unrecognized compression algorithm.
 
 ```yaml
-compression_rules:
+cloudflare:
+  compression_rules:
   - ref: compress-rule
     expression: 'true'
     action_parameters:
       algorithms:
-        - name: gzip
-        - name: deflate                    # not a valid algorithm
+      - name: gzip
+      - name: deflate
 ```
 
 Fix: Use valid algorithms: `gzip`, `brotli`, `zstd`, `none`, `auto`.
@@ -243,13 +249,14 @@ Fix: Use valid algorithms: `gzip`, `brotli`, `zstd`, `none`, `auto`.
 Triggers when a rate limiting rule's `characteristics` list contains an unrecognized value.
 
 ```yaml
-rate_limiting_rules:
+cloudflare:
+  rate_limiting_rules:
   - ref: rate-limit
     action: block
     action_parameters:
       characteristics:
-        - ip.src
-        - bogus.field                      # not a valid characteristic
+      - ip.src
+      - bogus.field
       period: 60
       requests_per_period: 100
 ```
@@ -268,15 +275,16 @@ Triggers when a `block` action's `action_parameters.response` contains invalid v
 - `content` must be a string.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: block-with-response
     action: block
-    expression: 'ip.src in {1.2.3.4}'
+    expression: ip.src in {1.2.3.4}
     action_parameters:
       response:
-        status_code: 503   # must be 400-499
+        status_code: 503
         content_type: text/html
-        content: "<h1>Blocked</h1>"
+        content: <h1>Blocked</h1>
 ```
 
 Fix: Use a status code in the 400–499 range. Cloudflare only allows 4xx responses for block actions.
@@ -290,11 +298,12 @@ Fix: Use a status code in the 400–499 range. Cloudflare only allows 4xx respon
 Triggers when an `execute` action's `action_parameters` is missing the required `id` field. The `id` identifies which managed ruleset or custom ruleset to execute.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: deploy-custom
     expression: 'true'
     action: execute
-    action_parameters: {}   # missing id
+    action_parameters: {}
 ```
 
 Fix:
@@ -328,13 +337,14 @@ Fix: Use the correct 32-character hex ruleset ID from Cloudflare.
 Triggers when a `compress_response` action's `algorithms` list has a terminal algorithm (`none`, `auto`) that is not the last entry. Terminal algorithms stop the algorithm negotiation — any algorithms listed after them will never be used.
 
 ```yaml
-compression_rules:
+cloudflare:
+  compression_rules:
   - ref: compress
     expression: 'true'
     action_parameters:
       algorithms:
-        - name: auto     # terminal — stops negotiation
-        - name: gzip     # never reached
+      - name: auto
+      - name: gzip
 ```
 
 Fix: Move terminal algorithms to the end of the list, or remove subsequent entries.
@@ -362,7 +372,8 @@ The `skip` action's `rulesets` list contains an empty or whitespace-only entry. 
 The `execute` action's `overrides` contain a `sensitivity_level` value that is not one of the recognized levels (`default`, `medium`, `low`, `eoff`). Each override entry's sensitivity must be a valid Cloudflare WAF sensitivity level.
 
 ```yaml
-waf_managed_rules:
+cloudflare:
+  waf_managed_rules:
   - ref: deploy-owasp
     expression: 'true'
     action: execute
@@ -370,8 +381,8 @@ waf_managed_rules:
       id: abc12345def67890abc12345def67890
       overrides:
         rules:
-          - id: rule123
-            sensitivity_level: extreme   # not a valid value
+        - id: rule123
+          sensitivity_level: extreme
 ```
 
 **Fix:** Use one of the valid sensitivity levels: `default`, `medium`, `low`, or `eoff`.
@@ -383,13 +394,14 @@ waf_managed_rules:
 The `serve_error` action's `content_type` value is not one of the recognized MIME types for custom error responses. Cloudflare only supports specific content types for error pages.
 
 ```yaml
-custom_error_rules:
+cloudflare:
+  custom_error_rules:
   - ref: custom-error
     expression: 'true'
     action: serve_error
     action_parameters:
-      content: "<h1>Error</h1>"
-      content_type: application/pdf   # not a valid serve_error content type
+      content: <h1>Error</h1>
+      content_type: application/pdf
 ```
 
 **Fix:** Use a valid content type for serve_error responses (e.g., `text/html`, `text/xml`, `application/json`, `text/plain`).
@@ -401,12 +413,13 @@ custom_error_rules:
 The `skip` action's `ruleset` parameter must be the string `"current"`. Any other value is rejected by the Cloudflare API — the only supported skip scope for rulesets is the current ruleset.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: skip-waf
-    expression: '(ip.src eq 10.0.0.1)'
+    expression: (ip.src eq 10.0.0.1)
     action: skip
     action_parameters:
-      ruleset: all   # must be "current"
+      ruleset: all
 ```
 
 **Fix:** Set `ruleset` to `"current"`.
@@ -420,14 +433,16 @@ Cloudflare rejects `action: skip` in `waf_custom_rules` rules deployed at the ac
 CF223 detects account scope via the `cf.zone.plan eq "ENT"` expression suffix that Cloudflare requires on account-level rules.
 
 ```yaml
-# In an account-scoped YAML (e.g. <account-slug>.yaml):
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: skip-trusted-asn
-    expression: '(ip.src.asnum eq 12345) and (cf.zone.plan eq "ENT")'
-    action: skip   # ERROR — CF rejects skip at account level
+    expression: (ip.src.asnum eq 12345) and (cf.zone.plan eq "ENT")
+    action: skip
     action_parameters:
       ruleset: current
-      phases: [http_request_firewall_managed, http_ratelimit]
+      phases:
+      - http_request_firewall_managed
+      - http_ratelimit
 ```
 
 **Fix:** Move the rule to a zone-level YAML file, or rewrite the action as `block` / `managed_challenge` if the intent is to allow specific traffic through.
@@ -441,9 +456,10 @@ Cloudflare's Rulesets API rejects a rule expression longer than 4096 characters 
 The length is measured against the canonical, whitespace-normalized form of the expression (the same form octorules sends to the API), so a multi-line YAML block scalar is judged by its collapsed single-line length, not its source-byte count. 4096 is the maximum allowed; the rule fires at 4097+.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: block-attackers
-    expression: '(ip.src in {1.2.3.4 5.6.7.8 ...})'   # 350+ inline IPs → 4097+ chars
+    expression: (ip.src in {1.2.3.4 5.6.7.8 ...})
     action: block
 ```
 
@@ -702,11 +718,12 @@ Fix: Confirm this is intentional. If not, use a higher security level.
 Triggers when `ssl` is explicitly set to `off`. This disables SSL/TLS encryption, allowing traffic to travel unencrypted between Cloudflare and your origin.
 
 ```yaml
-config_rules:
+cloudflare:
+  config_rules:
   - ref: disable-ssl
-    expression: 'http.host eq "legacy.example.com"'
+    expression: http.host eq "legacy.example.com"
     action_parameters:
-      ssl: off
+      ssl: false
 ```
 
 Fix: Confirm this is intentional. If not, use `flexible`, `full`, `strict`, or `origin_pull`.
@@ -802,13 +819,14 @@ Fix: Use a valid operation value.
 Triggers when a header transform with `operation: set` or `operation: add` has neither a `value` nor an `expression` key.
 
 ```yaml
-request_header_rules:
+cloudflare:
+  request_header_rules:
   - ref: missing-value
     expression: 'true'
     action_parameters:
       headers:
         x-custom:
-          operation: set     # missing value or expression
+          operation: set
 ```
 
 Fix:
@@ -832,13 +850,14 @@ Triggers when an expression embedded in transform `action_parameters` (e.g., `ur
 Known transform function-call patterns (`regex_replace()`, `concat()`, `lower()`, etc.) are suppressed because wirefilter doesn't support the function-call syntax that Cloudflare accepts in transform phases.
 
 ```yaml
-url_rewrite_rules:
+cloudflare:
+  url_rewrite_rules:
   - ref: bad-rewrite
     expression: 'true'
     action_parameters:
       uri:
         path:
-          expression: 'invalid syntax <<<'
+          expression: invalid syntax <<<
 ```
 
 Fix: Correct the expression syntax.
@@ -852,14 +871,15 @@ Fix: Correct the expression syntax.
 Triggers when a header transform in `request_header_rules` uses `operation: add`. Cloudflare only supports `set` and `remove` for request header modifications. The `add` operation (append a value) is only available in `response_header_rules`.
 
 ```yaml
-request_header_rules:
+cloudflare:
+  request_header_rules:
   - ref: add-header
     expression: 'true'
     action_parameters:
       headers:
         x-custom:
-          operation: add       # not valid for request headers
-          value: "my-value"
+          operation: add
+          value: my-value
 ```
 
 Fix: Use `operation: set` instead, or move the rule to `response_header_rules` if you need `add`.
@@ -873,7 +893,8 @@ Fix: Use `operation: set` instead, or move the rule to `response_header_rules` i
 Triggers when a header transform with `operation: remove` includes a `value` or `expression` field. The Cloudflare API ignores these fields on remove operations — their presence is misleading.
 
 ```yaml
-request_header_rules:
+cloudflare:
+  request_header_rules:
   - ref: cleanup
     expression: (true)
     action: rewrite
@@ -881,7 +902,7 @@ request_header_rules:
       headers:
         X-Debug:
           operation: remove
-          value: "ignored"      # CF API ignores this
+          value: ignored
 ```
 
 Fix: Remove the `value` or `expression` field — only specify the header name and `operation: remove`.
@@ -899,15 +920,16 @@ Cloudflare forbids modifying certain request headers in transform rules, and rej
 - Headers that identify the visitor IP/protocol — `x-forwarded-for`, `true-client-ip`, `x-real-ip`, `x-forwarded-proto` — cannot have their value set or modified (they can be removed).
 
 ```yaml
-request_header_rules:
+cloudflare:
+  request_header_rules:
   - ref: spoof
     expression: (true)
     action: rewrite
     action_parameters:
       headers:
         X-Forwarded-For:
-          operation: set        # rejected — visitor-IP header is immutable
-          value: "203.0.113.1"
+          operation: set
+          value: 203.0.113.1
 ```
 
 Fix: Don't set/modify reserved headers. If you need to strip one (e.g. `cookie`, `x-forwarded-for`), use `operation: remove` where Cloudflare permits it.
@@ -923,15 +945,16 @@ Fix: Don't set/modify reserved headers. If you need to strip one (e.g. `cookie`,
 A transform header name may contain only letters, digits, hyphen, and underscore (`^[A-Za-z0-9_-]+$`) — for both request and response header transforms. Cloudflare rejects names with other characters.
 
 ```yaml
-response_header_rules:
+cloudflare:
+  response_header_rules:
   - ref: bad
     expression: (true)
     action: rewrite
     action_parameters:
       headers:
-        "X Spaced Header":      # rejected — space is not allowed
+        X Spaced Header:
           operation: set
-          value: "1"
+          value: '1'
 ```
 
 Fix: Use only `A-Z a-z 0-9 - _` in the header name.
@@ -1502,9 +1525,10 @@ expression: 'lookup_json_string(http.request.body.raw, "/name") eq "test"'
 Triggers when `bit_slice()` is called with an offset or size outside the valid range. The offset must be between 0 and 2040, and the size must be between 1 and 32. `bit_slice` is only available in network (Magic Transit) phases.
 
 ```yaml
-network_firewall_rules:
+cloudflare:
+  network_firewall_rules:
   - ref: bad-bit-slice
-    expression: 'bit_slice(ip.hdr, 3000, 8) eq 0x45'   # offset > 2040
+    expression: bit_slice(ip.hdr, 3000, 8) eq 0x45
 ```
 
 Fix: Use valid offset (0–2040) and size (1–32) values.
@@ -1872,16 +1896,15 @@ Triggers when an inline `in {…}` list contains more than 25 entries. Large inl
 Fix: Move the list to a managed list at the top level.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: blocked_ips
     kind: ip
     items:
-      - 1.2.3.4
-      - 5.6.7.8
-      - 9.10.11.12
-      # ... more entries
-
-waf_custom_rules:
+    - 1.2.3.4
+    - 5.6.7.8
+    - 9.10.11.12
+  waf_custom_rules:
   - ref: r-long-inline
     expression: ip.src in $blocked_ips
     action: block

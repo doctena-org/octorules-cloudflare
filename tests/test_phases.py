@@ -51,7 +51,7 @@ class TestPhaseRegistry:
             get_phase("nonexistent_rules")
 
     def test_unknown_phase_with_suggestion(self):
-        with pytest.raises(KeyError, match="Did you mean 'redirect_rules'"):
+        with pytest.raises(KeyError, match="Did you mean 'cloudflare.redirect_rules'"):
             get_phase("redirect_rule")
 
     def test_unknown_phase_no_suggestion_lists_valid(self):
@@ -584,7 +584,7 @@ class TestSuggestPhase:
 class TestUnknownPhaseMessage:
     def test_with_suggestion(self):
         msg = unknown_phase_message("redirect_rule")
-        assert "Did you mean 'redirect_rules'?" in msg
+        assert "Did you mean 'cloudflare.redirect_rules'?" in msg
 
     def test_without_suggestion(self):
         msg = unknown_phase_message("zzz_totally_wrong")
@@ -593,4 +593,4 @@ class TestUnknownPhaseMessage:
 
     def test_provider_id_suggests_friendly(self):
         msg = unknown_phase_message("http_request_dynamic_redirect")
-        assert "Did you mean 'redirect_rules'?" in msg
+        assert "Did you mean 'cloudflare.redirect_rules'?" in msg

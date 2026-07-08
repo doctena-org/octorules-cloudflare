@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from octorules.cli import cmd_dump, cmd_plan, cmd_sync
-from octorules.commands._validate import cmd_validate
 from octorules.config import Config, ProviderConfig, ZoneConfig
 from octorules.phases import get_phase
 from octorules.planner import ChangeType, RuleChange, ZonePlan
@@ -164,52 +163,66 @@ class TestPageShieldPoliciesCLI:
         data = yaml.safe_load(dumped.read_text())
         assert "page_shield_policies" not in (data or {})
 
-    def test_validate_page_shield_policies_ok(self, sample_config, caplog):
-        rules_file = sample_config.rules_dir / "example.com.yaml"
-        rules_file.write_text(
-            "page_shield_policies:\n"
-            "  - description: 'CSP on all'\n"
-            "    action: allow\n"
-            "    expression: 'true'\n"
-            "    enabled: true\n"
-            "    value: \"script-src 'self'\"\n"
-        )
-        with (
-            caplog.at_level(logging.INFO, logger="octorules"),
-            caplog.at_level(logging.INFO, logger="octorules_cloudflare"),
-        ):
-            result = cmd_validate(sample_config, ["example.com"])
-        assert result == 0
-        assert "page_shield:CSP on all: OK" in caplog.text
+    def test_lint_page_shield_policies_ok(self):
+        """A valid policy produces no CORE010 finding via the lint hook path."""
+        from octorules.commands._lint import _core_lint_zone
+        from octorules.linter.engine import LintContext
 
-    def test_validate_page_shield_policies_error(self, sample_config, caplog):
-        rules_file = sample_config.rules_dir / "example.com.yaml"
-        rules_file.write_text(
-            "page_shield_policies:\n"
-            "  - description: ''\n"
-            "    action: allow\n"
-            "    expression: 'true'\n"
-            "    enabled: true\n"
-            "    value: \"script-src 'self'\"\n"
-        )
-        with caplog.at_level(logging.ERROR, logger="octorules"):
-            result = cmd_validate(sample_config, ["example.com"])
-        assert result == 1
-        assert "page_shield_policies" in caplog.text
+        desired = {
+            "page_shield_policies": [
+                {
+                    "description": "CSP on all",
+                    "action": "allow",
+                    "expression": "true",
+                    "enabled": True,
+                    "value": "script-src 'self'",
+                }
+            ]
+        }
+        ctx = LintContext(zone_name="example.com")
+        _core_lint_zone(desired, ctx)
+        assert not [r for r in ctx.results if r.rule_id == "CORE010"]
 
-    def test_validate_page_shield_invalid_action(self, sample_config, caplog):
-        rules_file = sample_config.rules_dir / "example.com.yaml"
-        rules_file.write_text(
-            "page_shield_policies:\n"
-            "  - description: 'CSP'\n"
-            "    action: invalid_action\n"
-            "    expression: 'true'\n"
-            "    enabled: true\n"
-            "    value: 'v'\n"
-        )
-        with caplog.at_level(logging.ERROR, logger="octorules"):
-            result = cmd_validate(sample_config, ["example.com"])
-        assert result == 1
+    def test_lint_page_shield_policies_error(self):
+        """An empty description surfaces as a CORE010 lint error."""
+        from octorules.commands._lint import _core_lint_zone
+        from octorules.linter.engine import LintContext, Severity
+
+        desired = {
+            "page_shield_policies": [
+                {
+                    "description": "",
+                    "action": "allow",
+                    "expression": "true",
+                    "enabled": True,
+                    "value": "script-src 'self'",
+                }
+            ]
+        }
+        ctx = LintContext(zone_name="example.com")
+        _core_lint_zone(desired, ctx)
+        core010 = [r for r in ctx.results if r.rule_id == "CORE010"]
+        assert core010 and core010[0].severity == Severity.ERROR
+        assert "page_shield_policies" in core010[0].message
+
+    def test_lint_page_shield_invalid_action(self):
+        from octorules.commands._lint import _core_lint_zone
+        from octorules.linter.engine import LintContext
+
+        desired = {
+            "page_shield_policies": [
+                {
+                    "description": "CSP",
+                    "action": "invalid_action",
+                    "expression": "true",
+                    "enabled": True,
+                    "value": "v",
+                }
+            ]
+        }
+        ctx = LintContext(zone_name="example.com")
+        _core_lint_zone(desired, ctx)
+        assert [r for r in ctx.results if r.rule_id == "CORE010"]
 
     @patch("octorules.commands._providers._init_providers")
     def test_sync_creates_page_shield_policy(self, mock_init_provs, sample_config, caplog):

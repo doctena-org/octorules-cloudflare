@@ -313,14 +313,6 @@ class TestUnsupportedFields:
         assert "bot_management.fight_mode" in html
         assert "not exposed on this zone" in html
 
-    def test_format_report_unsupported_is_not_drift(self):
-        fmt = BotManagementFormatter()
-        plan = BotManagementPlan(changes=[], unsupported=["fight_mode"])
-        phases_data: list = []
-        drift = fmt.format_report([plan], False, phases_data)
-        assert drift is False
-        assert phases_data == []
-
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -756,46 +748,6 @@ class TestFormatHtml:
         html = "\n".join(lines)
         assert "&lt;script&gt;" in html
         assert "<script>" not in html.replace("&lt;script&gt;", "")
-
-
-# ---------------------------------------------------------------------------
-# Format extension -- format_report
-# ---------------------------------------------------------------------------
-class TestFormatReport:
-    def test_with_drift(self):
-        fmt = BotManagementFormatter()
-        plan = BotManagementPlan(
-            changes=[
-                BotManagementChange("fight_mode", False, True),
-                BotManagementChange("ai_bots_protection", "disabled", "block"),
-            ]
-        )
-        phases_data: list[dict] = []
-        result = fmt.format_report([plan], zone_has_drift=False, phases_data=phases_data)
-        assert result is True
-        assert len(phases_data) == 1
-        entry = phases_data[0]
-        assert entry["phase"] == "bot_management"
-        assert entry["provider_id"] == "cloudflare_bot_management"
-        assert entry["status"] == "drifted"
-        assert entry["modifies"] == 2
-        assert entry["adds"] == 0
-        assert entry["removes"] == 0
-
-    def test_preserves_incoming_drift(self):
-        fmt = BotManagementFormatter()
-        plan = BotManagementPlan(changes=[BotManagementChange("fight_mode", True, True)])
-        phases_data: list[dict] = []
-        result = fmt.format_report([plan], zone_has_drift=True, phases_data=phases_data)
-        assert result is True
-        assert phases_data == []
-
-    def test_no_drift(self):
-        fmt = BotManagementFormatter()
-        phases_data: list[dict] = []
-        result = fmt.format_report([], zone_has_drift=False, phases_data=phases_data)
-        assert result is False
-        assert phases_data == []
 
 
 # ---------------------------------------------------------------------------

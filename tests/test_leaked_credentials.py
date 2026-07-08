@@ -511,28 +511,6 @@ class TestFormatHtml:
 
 
 # ---------------------------------------------------------------------------
-# Format extension — format_report
-# ---------------------------------------------------------------------------
-class TestFormatReport:
-    def test_with_drift(self):
-        fmt = LeakedCredentialFormatter()
-        plan = LeakedCredentialPlan(changes=[LeakedCredentialChange("enabled", False, True)])
-        phases_data: list[dict] = []
-        result = fmt.format_report([plan], zone_has_drift=False, phases_data=phases_data)
-        assert result is True
-        assert len(phases_data) == 1
-        entry = phases_data[0]
-        assert entry["phase"] == "leaked_credential_check"
-        assert entry["provider_id"] == "cloudflare_leaked_credential_check"
-        assert entry["status"] == "drifted"
-
-    def test_no_drift(self):
-        fmt = LeakedCredentialFormatter()
-        result = fmt.format_report([], zone_has_drift=False, phases_data=[])
-        assert result is False
-
-
-# ---------------------------------------------------------------------------
 # Provider methods
 # ---------------------------------------------------------------------------
 class TestProviderGetLeakedCredentialCheck:

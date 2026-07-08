@@ -17,7 +17,6 @@ from octorules.phases import (
     PHASE_BY_NAME,
     PHASE_BY_PROVIDER_ID,
     RENAMED_PHASES,
-    suggest_phase,
 )
 
 RULE_IDS = frozenset(
@@ -28,7 +27,6 @@ RULE_IDS = frozenset(
         "CF006",
         "CF007",
         "CF008",
-        "CF009",
         "CF010",
         "CF011",
         "CF012",
@@ -46,10 +44,15 @@ _MAX_DESCRIPTION_LENGTH = 500
 # Phase keys whose rename aliases have been REMOVED from the registry: the
 # planner no longer resolves them, so plan/sync skip the section with only
 # a log warning — for a managed-WAF section that silently unmanages it.
-# Lint keeps flagging these as errors until v2.
+# Lint keeps flagging these as errors for as long as the table has entries.
 _REMOVED_PHASE_ALIASES: dict[str, str] = {
     "waf_managed_exceptions": "waf_managed_rules",
 }
+
+# Zone files nest Cloudflare sections under this namespace; core flattens
+# them to ``"cloudflare:<member>"`` for anything it cannot map, so the
+# removed-alias check has to see through that scoping.
+_NAMESPACE_PREFIX = "cloudflare:"
 
 
 def lint_yaml_structure(rules_data: dict[str, Any], ctx: LintContext) -> None:
@@ -68,20 +71,29 @@ def lint_yaml_structure(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
 
 def _check_top_level_keys(rules_data: dict[str, Any], ctx: LintContext) -> None:
-    """Check for unknown, deprecated, or CF-identifier phase keys (CF009, CF010, CF014)."""
+    """Check for deprecated or CF-identifier phase keys (CF010, CF014).
+
+    Generic unknown sections are core's CORE011 — it sees the whole file
+    and every registered namespace, whereas only the zone's own target
+    plugin runs here.
+    """
     from octorules_cloudflare import CF_PHASE_NAMES
 
     for key in sorted(rules_data.keys()):
         if key in KNOWN_NON_PHASE_KEYS:
             continue
-        if key in _REMOVED_PHASE_ALIASES:
-            new_name = _REMOVED_PHASE_ALIASES[key]
+        # A nested section core could not map arrives as "cloudflare:<member>";
+        # match the removed aliases against the member so the canonical
+        # nested spelling is flagged just like the flat one.
+        bare = key[len(_NAMESPACE_PREFIX) :] if key.startswith(_NAMESPACE_PREFIX) else key
+        if bare in _REMOVED_PHASE_ALIASES:
+            new_name = _REMOVED_PHASE_ALIASES[bare]
             ctx.add(
                 LintResult(
                     rule_id="CF010",
                     severity=Severity.ERROR,
                     message=(
-                        f"Phase {key!r} has been renamed to {new_name!r} and the old"
+                        f"Phase {bare!r} has been renamed to {new_name!r} and the old"
                         " name is no longer accepted — plan and sync ignore this"
                         " section until it is renamed"
                     ),
@@ -117,22 +129,7 @@ def _check_top_level_keys(rules_data: dict[str, Any], ctx: LintContext) -> None:
                     suggestion=f"Use {friendly!r} instead",
                 )
             )
-        elif key not in PHASE_BY_NAME:
-            suggestion = suggest_phase(key)
-            msg = f"Unknown top-level key {key!r}"
-            fix = ""
-            if suggestion:
-                msg += f". Did you mean {suggestion!r}?"
-                fix = f"Rename to {suggestion!r}"
-            ctx.add(
-                LintResult(
-                    rule_id="CF009",
-                    severity=Severity.WARNING,
-                    message=msg,
-                    phase=key,
-                    suggestion=fix,
-                )
-            )
+        # Anything else unknown falls to core's CORE011.
 
 
 def _check_phase_rules(phase_name: str, rules: Any, ctx: LintContext) -> None:

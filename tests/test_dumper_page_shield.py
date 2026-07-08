@@ -32,7 +32,7 @@ class TestDumpPageShieldPolicies:
             {
                 "id": "policy-123",
                 "last_updated": "2026-01-01",
-                "description": "CSP on all doctena.com",
+                "description": "CSP on all example.com",
                 "action": "allow",
                 "expression": "true",
                 "enabled": True,
@@ -45,7 +45,7 @@ class TestDumpPageShieldPolicies:
         assert "page_shield_policies" in data
         assert len(data["page_shield_policies"]) == 1
         policy = data["page_shield_policies"][0]
-        assert policy["description"] == "CSP on all doctena.com"
+        assert policy["description"] == "CSP on all example.com"
         assert policy["action"] == "allow"
         assert policy["expression"] == "true"
         assert policy["enabled"] is True

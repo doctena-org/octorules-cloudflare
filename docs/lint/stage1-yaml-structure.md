@@ -13,17 +13,18 @@ Validates top-level keys, required fields, types, and structural correctness bef
 Triggers when:
 
 ```yaml
-redirect_rules:
-  - expression: 'http.host eq "example.com"'
-    # no ref field
+cloudflare:
+  redirect_rules:
+  - expression: http.host eq "example.com"
 ```
 
 Fix:
 
 ```yaml
-redirect_rules:
+cloudflare:
+  redirect_rules:
   - ref: my-redirect
-    expression: 'http.host eq "example.com"'
+    expression: http.host eq "example.com"
 ```
 
 ### CF004 — Missing expression field
@@ -35,17 +36,18 @@ redirect_rules:
 Triggers when:
 
 ```yaml
-redirect_rules:
+cloudflare:
+  redirect_rules:
   - ref: my-redirect
-    # no expression field
 ```
 
 Fix:
 
 ```yaml
-redirect_rules:
+cloudflare:
+  redirect_rules:
   - ref: my-redirect
-    expression: 'http.host eq "example.com"'
+    expression: http.host eq "example.com"
 ```
 
 ### CF005 — Duplicate ref within phase
@@ -57,11 +59,12 @@ redirect_rules:
 Triggers when two or more rules in the same phase share the same `ref` value.
 
 ```yaml
-redirect_rules:
+cloudflare:
+  redirect_rules:
   - ref: my-rule
-    expression: 'http.host eq "a.com"'
-  - ref: my-rule          # duplicate
-    expression: 'http.host eq "b.com"'
+    expression: http.host eq "a.com"
+  - ref: my-rule
+    expression: http.host eq "b.com"
 ```
 
 Fix: Give each rule a unique `ref` within its phase.
@@ -102,22 +105,6 @@ Triggers when `enabled` is present but not a boolean.
 
 Fix: Use `enabled: true` or `enabled: false`.
 
-### CF009 — Unknown top-level phase key
-
-| Severity | Category |
-|----------|----------|
-| WARNING | structure |
-
-Triggers when a top-level key is not a recognized phase name or known non-phase key (`custom_rulesets`, `lists`, `page_shield_policies`). Includes "did you mean?" suggestions.
-
-```yaml
-redirecr_rules:            # typo
-  - ref: my-rule
-    expression: 'true'
-```
-
-Fix: Use the correct phase name (e.g., `redirect_rules`).
-
 ### CF010 — Renamed phase name
 
 | Severity | Category |
@@ -156,14 +143,16 @@ Fix: Shorten the description.
 Triggers when a phase key's value is not a list.
 
 ```yaml
-redirect_rules:
-  ref: my-rule             # should be a list of rules
+cloudflare:
+  redirect_rules:
+    ref: my-rule
 ```
 
 Fix: Wrap rules in a list.
 
 ```yaml
-redirect_rules:
+cloudflare:
+  redirect_rules:
   - ref: my-rule
     expression: 'true'
 ```
@@ -177,8 +166,9 @@ redirect_rules:
 Triggers when an entry in a phase list is not a mapping.
 
 ```yaml
-redirect_rules:
-  - "just a string"        # must be a dict
+cloudflare:
+  redirect_rules:
+  - just a string
 ```
 
 Fix: Use a proper mapping with `ref` and `expression` keys.
@@ -236,9 +226,10 @@ owns the cap and measures the normalized form the API receives. Remove any
 Triggers when a rule has `enabled: false`. Disabled rules are valid but may indicate stale configuration.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: old-block
-    expression: 'ip.src in {1.2.3.4}'
+    expression: ip.src in {1.2.3.4}
     action: block
     enabled: false
 ```

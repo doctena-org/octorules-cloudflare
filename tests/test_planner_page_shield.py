@@ -13,8 +13,8 @@ from octorules.planner import (
     RuleValidationError,
     ZonePlan,
     check_safety,
+    check_zone_sections,
     compute_checksum,
-    warn_unknown_phase_keys,
 )
 from octorules.provider.base import Scope
 
@@ -490,7 +490,7 @@ class TestWarnUnknownPhaseKeysPageShield:
     def test_page_shield_policies_not_warned(self, caplog):
         rules_data = {"redirect_rules": [], "page_shield_policies": []}
         with caplog.at_level(logging.WARNING, logger="octorules"):
-            warn_unknown_phase_keys(rules_data, "example.com")
+            check_zone_sections(rules_data, "example.com")
         assert "page_shield_policies" not in caplog.text
 
 

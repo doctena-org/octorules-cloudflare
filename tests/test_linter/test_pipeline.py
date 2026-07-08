@@ -118,8 +118,7 @@ _CLEAN_ZONE: dict = {
 # A zone with known issues that should trigger specific findings across
 # all four linter stages.
 _BAD_ZONE: dict = {
-    # Stage 1 (YAML structure): CF003 (missing ref), CF009 (unknown key)
-    "bogus_phase": [],
+    # Stage 1 (YAML structure): CF003 (missing ref)
     "redirect_rules": [
         # CF003: missing ref
         {"expression": 'http.host eq "old.example.com"'},
@@ -199,7 +198,6 @@ class TestLinterPipeline:
         # Stage 1: YAML structure
         assert "CF003" in rule_ids, "Missing ref not caught (stage 1)"
         assert "CF005" in rule_ids, "Duplicate ref not caught (stage 1)"
-        assert "CF009" in rule_ids, "Unknown phase key not caught (stage 1)"
 
         # Stage 2: Per-rule checks
         assert "CF200" in rule_ids, "Invalid action not caught (stage 2)"

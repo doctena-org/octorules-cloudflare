@@ -74,9 +74,8 @@ Layer-4 phases, whose packet-level expressions are validated against
 octorules-wirefilter's L4 scheme). Together they exercise every supported phase
 and key. Copy them as a starting point.
 
-All Cloudflare sections (phases, settings, lists, and policies) can nest under
-a single `cloudflare:` block; the flat spelling (top-level keys) is still supported
-but deprecated.
+All Cloudflare sections (phases, settings, lists, and policies) nest under
+a single `cloudflare:` block.
 
 ## Supported features
 
@@ -131,32 +130,32 @@ octorules manages both tiers. Deploy rules are managed via the normal phase sect
 
 ```yaml
 # Account rules file (e.g. rules/my-account.yaml)
+cloudflare:
+  # Deploy rules (phase entrypoint — references child rulesets by ID)
+  waf_custom_rules:
+    - ref: deploy-known-attackers
+      description: Deploy known attackers ruleset
+      action: execute
+      action_parameters:
+        id: abc12345def67890abc12345def67890
+        version: latest
+      enabled: true
+      expression: (http.host eq "api.example.com")
 
-# Deploy rules (phase entrypoint — references child rulesets by ID)
-waf_custom_rules:
-  - ref: deploy-known-attackers
-    description: Deploy known attackers ruleset
-    action: execute
-    action_parameters:
-      id: abc12345def67890abc12345def67890
-      version: latest
-    enabled: true
-    expression: (http.host eq "api.example.com")
-
-# Individual rules inside each custom ruleset
-custom_rulesets:
-  - id: abc12345def67890abc12345def67890
-    name: Known attackers
-    phase: http_request_firewall_custom
-    rules:
-      - ref: block-bad-asn
-        description: Block by AS number
-        action: block
-        expression: (ip.geoip.asnum in {12345 67890})
-      - ref: block-bad-ua
-        description: Block by user-agent
-        action: block
-        expression: (http.user_agent contains "BadBot")
+  # Individual rules inside each custom ruleset
+  custom_rulesets:
+    - id: abc12345def67890abc12345def67890
+      name: Known attackers
+      phase: http_request_firewall_custom
+      rules:
+        - ref: block-bad-asn
+          description: Block by AS number
+          action: block
+          expression: (ip.geoip.asnum in {12345 67890})
+        - ref: block-bad-ua
+          description: Block by user-agent
+          action: block
+          expression: (http.user_agent contains "BadBot")
 ```
 
 The `id` field in each `custom_rulesets` entry links it to the deploy rule's `action_parameters.id`. Rules inside use `ref` for identification (same pattern as phase rules). Every rule must specify an `action` explicitly.
@@ -169,28 +168,29 @@ Use `octorules dump --scope account` to export existing custom rulesets to YAML.
 
 Cloudflare account-level [Lists](https://developers.cloudflare.com/waf/tools/lists/) (IP lists, ASN lists, hostname lists, redirect lists) can be referenced in rule expressions via `$list_name` syntax. octorules manages full lifecycle of lists declaratively: create, delete, update metadata, and manage items.
 
-Add a top-level `lists` key to your account rules file:
+Add a `lists` key under the `cloudflare:` block of your account rules file:
 
 ```yaml
 # rules/my-account.yaml
-lists:
-  - name: blocked_ips
-    kind: ip
-    description: "Known bad IPs"
-    items:
-      - ip: "1.2.3.4"
-        comment: "Scanner"
-      - ip: "5.6.7.0/24"
-        comment: "Botnet range"
+cloudflare:
+  lists:
+    - name: blocked_ips
+      kind: ip
+      description: "Known bad IPs"
+      items:
+        - ip: "1.2.3.4"
+          comment: "Scanner"
+        - ip: "5.6.7.0/24"
+          comment: "Botnet range"
 
-  - name: partner_asns
-    kind: asn
-    description: "Partner AS numbers"
-    items:
-      - asn: 12345
-        comment: "Partner A"
-      - asn: 67890
-        comment: "Partner B"
+    - name: partner_asns
+      kind: asn
+      description: "Partner AS numbers"
+      items:
+        - asn: 12345
+          comment: "Partner A"
+        - asn: 67890
+          comment: "Partner B"
 ```
 
 Each list entry requires:
@@ -213,35 +213,37 @@ Each list entry requires:
 Reference lists in rule expressions:
 
 ```yaml
-waf_custom_rules:
-  - ref: block-bad-ips
-    description: Block IPs from blocklist
-    action: block
-    expression: (ip.src in $blocked_ips)
+cloudflare:
+  waf_custom_rules:
+    - ref: block-bad-ips
+      description: Block IPs from blocklist
+      action: block
+      expression: (ip.src in $blocked_ips)
 ```
 
 ## Page Shield policies (zone-level)
 
 Cloudflare [Page Shield](https://developers.cloudflare.com/page-shield/) manages Content Security Policies (CSP) at the zone level. octorules manages full lifecycle of Page Shield policies declaratively: create, update, and delete.
 
-Add a top-level `page_shield_policies` key to your zone rules file:
+Add a `page_shield_policies` key under the `cloudflare:` block of your zone rules file:
 
 ```yaml
 # rules/example.com.yaml
-page_shield_policies:
-  - description: "CSP on all example.com"
-    action: allow
-    expression: "true"
-    enabled: true
-    value: >-
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
-      worker-src 'self' blob:
+cloudflare:
+  page_shield_policies:
+    - description: "CSP on all example.com"
+      action: allow
+      expression: "true"
+      enabled: true
+      value: >-
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+        worker-src 'self' blob:
 
-  - description: "Log CSP on staging"
-    action: log
-    expression: '(http.host eq "staging.example.com")'
-    enabled: true
-    value: "default-src 'self'"
+    - description: "Log CSP on staging"
+      action: log
+      expression: '(http.host eq "staging.example.com")'
+      enabled: true
+      value: "default-src 'self'"
 ```
 
 Each policy entry requires:
@@ -266,11 +268,11 @@ Each policy entry requires:
 
 ## Linting
 
-161 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+160 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|
-| CF001–CF027 | Structure, parse & phase | 26 |
+| CF001–CF027 | Structure, parse & phase | 25 |
 | CF100–CF105 | Cross-rule ordering | 6 |
 | CF200–CF225 | Action validation | 26 |
 | CF300–CF309 | Expression, function & type | 10 |

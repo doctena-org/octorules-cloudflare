@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.0] - 2026-07-25
 
 ### Added
 - Zone files can nest all Cloudflare sections under a single `cloudflare:` block;
@@ -15,9 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The `waf_managed_exceptions` phase alias. **Rename to
   `waf_managed_rules` before upgrading** — a stale section is skipped
   with only a log warning, silently unmanaging its rules. Lint flags
-  the old name as an error (CF010).
+  the old name as an error (CF010), and core's `strict_sections: true`
+  turns the skip into a hard error.
 - The empty `[wirefilter]` extra (wirefilter is a base dependency since
   0.12.0).
+- Lint rule **CF009** (unknown top-level key) — superseded by octorules
+  `CORE011`, which covers every provider and raises an error.
+- `PageShieldFormatter.format_report` — core removed the dead
+  `FormatExtension.format_report` drift-report hook.
 
 ### Changed
 - Minimum `octorules` dependency: `>=0.32.0` (settings extensions and

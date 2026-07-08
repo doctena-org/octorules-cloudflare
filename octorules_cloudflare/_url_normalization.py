@@ -182,8 +182,6 @@ class UrlNormalizationFormatter(SettingsFormatter):
         super().__init__(
             plan_type=UrlNormalizationPlan,
             prefix="url_normalization",
-            phase="url_normalization_settings",
-            provider_id="cloudflare_url_normalization",
         )
 
 

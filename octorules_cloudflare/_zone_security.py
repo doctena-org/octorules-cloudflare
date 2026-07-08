@@ -195,8 +195,6 @@ class ZoneSecurityFormatter(SettingsFormatter):
         super().__init__(
             plan_type=ZoneSecurityPlan,
             prefix="zone_security",
-            phase="zone_security",
-            provider_id="cloudflare_zone_security",
         )
 
 

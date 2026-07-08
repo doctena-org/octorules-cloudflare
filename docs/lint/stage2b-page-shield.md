@@ -15,12 +15,12 @@ Also checks CF015/CF016 (always-true/always-false) on policy expressions and del
 Triggers when a policy is missing one of the 5 required fields: `description`, `action`, `expression`, `enabled`, `value`.
 
 ```yaml
-page_shield_policies:
+cloudflare:
+  page_shield_policies:
   - action: allow
-    expression: "true"
+    expression: 'true'
     enabled: true
-    value: "script-src 'self'"
-    # missing description
+    value: script-src 'self'
 ```
 
 Fix: Add all required fields.
@@ -34,12 +34,13 @@ Fix: Add all required fields.
 Triggers when `action` is not `allow` or `log`.
 
 ```yaml
-page_shield_policies:
-  - description: "My policy"
-    action: block           # must be allow or log
-    expression: "true"
+cloudflare:
+  page_shield_policies:
+  - description: My policy
+    action: block
+    expression: 'true'
     enabled: true
-    value: "script-src 'self'"
+    value: script-src 'self'
 ```
 
 Fix: Use `action: allow` or `action: log`.
@@ -67,17 +68,18 @@ Fix: Use the correct type for each field.
 Triggers when two policies share the same `description`. Descriptions are identity keys — duplicates cause ambiguous matching.
 
 ```yaml
-page_shield_policies:
-  - description: "CSP policy"
+cloudflare:
+  page_shield_policies:
+  - description: CSP policy
     action: allow
-    expression: "true"
+    expression: 'true'
     enabled: true
-    value: "script-src 'self'"
-  - description: "CSP policy"    # duplicate
+    value: script-src 'self'
+  - description: CSP policy
     action: log
-    expression: "true"
+    expression: 'true'
     enabled: true
-    value: "default-src 'self'"
+    value: default-src 'self'
 ```
 
 Fix: Give each policy a unique description.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "octorules-cloudflare"
-version = "0.12.2"
+version = "0.13.0"
 description = "Cloudflare provider for octorules"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -49,6 +49,7 @@ Issues = "https://github.com/doctena-org/octorules-cloudflare/issues"
 cloudflare = "octorules_cloudflare:CloudflareProvider"
 
 [tool.setuptools.packages.find]
+include = ["octorules_cloudflare*"]
 
 [tool.setuptools.package-data]
 "octorules_cloudflare.linter.schemas" = ["overlay.toml"]

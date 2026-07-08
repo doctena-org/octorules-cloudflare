@@ -195,8 +195,6 @@ class ContentScanningFormatter(SettingsFormatter):
         super().__init__(
             plan_type=ContentScanningPlan,
             prefix="content_scanning",
-            phase="content_scanning",
-            provider_id="cloudflare_content_scanning",
         )
 
 

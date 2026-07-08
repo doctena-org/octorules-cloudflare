@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **161 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **160 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -11,8 +11,8 @@ Add a `# octorules:disable=RULE` comment immediately before a rule to suppress a
 **Per-rule suppression** — suppresses the rule for a single ref:
 
 ```yaml
-request_header_rules:
-  # octorules:disable=CF015
+cloudflare:
+  request_header_rules:
   - ref: add-security-headers
     expression: (true)
     action_parameters:
@@ -25,23 +25,22 @@ request_header_rules:
 **Page Shield policy suppression** — works with `- description:` lines (since policies use description as identity):
 
 ```yaml
-page_shield_policies:
-  # octorules:disable=CF015
-  - description: "Allow all scripts"
+cloudflare:
+  page_shield_policies:
+  - description: Allow all scripts
     expression: (true)
     action: allow
-    value: "script-src 'self'"
+    value: script-src 'self'
     enabled: true
 ```
 
 **File-level suppression** — place the directive before any rules to suppress across the entire file:
 
 ```yaml
-# octorules:disable=CF511
----
-origin_rules:
+cloudflare:
+  origin_rules:
   - ref: route-api
-    expression: 'raw.http.request.uri.path eq "/api"'
+    expression: raw.http.request.uri.path eq "/api"
 ```
 
 **Multiple rules:**
@@ -227,7 +226,6 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF006](stage1-yaml-structure.md#cf006--invalid-ref-type) | Invalid ref type | ERROR |
 | [CF007](stage1-yaml-structure.md#cf007--invalid-expression-type) | Invalid expression type | ERROR |
 | [CF008](stage1-yaml-structure.md#cf008--invalid-enabled-type) | Invalid enabled type | ERROR |
-| [CF009](stage1-yaml-structure.md#cf009--unknown-top-level-phase-key) | Unknown top-level phase key | WARNING |
 | [CF010](stage1-yaml-structure.md#cf010--deprecated-phase-name) | Deprecated phase name | WARNING |
 | [CF011](stage1-yaml-structure.md#cf011--description-exceeds-500-characters) | Description exceeds 500 characters | WARNING |
 | [CF012](stage1-yaml-structure.md#cf012--phase-value-is-not-a-list) | Phase value is not a list | ERROR |

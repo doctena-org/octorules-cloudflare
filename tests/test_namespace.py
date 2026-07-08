@@ -1,12 +1,10 @@
 """Test Cloudflare namespace registration and zone format normalization."""
 
-import pytest
-
 # Import octorules_cloudflare to trigger namespace registration
-import octorules_cloudflare  # noqa: F401
-
 from octorules.config import normalize_zone_format
 from octorules.phases import PROVIDER_NAMESPACES
+
+import octorules_cloudflare  # noqa: F401
 
 
 class TestCloudflareNamespace:

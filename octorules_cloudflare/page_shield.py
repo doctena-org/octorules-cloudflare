@@ -687,37 +687,6 @@ class PageShieldFormatter:
 
         return total_creates, total_removes, total_modifies, 0
 
-    def format_report(self, plans: list, zone_has_drift: bool, phases_data: list[dict]) -> bool:
-        for psp in plans:
-            psp_adds = psp_removes = psp_modifies = 0
-            if psp.create:
-                psp_adds += 1
-            if psp.delete:
-                psp_removes += 1
-            for c in psp.changes:
-                if c.change_type == ChangeType.ADD:
-                    psp_adds += 1
-                elif c.change_type == ChangeType.REMOVE:
-                    psp_removes += 1
-                elif c.change_type == ChangeType.MODIFY:
-                    psp_modifies += 1
-            psp_status = "drifted" if (psp_adds or psp_removes or psp_modifies) else "in_sync"
-            if psp_status != "in_sync":
-                zone_has_drift = True
-            phases_data.append(
-                {
-                    "phase": f"page_shield:{psp.description}",
-                    "provider_id": "page_shield_policies",
-                    "status": psp_status,
-                    "yaml_rules": 0,
-                    "live_rules": 0,
-                    "adds": psp_adds,
-                    "removes": psp_removes,
-                    "modifies": psp_modifies,
-                }
-            )
-        return zone_has_drift
-
 
 # ---------------------------------------------------------------------------
 # Registration entry point

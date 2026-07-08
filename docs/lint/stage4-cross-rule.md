@@ -24,12 +24,13 @@ Fix: Remove the duplicate rule, or differentiate the expressions if the rules se
 Triggers when a rule follows an always-true rule (`expression: "true"`) with a terminating action (`block`, `challenge`, `js_challenge`, `managed_challenge`, `redirect`). The subsequent rule will never execute.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: block-all
-    expression: "true"
+    expression: 'true'
     action: block
-  - ref: log-bots             # unreachable
-    expression: 'cf.bot_management.score lt 30'
+  - ref: log-bots
+    expression: cf.bot_management.score lt 30
     action: log
 ```
 
@@ -44,23 +45,26 @@ Fix: Reorder rules so the catch-all comes last, or remove the unreachable rule.
 Triggers when an expression references a list via `$list_name` syntax but the list is not defined in the `lists` section of the rules file. Does not flag managed list references (`$cf.*`) — those are checked by CF103.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: known_ips
     kind: ip
-    items: [...]
-
-waf_custom_rules:
+    items:
+    - '...'
+  waf_custom_rules:
   - ref: block-unknown
-    expression: 'ip.src in $unknown_list'    # $unknown_list not in lists section
+    expression: ip.src in $unknown_list
 ```
 
 Fix: Add the referenced list to the `lists` section, or fix the list name.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: unknown_list
     kind: ip
-    items: [...]
+    items:
+    - '...'
 ```
 
 ### CF103 — Unknown managed list name
@@ -72,9 +76,10 @@ lists:
 Triggers when an expression references a managed list via `$cf.*` syntax that is not a known Cloudflare managed list.
 
 ```yaml
-waf_custom_rules:
+cloudflare:
+  waf_custom_rules:
   - ref: block-anon
-    expression: 'ip.src in $cf.invalid_list'
+    expression: ip.src in $cf.invalid_list
 ```
 
 Fix: Use a valid managed list name. Known managed lists: `$cf.anonymizer`, `$cf.botnetcc`, `$cf.malware`, `$cf.open_proxies`, `$cf.vpn`. If Cloudflare has added a new managed list not yet in this set, please open an issue.
@@ -96,16 +101,17 @@ Compatible field/kind mappings:
 - **Redirect lists** (`kind: redirect`): `http.request.full_uri`
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: my_asns
     kind: asn
-    items: [...]
-
-waf_custom_rules:
+    items:
+    - '...'
+  waf_custom_rules:
   - ref: block-asns
-    expression: 'ip.src in $my_asns'    # ip.src expects IP list, not ASN
+    expression: ip.src in $my_asns
   - ref: block-anon
-    expression: 'ip.src.asnum in $cf.anonymizer'  # asnum expects ASN, $cf.anonymizer is IP
+    expression: ip.src.asnum in $cf.anonymizer
 ```
 
 Fix: Use the correct field for the list kind (e.g., `ip.src.asnum in $my_asns`), or change the list kind.
@@ -119,27 +125,27 @@ Fix: Use the correct field for the list kind (e.g., `ip.src.asnum in $my_asns`),
 Triggers when two or more rules in the same phase have `action: execute` with the same `action_parameters.id` (managed ruleset UUID). Cloudflare's API rejects this at deploy time with error 20014: *"more than one rule is trying to execute the same managed ruleset"*. Lint catches the violation before sync fails.
 
 ```yaml
-waf_managed_rules:
+cloudflare:
+  waf_managed_rules:
   - ref: rule-a
     action: execute
     action_parameters:
-      id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # same id
+      id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       overrides:
         categories:
-          - category: wordpress
-            enabled: false
-    expression: "true"
-
+        - category: wordpress
+          enabled: false
+    expression: 'true'
   - ref: rule-b
     action: execute
     action_parameters:
-      id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa    # ← duplicate
+      id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       overrides:
         enabled: false
         categories:
-          - category: wordpress
-            enabled: true
-    expression: '(http.host eq "example.com")'
+        - category: wordpress
+          enabled: true
+    expression: (http.host eq "example.com")
 ```
 
 Cloudflare permits one `execute` per managed-ruleset id per phase entrypoint, regardless of how the overrides differ.

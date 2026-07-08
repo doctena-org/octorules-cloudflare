@@ -200,8 +200,6 @@ class LeakedCredentialFormatter(SettingsFormatter):
         super().__init__(
             plan_type=LeakedCredentialPlan,
             prefix="leaked_credential_check",
-            phase="leaked_credential_check",
-            provider_id="cloudflare_leaked_credential_check",
         )
 
 

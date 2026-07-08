@@ -20,7 +20,6 @@ CF007 = RuleMeta(
     "CF007", "structure", "Invalid 'expression' type (must be non-empty string)", Severity.ERROR
 )
 CF008 = RuleMeta("CF008", "structure", "Invalid 'enabled' type (must be boolean)", Severity.ERROR)
-CF009 = RuleMeta("CF009", "structure", "Unknown top-level phase key", Severity.WARNING)
 CF010 = RuleMeta("CF010", "structure", "Deprecated phase name", Severity.WARNING)
 CF011 = RuleMeta("CF011", "structure", "Description exceeds 500 characters", Severity.WARNING)
 CF012 = RuleMeta("CF012", "structure", "Phase value is not a list", Severity.ERROR)

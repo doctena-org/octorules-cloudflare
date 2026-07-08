@@ -5,7 +5,6 @@ import json
 
 import pytest
 from octorules.formatter import (
-    build_report_data,
     format_plan_html,
     format_plan_json,
     format_plan_markdown,
@@ -152,26 +151,6 @@ class TestPageShieldPolicyFormatting:
         assert psp_data["changes"][0]["type"] == "modify"
         assert "current" in psp_data["changes"][0]
         assert "desired" in psp_data["changes"][0]
-
-    def test_report_includes_page_shield(self):
-        psp = PageShieldPolicyPlan(description="CSP on all", create=True)
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        data = build_report_data([zp], {"test.com": {}}, {"test.com": {}})
-        zone = data["zones"][0]
-        psp_phases = [p for p in zone["phases"] if p["phase"].startswith("page_shield:")]
-        assert len(psp_phases) == 1
-        assert psp_phases[0]["phase"] == "page_shield:CSP on all"
-        assert psp_phases[0]["status"] == "drifted"
-        assert psp_phases[0]["adds"] == 1
-
-    def test_report_in_sync_page_shield(self):
-        psp = PageShieldPolicyPlan(description="CSP stable", policy_id="p1", changes=[])
-        zp = ZonePlan(zone_name="test.com", extension_plans={"page_shield": [psp]})
-        data = build_report_data([zp], {"test.com": {}}, {"test.com": {}})
-        zone = data["zones"][0]
-        psp_phases = [p for p in zone["phases"] if p["phase"].startswith("page_shield:")]
-        assert len(psp_phases) == 1
-        assert psp_phases[0]["status"] == "in_sync"
 
     def test_print_plan_text_with_page_shield(self):
         psp = PageShieldPolicyPlan(description="CSP", create=True)

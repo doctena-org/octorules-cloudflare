@@ -38,4 +38,3 @@ class TestFormatterPlanTypeGating:
         fmt = ContentScanningFormatter()
         assert fmt.format_text([foreign], use_color=False) == []
         assert fmt.format_json([foreign]) == []
-        assert fmt.format_report([foreign], False, []) is False

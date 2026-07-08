@@ -520,48 +520,6 @@ class TestFormatHtml:
 
 
 # ---------------------------------------------------------------------------
-# Format extension -- format_report
-# ---------------------------------------------------------------------------
-class TestFormatReport:
-    def test_with_drift(self):
-        fmt = UrlNormalizationFormatter()
-        plan = UrlNormalizationPlan(
-            changes=[
-                UrlNormalizationChange("scope", "incoming", "both"),
-                UrlNormalizationChange("type", "cloudflare", "rfc3986"),
-            ]
-        )
-        phases_data: list[dict] = []
-        result = fmt.format_report([plan], zone_has_drift=False, phases_data=phases_data)
-        assert result is True
-        assert len(phases_data) == 1
-        entry = phases_data[0]
-        assert entry["phase"] == "url_normalization_settings"
-        assert entry["provider_id"] == "cloudflare_url_normalization"
-        assert entry["status"] == "drifted"
-        assert entry["modifies"] == 2
-        assert entry["adds"] == 0
-        assert entry["removes"] == 0
-
-    def test_preserves_incoming_drift(self):
-        fmt = UrlNormalizationFormatter()
-        plan = UrlNormalizationPlan(
-            changes=[UrlNormalizationChange("scope", "incoming", "incoming")]
-        )
-        phases_data: list[dict] = []
-        result = fmt.format_report([plan], zone_has_drift=True, phases_data=phases_data)
-        assert result is True
-        assert phases_data == []
-
-    def test_no_drift(self):
-        fmt = UrlNormalizationFormatter()
-        phases_data: list[dict] = []
-        result = fmt.format_report([], zone_has_drift=False, phases_data=phases_data)
-        assert result is False
-        assert phases_data == []
-
-
-# ---------------------------------------------------------------------------
 # Provider methods
 # ---------------------------------------------------------------------------
 class TestProviderGetUrlNormalization:
@@ -645,9 +603,3 @@ class TestUnsupportedNotes:
         html = "\n".join(lines)
         assert "<td>Note</td>" in html
         assert "url_normalization.type" in html
-
-    def test_format_report_note_is_not_drift(self):
-        fmt = UrlNormalizationFormatter()
-        phases_data: list = []
-        assert fmt.format_report([self._plan()], False, phases_data) is False
-        assert phases_data == []

@@ -1044,12 +1044,12 @@ class TestResolveZoneId:
         zone.name = "example.com"
         zone.id = "aabbccdd" * 4
         zone.account.id = "acct-123"
-        zone.account.name = "Doctena S.A."
+        zone.account.name = "Example S.A."
         mock_cf_client.zones.list.return_value = [zone]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         provider.resolve_zone_id("example.com")
         assert provider.account_id == "acct-123"
-        assert provider.account_name == "Doctena S.A."
+        assert provider.account_name == "Example S.A."
 
     def test_stashes_account_only_once(self, mock_cf_client):
         """Only the first resolution should stash account info."""

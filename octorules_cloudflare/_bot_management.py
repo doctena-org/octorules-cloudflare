@@ -223,8 +223,6 @@ class BotManagementFormatter(SettingsFormatter):
         super().__init__(
             plan_type=BotManagementPlan,
             prefix="bot_management",
-            phase="bot_management",
-            provider_id="cloudflare_bot_management",
         )
 
 

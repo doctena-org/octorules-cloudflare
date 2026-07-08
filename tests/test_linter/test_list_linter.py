@@ -37,7 +37,7 @@ class TestListStructure:
         assert_lint(ctx, "CF480")
 
     def test_cf480_valid_name_ok(self):
-        ctx = _lint({"lists": [{"name": "doctena_legacy_301", "kind": "ip", "items": []}]})
+        ctx = _lint({"lists": [{"name": "legacy_301_redirects", "kind": "ip", "items": []}]})
         assert_no_lint(ctx, "CF480")
 
     def test_cf471_missing_kind(self):

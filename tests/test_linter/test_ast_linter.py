@@ -34,7 +34,7 @@ class TestValueConstraints:
 
     def test_cf521_no_false_positive_on_other_field_values(self):
         # Values for cf.zone.name should not trigger CF521
-        ctx = _lint('cf.zone.name eq "doctena.com" and http.request.uri.path eq "/api"')
+        ctx = _lint('cf.zone.name eq "example.com" and http.request.uri.path eq "/api"')
         g002 = [r for r in ctx.results if r.rule_id == "CF521"]
         assert len(g002) == 0
 

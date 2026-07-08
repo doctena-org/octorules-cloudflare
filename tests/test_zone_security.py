@@ -545,30 +545,6 @@ class TestFormatHtml:
 
 
 # ---------------------------------------------------------------------------
-# Format extension — format_report
-# ---------------------------------------------------------------------------
-class TestFormatReport:
-    def test_with_drift(self):
-        fmt = ZoneSecurityFormatter()
-        plan = ZoneSecurityPlan(changes=[ZoneSecurityChange("security_level", "low", "high")])
-        phases_data: list[dict] = []
-        result = fmt.format_report([plan], zone_has_drift=False, phases_data=phases_data)
-        assert result is True
-        assert len(phases_data) == 1
-        entry = phases_data[0]
-        assert entry["phase"] == "zone_security"
-        assert entry["provider_id"] == "cloudflare_zone_security"
-        assert entry["status"] == "drifted"
-        assert entry["modifies"] == 1
-
-    def test_no_drift(self):
-        fmt = ZoneSecurityFormatter()
-        phases_data: list[dict] = []
-        result = fmt.format_report([], zone_has_drift=False, phases_data=phases_data)
-        assert result is False
-
-
-# ---------------------------------------------------------------------------
 # Provider methods
 # ---------------------------------------------------------------------------
 class TestProviderGetZoneSecurity:
@@ -712,9 +688,3 @@ class TestUnsupportedNotes:
         html = "\n".join(lines)
         assert "<td>Note</td>" in html
         assert "zone_security.browser_integrity_check" in html
-
-    def test_format_report_note_is_not_drift(self):
-        fmt = ZoneSecurityFormatter()
-        phases_data: list = []
-        assert fmt.format_report([self._plan()], False, phases_data) is False
-        assert phases_data == []

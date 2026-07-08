@@ -1,7 +1,7 @@
 """Tests for YAML structure validation (Category M)."""
 
 from octorules.linter.engine import LintContext, Severity
-from octorules.testing.lint import assert_lint, assert_no_lint
+from octorules.testing.lint import assert_lint
 
 from octorules_cloudflare.linter.yaml_validator import lint_yaml_structure
 
@@ -16,13 +16,13 @@ class TestTopLevelKeys:
     def test_valid_phase_names(self):
         ctx = _lint({"redirect_rules": [], "cache_rules": []})
         assert len(ctx.results) == 0
-        assert_no_lint(ctx, "CF009")
 
-    def test_unknown_phase_key(self):
+    def test_unknown_phase_key_is_left_to_core(self):
+        """Generic unknown sections belong to core's CORE011 — only the
+        zone's own target plugin runs here, so a CF-owned rule would leave
+        every other provider's files uncovered."""
         ctx = _lint({"bogus_phase": []})
-        assert len(ctx.results) == 1
-        m007 = assert_lint(ctx, "CF009", count=1, severity=Severity.WARNING)
-        assert "bogus_phase" in m007[0].message
+        assert len(ctx.results) == 0
 
     def test_removed_phase_name_is_error(self):
         """The waf_managed_exceptions alias was removed from the registry —
@@ -30,6 +30,18 @@ class TestTopLevelKeys:
         the old name as an ERROR, not a deprecation warning."""
         ctx = _lint({"waf_managed_exceptions": []})
         m008 = assert_lint(ctx, "CF010", count=1, severity=Severity.ERROR)
+        assert "waf_managed_rules" in m008[0].message
+        assert "no longer accepted" in m008[0].message
+
+    def test_removed_phase_name_is_error_when_nested(self):
+        """The nested form is the spelling this release makes canonical.
+        Core flattens an unmappable nested member to "cloudflare:<member>",
+        so an exact match on the bare name used to miss it entirely —
+        CF010 degraded to a plain unknown-key warning in exactly the
+        nest-but-forget-to-rename case the migration creates."""
+        ctx = _lint({"cloudflare:waf_managed_exceptions": []})
+        m008 = assert_lint(ctx, "CF010", count=1, severity=Severity.ERROR)
+        assert "'waf_managed_exceptions'" in m008[0].message
         assert "waf_managed_rules" in m008[0].message
         assert "no longer accepted" in m008[0].message
 

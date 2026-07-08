@@ -33,10 +33,11 @@ class TestLintZoneFile:
         m001 = [r for r in ctx.results if r.rule_id == "CF003"]
         assert len(m001) == 1
 
-    def test_unknown_phase_caught(self):
+    def test_unknown_phase_left_to_core(self):
+        """Ownership moved to core's CORE011, which runs outside the
+        plugin dispatch that lint_zone_file() drives."""
         ctx = lint_zone_file({"bogus_phase": []})
-        m007 = [r for r in ctx.results if r.rule_id == "CF009"]
-        assert len(m007) == 1
+        assert [r for r in ctx.results if r.rule_id == "CF009"] == []
 
     def test_severity_filter_works(self):
         ctx = lint_zone_file(

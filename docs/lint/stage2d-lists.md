@@ -15,10 +15,10 @@ Triggers when:
 - Two lists share the same `name`.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - kind: ip
     items: []
-    # missing name
 ```
 
 Fix: Give each list a unique, non-empty `name`.
@@ -32,9 +32,10 @@ Fix: Give each list a unique, non-empty `name`.
 Triggers when a list entry is missing the `kind` field or has an unrecognized kind value. Valid kinds: `ip`, `asn`, `hostname`, `redirect`.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: my_list
-    kind: bogus     # not a valid kind
+    kind: bogus
     items: []
 ```
 
@@ -53,11 +54,12 @@ Triggers when a list item is missing the required field for its kind:
 - **Redirect lists**: each item must have a `redirect` field.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: my_ips
     kind: ip
     items:
-      - comment: "oops"    # missing ip field
+    - comment: oops
 ```
 
 Fix: Add the required field for the list kind.
@@ -71,11 +73,12 @@ Fix: Add the required field for the list kind.
 Triggers when an `ip` field value is not a valid IPv4/IPv6 address or CIDR range.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: my_ips
     kind: ip
     items:
-      - ip: "not-an-ip"
+    - ip: not-an-ip
 ```
 
 Fix: Use a valid IP address (e.g., `1.2.3.4`) or CIDR range (e.g., `10.0.0.0/8`, `2001:db8::/32`).
@@ -89,12 +92,13 @@ Fix: Use a valid IP address (e.g., `1.2.3.4`) or CIDR range (e.g., `10.0.0.0/8`,
 Triggers when an `asn` field value is not an integer, or is outside the valid range (0–4294967295).
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: my_asns
     kind: asn
     items:
-      - asn: "not-int"    # must be integer
-      - asn: -1            # out of range
+    - asn: not-int
+    - asn: -1
 ```
 
 Fix: Use a valid ASN integer between 0 and 4294967295.
@@ -112,12 +116,13 @@ Triggers when a list contains duplicate items. Checks the identifying value for 
 - **Redirect lists**: duplicate `source_url` values within `redirect` objects.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: my_ips
     kind: ip
     items:
-      - ip: "1.2.3.4"
-      - ip: "1.2.3.4"     # duplicate
+    - ip: 1.2.3.4
+    - ip: 1.2.3.4
 ```
 
 Fix: Remove the duplicate entry.
@@ -139,11 +144,12 @@ A list has more than 10,000 items. Cloudflare limits the number of items per lis
 Triggers when an IP list item has host bits set. For example, `10.0.0.1/24` should be `10.0.0.0/24`.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: blocked
     kind: ip
     items:
-      - ip: "10.0.0.1/24"       # host bits set — did you mean 10.0.0.0/24?
+    - ip: 10.0.0.1/24
 ```
 
 Fix: Use the network address with host bits zeroed.
@@ -157,12 +163,13 @@ Fix: Use the network address with host bits zeroed.
 Triggers when an IP list contains overlapping CIDR ranges where one is a subnet of the other.
 
 ```yaml
-lists:
+cloudflare:
+  lists:
   - name: blocked
     kind: ip
     items:
-      - ip: "10.0.0.0/8"
-      - ip: "10.1.0.0/16"       # redundant — already covered by 10.0.0.0/8
+    - ip: 10.0.0.0/8
+    - ip: 10.1.0.0/16
 ```
 
 Fix: Remove the narrower entry (it's already covered by the broader one) or consolidate into a single range.
@@ -176,14 +183,15 @@ Fix: Remove the narrower entry (it's already covered by the broader one) or cons
 Triggers when a redirect list item's `source_url` (the matching URL) contains a query string. Cloudflare rejects such a Bulk Redirect at deploy time with API error 10053 (`matching url cannot have a query string`). Query-string matching is controlled by the separate `preserve_query_string` parameter, not by putting `?...` in the source URL.
 
 ```yaml
-lists:
-  - name: doctena_legacy_301
+cloudflare:
+  lists:
+  - name: legacy_301_redirects
     kind: redirect
     items:
-      - redirect:
-          source_url: "example.com/old?ref=email"   # rejected — query string in matching URL
-          target_url: "https://example.com/new"
-          status_code: 301
+    - redirect:
+        source_url: example.com/old?ref=email
+        target_url: https://example.com/new
+        status_code: 301
 ```
 
 Fix: Drop the query string from `source_url` (match on the path only) and, if you need query behaviour preserved on the redirect, set `preserve_query_string: true`.
@@ -197,11 +205,12 @@ Fix: Drop the query string from `source_url` (match on the path only) and, if yo
 Triggers when a list `name` violates Cloudflare's naming rules: it must match `^[a-z0-9_]+$` (only lowercase letters, digits, and underscore) and be at most 50 characters. Cloudflare rejects list creation otherwise.
 
 ```yaml
-lists:
-  - name: My-Block-List        # rejected — uppercase and hyphen
+cloudflare:
+  lists:
+  - name: My-Block-List
     kind: ip
     items:
-      - ip: "203.0.113.0/24"
+    - ip: 203.0.113.0/24
 ```
 
 Fix: Use a name like `my_block_list` — lowercase, digits, and underscore only, ≤50 characters.
