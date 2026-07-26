@@ -5,11 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.13.0] - 2026-07-25
+## [0.13.0] - 2026-07-26
 
 ### Added
 - Zone files can nest all Cloudflare sections under a single `cloudflare:` block;
   the flat spelling is deprecated.
+- Cache rules support `set_cache_settings.vary` (custom Vary headers, Cloudflare
+  SDK 5.6+), validated by **CF415** (ERROR) across `default`, `headers`,
+  `action`, `languages` and `media_types`.
 
 ### Removed
 - The `waf_managed_exceptions` phase alias. **Rename to
@@ -27,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Minimum `octorules` dependency: `>=0.32.0` (settings extensions and
   Page Shield use its public API; no output changes).
+- Minimum Cloudflare SDK: `cloudflare>=5.6,<6.0` — the linter schema tracks the
+  SDK's `action_parameters` models.
 
 ## [0.12.2] - 2026-07-02
 

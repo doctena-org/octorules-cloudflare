@@ -114,8 +114,6 @@ Phases marked as both Zone and Account work at either scope. Account-only phases
 
 For the full phase reference — execution order diagram, valid actions per phase, field/function availability, and key behaviors — see [docs/lint/README.md](docs/lint/README.md).
 
-> **Note:** `waf_managed_exceptions` was renamed to `waf_managed_rules` and the old name is **no longer accepted**. Rename it in your YAML files *before* upgrading — plan and sync skip unknown sections with only a log warning, so a stale key would silently leave its managed-WAF rules unmanaged. `octorules lint` flags the old name as an error (CF010).
-
 ## Expression syntax
 
 Rule expressions use [Cloudflare's ruleset expression language](https://developers.cloudflare.com/ruleset-engine/rules-language/expressions/). Expressions are parsed by Cloudflare's actual wirefilter engine via [octorules-wirefilter](https://github.com/doctena-org/octorules-wirefilter) — a required dependency, installed automatically with `octorules-cloudflare` — providing authoritative type checking, field validation, and syntax verification.
@@ -268,7 +266,7 @@ Each policy entry requires:
 
 ## Linting
 
-160 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+161 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|
@@ -276,7 +274,7 @@ Each policy entry requires:
 | CF100–CF105 | Cross-rule ordering | 6 |
 | CF200–CF225 | Action validation | 26 |
 | CF300–CF309 | Expression, function & type | 10 |
-| CF400–CF480 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 50 |
+| CF400–CF480 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 51 |
 | CF500–CF550 | Plan limits, style & value constraints | 43 |
 
 See [docs/lint/README.md](docs/lint/README.md) for the full rule reference.

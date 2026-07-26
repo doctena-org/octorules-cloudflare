@@ -35,6 +35,7 @@ from octorules_cloudflare.linter.schemas.actions import (
     VALID_SKIP_PRODUCTS,
     VALID_SKIP_RULESET_VALUES,
     VALID_SSL_VALUES,
+    VALID_VARY_ACTIONS,
     ZONE_ONLY_SECURITY_LEVELS,
 )
 
@@ -89,6 +90,7 @@ RULE_IDS = frozenset(
         "CF412",
         "CF413",
         "CF414",
+        "CF415",
         "CF420",
         "CF421",
         "CF422",
@@ -570,8 +572,119 @@ def _lint_redirect_params(params: dict, phase_name: str, ref: str, ctx: LintCont
         )
 
 
+def _vary_error(message: str, field: str, phase_name: str, ref: str, ctx: LintContext) -> None:
+    ctx.add(
+        LintResult(
+            rule_id="CF415",
+            severity=Severity.ERROR,
+            message=message,
+            phase=phase_name,
+            ref=ref,
+            field=field,
+        )
+    )
+
+
+def _lint_vary_action(entry: dict, label: str, phase_name: str, ref: str, ctx: LintContext) -> None:
+    """Check the required ``action`` on a vary default/header entry."""
+    action = entry.get("action")
+    if action is None:
+        _vary_error(f"{label} requires an 'action'", f"{label}", phase_name, ref, ctx)
+        return
+    if not isinstance(action, str) or action not in VALID_VARY_ACTIONS:
+        _vary_error(
+            f"Invalid {label} action {action!r}. Valid: {sorted(VALID_VARY_ACTIONS)}",
+            f"{label}.action",
+            phase_name,
+            ref,
+            ctx,
+        )
+
+
+def _lint_vary(vary: object, phase_name: str, ref: str, ctx: LintContext) -> None:
+    """Validate ``set_cache_settings.vary`` (CF415).
+
+    Shape mirrors the SDK's ActionParametersVary: an optional ``default``
+    object and an optional ``headers`` map of header name to object, each
+    carrying a required ``action`` plus optional ``languages`` /
+    ``media_types`` string lists.
+    """
+    base = "action_parameters.vary"
+    if not isinstance(vary, dict):
+        _vary_error(
+            f"vary must be a mapping, got {type(vary).__name__}", base, phase_name, ref, ctx
+        )
+        return
+    if not vary:
+        _vary_error("vary is empty — set 'default' and/or 'headers'", base, phase_name, ref, ctx)
+        return
+    for key in sorted(set(vary) - {"default", "headers"}):
+        _vary_error(
+            f"Unknown vary key {key!r}. Valid: ['default', 'headers']",
+            f"{base}.{key}",
+            phase_name,
+            ref,
+            ctx,
+        )
+
+    default = vary.get("default")
+    if default is not None:
+        if not isinstance(default, dict):
+            _vary_error(
+                f"vary.default must be a mapping, got {type(default).__name__}",
+                f"{base}.default",
+                phase_name,
+                ref,
+                ctx,
+            )
+        else:
+            _lint_vary_action(default, f"{base}.default", phase_name, ref, ctx)
+
+    headers = vary.get("headers")
+    if headers is None:
+        return
+    if not isinstance(headers, dict):
+        _vary_error(
+            f"vary.headers must be a mapping of header name to settings,"
+            f" got {type(headers).__name__}",
+            f"{base}.headers",
+            phase_name,
+            ref,
+            ctx,
+        )
+        return
+    for name, entry in headers.items():
+        label = f"{base}.headers.{name}"
+        if not isinstance(entry, dict):
+            _vary_error(
+                f"vary header {name!r} must be a mapping, got {type(entry).__name__}",
+                label,
+                phase_name,
+                ref,
+                ctx,
+            )
+            continue
+        _lint_vary_action(entry, label, phase_name, ref, ctx)
+        for list_key in ("languages", "media_types"):
+            value = entry.get(list_key)
+            if value is None:
+                continue
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                _vary_error(
+                    f"{label}.{list_key} must be a list of strings",
+                    f"{label}.{list_key}",
+                    phase_name,
+                    ref,
+                    ctx,
+                )
+
+
 def _lint_cache_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate cache action_parameters (CF410-CF413)."""
+    """Validate cache action_parameters (CF410-CF415)."""
+    vary = params.get("vary")
+    if vary is not None:
+        _lint_vary(vary, phase_name, ref, ctx)
+
     edge_ttl = params.get("edge_ttl")
     if isinstance(edge_ttl, dict):
         _lint_ttl(

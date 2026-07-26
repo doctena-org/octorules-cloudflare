@@ -47,6 +47,7 @@ SET_CACHE_SETTINGS_SCHEMA = ActionSchema(
             "strip_etags",
             "strip_last_modified",
             "strip_set_cookie",
+            "vary",
         }
     ),
 )
@@ -317,6 +318,17 @@ VALID_BROWSER_TTL_MODES = frozenset(
         "respect_origin",
         "override_origin",
         "bypass_by_default",
+    }
+)
+
+# --- Cache rule Vary actions (set_cache_settings.vary, SDK 5.6+) ---
+# Mirrors the Literal on ActionParametersVaryDefault.action and
+# ActionParametersVaryHeaders.action.
+VALID_VARY_ACTIONS = frozenset(
+    {
+        "bypass",
+        "passthrough",
+        "normalize",
     }
 )
 

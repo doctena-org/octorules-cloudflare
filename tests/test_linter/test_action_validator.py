@@ -3026,3 +3026,85 @@ class TestScoreIncrementOptional:
             "waf_custom_rules",
         )
         assert "CF203" not in _ids(ctx)
+
+
+class TestCF415CacheVary:
+    """set_cache_settings.vary — added by Cloudflare SDK 5.6."""
+
+    def _rule(self, vary):
+        return _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {"vary": vary},
+            },
+            "cache_rules",
+        )
+
+    def test_valid_default_and_headers(self):
+        ctx = self._rule(
+            {
+                "default": {"action": "normalize"},
+                "headers": {
+                    "accept-language": {"action": "bypass", "languages": ["en", "fr"]},
+                    "accept": {"action": "passthrough", "media_types": ["image/webp"]},
+                },
+            }
+        )
+        assert "CF415" not in _ids(ctx)
+
+    def test_absent_vary_is_clean(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_cache_settings",
+                "action_parameters": {"cache": True},
+            },
+            "cache_rules",
+        )
+        assert "CF415" not in _ids(ctx)
+
+    def test_not_a_mapping(self):
+        assert "CF415" in _ids(self._rule("bypass"))
+
+    def test_empty_mapping(self):
+        assert "CF415" in _ids(self._rule({}))
+
+    def test_unknown_key(self):
+        ctx = self._rule({"default": {"action": "bypass"}, "bogus": 1})
+        assert "CF415" in _ids(ctx)
+
+    def test_invalid_default_action(self):
+        assert "CF415" in _ids(self._rule({"default": {"action": "sometimes"}}))
+
+    def test_default_missing_action(self):
+        assert "CF415" in _ids(self._rule({"default": {}}))
+
+    def test_default_not_a_mapping(self):
+        assert "CF415" in _ids(self._rule({"default": "bypass"}))
+
+    def test_headers_not_a_mapping(self):
+        assert "CF415" in _ids(self._rule({"headers": ["accept-language"]}))
+
+    def test_header_entry_not_a_mapping(self):
+        assert "CF415" in _ids(self._rule({"headers": {"accept": "bypass"}}))
+
+    def test_header_invalid_action(self):
+        assert "CF415" in _ids(self._rule({"headers": {"accept": {"action": "nope"}}}))
+
+    def test_header_missing_action(self):
+        assert "CF415" in _ids(self._rule({"headers": {"accept": {"languages": ["en"]}}}))
+
+    def test_header_languages_not_a_list(self):
+        ctx = self._rule({"headers": {"accept": {"action": "bypass", "languages": "en"}}})
+        assert "CF415" in _ids(ctx)
+
+    def test_header_media_types_not_strings(self):
+        ctx = self._rule({"headers": {"accept": {"action": "bypass", "media_types": [1, 2]}}})
+        assert "CF415" in _ids(ctx)
+
+    def test_all_three_actions_accepted(self):
+        for action in ("bypass", "passthrough", "normalize"):
+            assert "CF415" not in _ids(self._rule({"default": {"action": action}})), action

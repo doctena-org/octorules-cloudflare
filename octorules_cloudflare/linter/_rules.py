@@ -117,6 +117,7 @@ CF411 = RuleMeta("CF411", "cache", "Missing TTL with override mode", Severity.ER
 CF412 = RuleMeta("CF412", "cache", "Negative TTL value", Severity.ERROR)
 CF413 = RuleMeta("CF413", "cache", "Conflicting bypass and eligible settings", Severity.WARNING)
 CF414 = RuleMeta("CF414", "cache", "Cache TTL exceeds maximum (1 year)", Severity.WARNING)
+CF415 = RuleMeta("CF415", "cache", "Invalid Vary settings", Severity.ERROR)
 
 # Category J — Config Rule Specific
 CF420 = RuleMeta("CF420", "config", "Invalid security_level value", Severity.ERROR)

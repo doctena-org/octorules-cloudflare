@@ -667,6 +667,35 @@ A TTL `default` value exceeds 31,536,000 seconds (1 year).
 
 ---
 
+### CF415 — Invalid Vary settings
+
+**Severity:** ERROR
+
+`set_cache_settings.vary` (Cloudflare SDK 5.6+) is malformed. It takes an
+optional `default` object and an optional `headers` map of header name to
+settings; each carries a required `action` of `bypass`, `passthrough` or
+`normalize`, plus optional `languages` / `media_types` string lists.
+
+```yaml
+cloudflare:
+  cache_rules:
+  - ref: vary-by-language
+    expression: 'true'
+    action: set_cache_settings
+    action_parameters:
+      vary:
+        default:
+          action: normalize
+        headers:
+          accept-language:
+            action: bypass
+            languages: [en, fr]
+```
+
+**Fix:** Correct the offending key — the message names the exact path.
+
+---
+
 ## Category J — Config Rules (5 rules)
 
 ### CF420 — Invalid security_level value

@@ -117,7 +117,8 @@ plan and sync no longer resolve the old key and skip the section
 entirely, which would silently unmanage its rules.
 
 ```yaml
-waf_managed_exceptions:    # renamed to waf_managed_rules; no longer accepted
+cloudflare:
+  waf_managed_exceptions:    # renamed to waf_managed_rules; no longer accepted
   - ref: my-rule
     expression: 'true'
 ```

@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **160 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **161 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -86,7 +86,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
 | CF400–CF409 | Rate limiting | 10 |
-| CF410–CF414 | Cache rules | 5 |
+| CF410–CF415 | Cache rules | 6 |
 | CF420–CF424 | Config rules | 5 |
 | CF430–CF432 | Redirect rules | 3 |
 | CF440–CF448 | Transform rules | 9 |
@@ -276,6 +276,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF412](stage2-per-rule.md#cf412--negative-ttl-value) | Negative TTL value | ERROR |
 | [CF413](stage2-per-rule.md#cf413--conflicting-bypass-and-eligible-settings) | Conflicting bypass and eligible settings | WARNING |
 | [CF414](stage2-per-rule.md#cf414--cache-ttl-exceeds-maximum) | Cache TTL exceeds maximum (1 year) | WARNING |
+| [CF415](stage2-per-rule.md#cf415--invalid-vary-settings) | Invalid Vary settings | ERROR |
 | [CF420](stage2-per-rule.md#cf420--invalid-security_level-value) | Invalid security_level value | ERROR |
 | [CF421](stage2-per-rule.md#cf421--invalid-ssl-value) | Invalid ssl value | ERROR |
 | [CF422](stage2-per-rule.md#cf422--invalid-polish-value) | Invalid polish value | ERROR |

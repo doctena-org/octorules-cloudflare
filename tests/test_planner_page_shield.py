@@ -1,6 +1,7 @@
 """Tests for the diff engine (planner) – page shield policies."""
 
 import logging
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 import pytest
@@ -721,3 +722,70 @@ class TestPageShieldSingleFieldUpdateEndToEnd:
         # The core regression assertion: single line, no raw newlines.
         assert "\n" not in sent_value
         assert sent_value == normalize_csp_value(desired_value)
+
+
+class TestCacheVaryRoundTrip:
+    """set_cache_settings.vary must survive the full pipeline (SDK 5.6+).
+
+    Lint accepting a key is not the same as supporting it: the value has to
+    pass prepare, come back identically through the SDK model, and compare
+    equal so plan does not show a phantom MODIFY on every run — the failure
+    mode behind the 0.11.1 alias and 0.12.2 logging regressions.
+    """
+
+    _VARY: ClassVar[dict] = {
+        "default": {"action": "normalize"},
+        "headers": {"accept-language": {"action": "bypass", "languages": ["en", "fr"]}},
+    }
+
+    def _prepared(self):
+        from octorules.phases import get_phase
+        from octorules.planner import prepare_desired_rules
+
+        rule = {
+            "ref": "vary-demo",
+            "expression": "true",
+            "action": "set_cache_settings",
+            "action_parameters": {"cache": True, "vary": dict(self._VARY)},
+        }
+        return prepare_desired_rules([rule], get_phase("cache_rules"))[0]
+
+    def test_survives_prepare(self):
+        assert self._prepared()["action_parameters"]["vary"] == self._VARY
+
+    def test_no_phantom_modify_after_sdk_round_trip(self):
+        from cloudflare.types.rulesets.set_cache_settings_rule import SetCacheSettingsRule
+        from octorules.planner import normalize_rule
+
+        from octorules_cloudflare.provider import _to_dict
+
+        prepared = self._prepared()
+        current = _to_dict(
+            SetCacheSettingsRule.model_validate(
+                {
+                    "id": "abc",
+                    "version": "1",
+                    "last_updated": "2026-07-26T00:00:00Z",
+                    "action": "set_cache_settings",
+                    "expression": "true",
+                    "ref": "vary-demo",
+                    "enabled": True,
+                    "action_parameters": prepared["action_parameters"],
+                }
+            )
+        )
+        assert current["action_parameters"]["vary"] == self._VARY
+        assert normalize_rule(prepared) == normalize_rule(current)
+
+    def test_dump_preserves_vary(self, tmp_path):
+        import yaml
+        from octorules.dumper import dump_zone_rules
+        from octorules.phases import get_phase
+
+        pid = get_phase("cache_rules").provider_id
+        out = dump_zone_rules(
+            "example.com", {pid: [self._prepared() | {"enabled": True}]}, tmp_path
+        )
+        data = yaml.safe_load(out.read_text())
+        ap = data["cloudflare"]["cache_rules"][0]["action_parameters"]
+        assert ap["vary"] == self._VARY
