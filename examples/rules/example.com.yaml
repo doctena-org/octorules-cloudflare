@@ -231,7 +231,7 @@ cloudflare:
     # with `octorules dump` or via the Cloudflare API. Custom rulesets are
     # account-level resources with stable IDs that octorules cannot create —
     # they must be created in the Cloudflare dashboard or via the API first.
-    - id: 00000000000000000000000000000000
+    - id: "00000000000000000000000000000000"
       name: shared-waf-rules
       phase: http_request_firewall_custom
       rules:
@@ -250,22 +250,22 @@ cloudflare:
       kind: ip
       description: "Internal monitoring IPs"
       items:
-        - 10.0.0.0/8
-        - 172.16.0.0/12
-        - 192.168.0.0/16
+        - ip: 10.0.0.0/8
+        - ip: 172.16.0.0/12
+        - ip: 192.168.0.0/16
 
     - name: blocklist
       kind: ip
       description: "Blocked IP ranges referenced by prod-only-waf rule"
       items:
-        - 198.51.100.0/24  # RFC 5737 documentation prefix — placeholder
+        - ip: 198.51.100.0/24  # RFC 5737 documentation prefix — placeholder
 
     - name: blocked_asns
       kind: asn
       description: "Blocked autonomous systems"
       items:
-        - 12345
-        - 67890
+        - asn: 12345
+        - asn: 67890
 
   # ---------------------------------------------------------------------------
   # Page Shield Policies — Content Security Policy management
@@ -360,7 +360,6 @@ cloudflare:
     enable_js: true
     ai_bots_protection: block
     suppress_session_score: false
-    using_latest_model: true
 
   # ---------------------------------------------------------------------------
   # URL Normalization Settings

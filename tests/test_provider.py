@@ -967,7 +967,7 @@ class TestListZones:
             (
                 lambda: __import__("cloudflare").APIConnectionError(request=MagicMock()),
                 ProviderError,
-                "",
+                "Connection error",
             ),
         ],
         ids=["auth", "permission_denied", "api_error", "connection"],

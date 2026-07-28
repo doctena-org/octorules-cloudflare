@@ -312,7 +312,7 @@ class TestPageShieldPolicies:
             (
                 lambda: __import__("cloudflare").APIConnectionError(request=MagicMock()),
                 ProviderError,
-                "",  # APIConnectionError has no specific message we can match on
+                "Connection error",
             ),
         ],
         ids=["auth", "permission_denied", "api_error", "connection"],
