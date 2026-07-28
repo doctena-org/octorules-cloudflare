@@ -397,27 +397,27 @@ class TestDumpExtension:
             "security_level": "high",
             "challenge_passage": 1800,
         }
-        result = _dump_zone_security(_zs(), provider, None)
+        result = _dump_zone_security(_zs(), provider)
         assert "cloudflare_zone_security" in result
         assert result["cloudflare_zone_security"]["security_level"] == "high"
 
     def test_dump_api_failure(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_zone_security_settings.side_effect = ProviderError("down")
-        result = _dump_zone_security(_zs(), provider, None)
+        result = _dump_zone_security(_zs(), provider)
         assert result is None
 
     def test_dump_empty_settings(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_zone_security_settings.return_value = {}
-        result = _dump_zone_security(_zs(), provider, None)
+        result = _dump_zone_security(_zs(), provider)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
         """ProviderAuthError in dump degrades gracefully (returns None)."""
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_zone_security_settings.side_effect = ProviderAuthError("forbidden")
-        result = _dump_zone_security(_zs(), provider, None)
+        result = _dump_zone_security(_zs(), provider)
         assert result is None
 
 

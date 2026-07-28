@@ -193,7 +193,6 @@ def register_url_normalization() -> None:
     """Register all URL normalization hooks with the core extension system."""
     from octorules.extensions import (
         register_apply_extension,
-        register_dump_extension,
         register_format_extension,
         register_plan_zone_hook,
         register_validate_extension,
@@ -203,4 +202,3 @@ def register_url_normalization() -> None:
     register_apply_extension("cloudflare_url_normalization", _apply_url_normalization)
     register_format_extension("cloudflare_url_normalization", UrlNormalizationFormatter())
     register_validate_extension(_validate_url_normalization)
-    register_dump_extension(_dump_url_normalization)

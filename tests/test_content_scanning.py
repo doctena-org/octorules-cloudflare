@@ -397,26 +397,26 @@ class TestDumpExtension:
             "enabled": True,
             "custom_expressions": [{"payload": "test"}],
         }
-        result = _dump_content_scanning(_zs(), provider, None)
+        result = _dump_content_scanning(_zs(), provider)
         assert "cloudflare_content_scanning" in result
 
     def test_dump_api_failure(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderError("down")
-        result = _dump_content_scanning(_zs(), provider, None)
+        result = _dump_content_scanning(_zs(), provider)
         assert result is None
 
     def test_dump_empty_config(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.return_value = {}
-        result = _dump_content_scanning(_zs(), provider, None)
+        result = _dump_content_scanning(_zs(), provider)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
         """ProviderAuthError in dump degrades gracefully (returns None)."""
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderAuthError("forbidden")
-        result = _dump_content_scanning(_zs(), provider, None)
+        result = _dump_content_scanning(_zs(), provider)
         assert result is None
 
 

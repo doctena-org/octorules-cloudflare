@@ -341,7 +341,7 @@ class TestDumpExtension:
             "scope": "incoming",
             "type": "cloudflare",
         }
-        result = _dump_url_normalization(_scope(), provider, None)
+        result = _dump_url_normalization(_scope(), provider)
         assert "cloudflare_url_normalization" in result
         assert result["cloudflare_url_normalization"]["scope"] == "incoming"
 
@@ -350,13 +350,13 @@ class TestDumpExtension:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderError("down")
-        result = _dump_url_normalization(_scope(), provider, None)
+        result = _dump_url_normalization(_scope(), provider)
         assert result is None
 
     def test_dump_empty_settings(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.return_value = {}
-        result = _dump_url_normalization(_scope(), provider, None)
+        result = _dump_url_normalization(_scope(), provider)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
@@ -365,7 +365,7 @@ class TestDumpExtension:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderAuthError("forbidden")
-        result = _dump_url_normalization(_scope(), provider, None)
+        result = _dump_url_normalization(_scope(), provider)
         assert result is None
 
 

@@ -747,6 +747,37 @@ class CloudflareProvider:
             result.append(stripped)
         return result
 
+    # --- Dump ---
+
+    def dump_extra_sections(self, scope: Scope) -> dict:
+        """Cloudflare-owned settings sections for the dumped zone file.
+
+        Each helper returns its own section or ``None`` when the feature is
+        unavailable on the zone.  Called only with this provider, so a
+        section can never be requested from a provider that cannot fetch it
+        — the reason dump is a method here and not an extension registry.
+        """
+        from octorules_cloudflare._bot_management import _dump_bot_management
+        from octorules_cloudflare._content_scanning import _dump_content_scanning
+        from octorules_cloudflare._leaked_credentials import _dump_leaked_credentials
+        from octorules_cloudflare._url_normalization import _dump_url_normalization
+        from octorules_cloudflare._zone_security import _dump_zone_security
+        from octorules_cloudflare.page_shield import _dump_page_shield
+
+        result: dict = {}
+        for fn in (
+            _dump_bot_management,
+            _dump_url_normalization,
+            _dump_zone_security,
+            _dump_leaked_credentials,
+            _dump_content_scanning,
+            _dump_page_shield,
+        ):
+            data = fn(scope, self)
+            if data:
+                result.update(data)
+        return result
+
     # --- Bot Management API ---
 
     @_wrap_provider_errors

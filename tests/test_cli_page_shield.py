@@ -23,12 +23,8 @@ def _make_dump_mock(**overrides):
 
     Any method not explicitly configured raises ProviderError, preventing
     auto-created MagicMock return values from reaching the YAML serializer
-    (which can't represent them). This isolates Page Shield dump tests from
-    extension hooks registered by other installed providers.
+    (which can't represent them).
     """
-    # Un-specced: cmd_dump iterates all registered dump extensions (including
-    # AWS's get_acl_settings). spec=CloudflareProvider would block those
-    # cross-provider attribute accesses in tests that install >1 provider.
     mock_prov = MagicMock()
     mock_prov.SUPPORTS = frozenset({"page_shield", "zone_discovery"})
     mock_prov.max_workers = 1
@@ -44,15 +40,15 @@ def _make_dump_mock(**overrides):
                 "zone_security_settings",
                 "leaked_credential_check",
                 "content_scanning",
-                # AWS/Google/Azure/Bunny extensions that may be installed
-                "acl_settings",
-                "policy_settings",
-                "managed_exclusions",
-                "pullzone_security",
-                "shield_zone_config",
-                "bot_detection_config",
             )
         }
+    )
+    # cmd_dump calls the provider's own dump_extra_sections, so bind the real
+    # implementation and let it aggregate against these mocked getters.  Other
+    # providers' getters no longer need stubbing: their dump code is reachable
+    # only through their own provider class.
+    mock_prov.dump_extra_sections = lambda scope: CloudflareProvider.dump_extra_sections(
+        mock_prov, scope
     )
     for k, v in overrides.items():
         setattr(mock_prov, k, v) if not callable(v) else setattr(
@@ -96,6 +92,9 @@ class TestPageShieldPoliciesCLI:
             "    value: \"script-src 'self'\"\n"
         )
         mock_prov = MagicMock(spec=CloudflareProvider)
+        # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
+        # the fail-closed capability check sees a real set.
+        mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
         mock_init_provs.return_value = {"cloudflare": mock_prov}
@@ -111,6 +110,9 @@ class TestPageShieldPoliciesCLI:
         rules_file = sample_config.rules_dir / "example.com.yaml"
         rules_file.write_text("redirect_rules:\n  - ref: r1\n    expression: 'true'\n")
         mock_prov = MagicMock(spec=CloudflareProvider)
+        # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
+        # the fail-closed capability check sees a real set.
+        mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
         mock_prov.get_all_phase_rules.return_value = {}
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
@@ -237,6 +239,9 @@ class TestPageShieldPoliciesCLI:
             "    value: \"script-src 'self'\"\n"
         )
         mock_prov = MagicMock(spec=CloudflareProvider)
+        # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
+        # the fail-closed capability check sees a real set.
+        mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
         mock_prov.create_page_shield_policy.return_value = {"id": "new-policy-id"}
@@ -254,6 +259,9 @@ class TestPageShieldPoliciesCLI:
         rules_file = sample_config.rules_dir / "example.com.yaml"
         rules_file.write_text("page_shield_policies: []\n")
         mock_prov = MagicMock(spec=CloudflareProvider)
+        # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
+        # the fail-closed capability check sees a real set.
+        mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = [
             {

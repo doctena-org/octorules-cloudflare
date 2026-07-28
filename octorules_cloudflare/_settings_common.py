@@ -158,10 +158,11 @@ def make_dump_hook(section_name: str, getter_attr: str) -> Callable:
                      (e.g. "get_bot_management")
 
     Returns a function matching the _dump_* signature that exports
-    current settings to dump output.
+    current settings to dump output.  Called by
+    ``CloudflareProvider.dump_extra_sections``, not by a registry.
     """
 
-    def _dump_hook(scope, provider, out_dir):
+    def _dump_hook(scope, provider):
         """Export current settings to dump output."""
         if not scope.zone_id:
             return None

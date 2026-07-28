@@ -403,26 +403,26 @@ class TestDumpExtension:
             "enabled": True,
             "detections": [{"username": "u1", "password": "p1"}],
         }
-        result = _dump_leaked_credentials(_zs(), provider, None)
+        result = _dump_leaked_credentials(_zs(), provider)
         assert "cloudflare_leaked_credential_check" in result
 
     def test_dump_api_failure(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderError("down")
-        result = _dump_leaked_credentials(_zs(), provider, None)
+        result = _dump_leaked_credentials(_zs(), provider)
         assert result is None
 
     def test_dump_empty_config(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.return_value = {}
-        result = _dump_leaked_credentials(_zs(), provider, None)
+        result = _dump_leaked_credentials(_zs(), provider)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
         """ProviderAuthError in dump degrades gracefully (returns None)."""
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderAuthError("forbidden")
-        result = _dump_leaked_credentials(_zs(), provider, None)
+        result = _dump_leaked_credentials(_zs(), provider)
         assert result is None
 
 

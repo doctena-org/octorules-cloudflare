@@ -8,13 +8,11 @@ registered at import time via ``register_page_shield()``.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from octorules.expression import normalize_expression
 from octorules.extensions import (
     make_synthetic_phase,
     register_apply_extension,
-    register_dump_extension,
     register_format_extension,
     register_plan_zone_hook,
     register_validate_extension,
@@ -558,7 +556,6 @@ def _clean_page_shield_policies(policies: list[dict]) -> list[dict]:
 def _dump_page_shield(
     scope: Scope,
     provider: BaseProvider,
-    out_dir: Path,
 ) -> dict | None:
     """Dump hook: fetch Page Shield policies, clean, and return as extra_sections."""
     if not provider_supports(provider, SUPPORTS_PAGE_SHIELD):
@@ -700,4 +697,3 @@ def register_page_shield() -> None:
     register_apply_extension("page_shield", _apply_page_shield)
     register_format_extension("page_shield", PageShieldFormatter())
     register_validate_extension(_validate_page_shield)
-    register_dump_extension(_dump_page_shield)

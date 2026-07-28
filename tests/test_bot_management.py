@@ -580,7 +580,7 @@ class TestDumpExtension:
             "enable_js": False,
             "ai_bots_protection": "block",
         }
-        result = _dump_bot_management(_scope(), provider, None)
+        result = _dump_bot_management(_scope(), provider)
         assert "cloudflare_bot_management" in result
         assert result["cloudflare_bot_management"]["fight_mode"] is True
 
@@ -589,13 +589,13 @@ class TestDumpExtension:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_bot_management.side_effect = ProviderError("down")
-        result = _dump_bot_management(_scope(), provider, None)
+        result = _dump_bot_management(_scope(), provider)
         assert result is None
 
     def test_dump_empty_settings(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_bot_management.return_value = {}
-        result = _dump_bot_management(_scope(), provider, None)
+        result = _dump_bot_management(_scope(), provider)
         assert result is None
 
     def test_dump_auth_error_returns_none(self):
@@ -604,7 +604,7 @@ class TestDumpExtension:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_bot_management.side_effect = ProviderAuthError("forbidden")
-        result = _dump_bot_management(_scope(), provider, None)
+        result = _dump_bot_management(_scope(), provider)
         assert result is None
 
 
