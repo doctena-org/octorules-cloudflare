@@ -20,7 +20,13 @@ from octorules.phases import (
     ZONE_PROVIDER_IDS,
     strip_api_fields,
 )
-from octorules.provider.base import PhaseRulesResult, Scope
+from octorules.provider.base import (
+    SUPPORTS_CUSTOM_RULESETS,
+    SUPPORTS_LISTS,
+    SUPPORTS_ZONE_DISCOVERY,
+    PhaseRulesResult,
+    Scope,
+)
 from octorules.provider.exceptions import (
     ProviderAuthError,
     ProviderError,
@@ -36,6 +42,7 @@ from octorules_cloudflare.exceptions import (
     NotFoundError,
     PermissionDeniedError,
 )
+from octorules_cloudflare.page_shield import SUPPORTS_PAGE_SHIELD
 
 _wrap_provider_errors = make_error_wrapper(
     auth_errors=(AuthenticationError, PermissionDeniedError),
@@ -93,7 +100,14 @@ class CloudflareProvider:
     """Wraps the Cloudflare Python SDK for ruleset phase operations."""
 
     NAMESPACE = "cloudflare"
-    SUPPORTS = frozenset({"custom_rulesets", "lists", "page_shield", "zone_discovery"})
+    SUPPORTS = frozenset(
+        {
+            SUPPORTS_CUSTOM_RULESETS,
+            SUPPORTS_LISTS,
+            SUPPORTS_PAGE_SHIELD,
+            SUPPORTS_ZONE_DISCOVERY,
+        }
+    )
 
     # Built lazily by the `extensions` property.
     _extensions: list | None = None
