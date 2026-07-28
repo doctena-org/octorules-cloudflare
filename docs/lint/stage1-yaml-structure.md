@@ -105,16 +105,16 @@ Triggers when `enabled` is present but not a boolean.
 
 Fix: Use `enabled: true` or `enabled: false`.
 
-### CF010 — Renamed phase name
+### CF010 — Removed phase name
 
 | Severity | Category |
 |----------|----------|
-| ERROR (removed names) / WARNING (registry aliases) | structure |
+| ERROR | structure |
 
-Triggers when using an old phase name. For names whose rename alias has
-been removed — currently `waf_managed_exceptions` — this is an ERROR:
-plan and sync no longer resolve the old key and skip the section
-entirely, which would silently unmanage its rules.
+Triggers on a phase name that has been renamed and is no longer accepted —
+currently `waf_managed_exceptions`. Plan and sync do not resolve the old key
+and skip the section entirely, which would silently unmanage its rules, so
+this is an error rather than a warning.
 
 ```yaml
 cloudflare:

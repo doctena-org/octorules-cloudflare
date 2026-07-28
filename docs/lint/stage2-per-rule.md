@@ -181,7 +181,7 @@ Fix: Reduce the content size to under 10KB. Consider linking to external assets 
 
 | Severity | Category |
 |----------|----------|
-| WARNING | action |
+| ERROR | action |
 
 Triggers when a `skip` action's `phases` list contains an unrecognized Cloudflare phase identifier.
 
@@ -202,7 +202,7 @@ Fix: Use valid Cloudflare phase identifiers (e.g. `http_request_firewall_custom`
 
 | Severity | Category |
 |----------|----------|
-| WARNING | action |
+| ERROR | action |
 
 Triggers when a `skip` action's `products` list contains an unrecognized product name.
 
@@ -244,7 +244,7 @@ Fix: Use valid algorithms: `gzip`, `brotli`, `zstd`, `none`, `auto`.
 
 | Severity | Category |
 |----------|----------|
-| WARNING | action |
+| ERROR | action |
 
 Triggers when a rate limiting rule's `characteristics` list contains an unrecognized value.
 

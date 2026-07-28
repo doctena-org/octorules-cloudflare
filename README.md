@@ -8,12 +8,6 @@ Cloudflare provider for [octorules](https://github.com/doctena-org/octorules) â€
 pip install octorules-cloudflare
 ```
 
-Or via the octorules extra:
-
-```bash
-pip install octorules[cloudflare]
-```
-
 This installs octorules (core), octorules-cloudflare, and
 [octorules-wirefilter](https://github.com/doctena-org/octorules-wirefilter)
 (Rust FFI bridge to Cloudflare's wirefilter engine for authoritative expression

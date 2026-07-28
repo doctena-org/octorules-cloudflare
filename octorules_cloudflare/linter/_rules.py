@@ -20,7 +20,7 @@ CF007 = RuleMeta(
     "CF007", "structure", "Invalid 'expression' type (must be non-empty string)", Severity.ERROR
 )
 CF008 = RuleMeta("CF008", "structure", "Invalid 'enabled' type (must be boolean)", Severity.ERROR)
-CF010 = RuleMeta("CF010", "structure", "Deprecated phase name", Severity.WARNING)
+CF010 = RuleMeta("CF010", "structure", "Removed phase name", Severity.ERROR)
 CF011 = RuleMeta("CF011", "structure", "Description exceeds 500 characters", Severity.WARNING)
 CF012 = RuleMeta("CF012", "structure", "Phase value is not a list", Severity.ERROR)
 CF013 = RuleMeta("CF013", "structure", "Rule entry is not a dict", Severity.ERROR)
@@ -58,10 +58,10 @@ CF208 = RuleMeta(
     "CF208", "action", "Unnecessary action_parameters for this action", Severity.WARNING
 )
 CF209 = RuleMeta("CF209", "action", "serve_error content exceeds 10KB limit", Severity.ERROR)
-CF210 = RuleMeta("CF210", "action", "Invalid skip phases value", Severity.WARNING)
-CF211 = RuleMeta("CF211", "action", "Invalid skip products value", Severity.WARNING)
+CF210 = RuleMeta("CF210", "action", "Invalid skip phases value", Severity.ERROR)
+CF211 = RuleMeta("CF211", "action", "Invalid skip products value", Severity.ERROR)
 CF212 = RuleMeta("CF212", "action", "Invalid compress_response algorithm", Severity.ERROR)
-CF213 = RuleMeta("CF213", "action", "Invalid rate limit characteristic", Severity.WARNING)
+CF213 = RuleMeta("CF213", "action", "Invalid rate limit characteristic", Severity.ERROR)
 CF214 = RuleMeta("CF214", "action", "Invalid block response parameter", Severity.ERROR)
 CF215 = RuleMeta("CF215", "action", "Missing execute ruleset id", Severity.ERROR)
 CF216 = RuleMeta("CF216", "action", "Invalid execute ruleset id format", Severity.WARNING)

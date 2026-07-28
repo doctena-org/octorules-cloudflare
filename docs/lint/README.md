@@ -226,7 +226,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF006](stage1-yaml-structure.md#cf006--invalid-ref-type) | Invalid ref type | ERROR |
 | [CF007](stage1-yaml-structure.md#cf007--invalid-expression-type) | Invalid expression type | ERROR |
 | [CF008](stage1-yaml-structure.md#cf008--invalid-enabled-type) | Invalid enabled type | ERROR |
-| [CF010](stage1-yaml-structure.md#cf010--deprecated-phase-name) | Deprecated phase name | WARNING |
+| [CF010](stage1-yaml-structure.md#cf010--removed-phase-name) | Removed phase name | ERROR |
 | [CF011](stage1-yaml-structure.md#cf011--description-exceeds-500-characters) | Description exceeds 500 characters | WARNING |
 | [CF012](stage1-yaml-structure.md#cf012--phase-value-is-not-a-list) | Phase value is not a list | ERROR |
 | [CF013](stage1-yaml-structure.md#cf013--rule-entry-is-not-a-dict) | Rule entry is not a dict | ERROR |
@@ -245,10 +245,10 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF207](stage2-per-rule.md#cf207--conflicting-static-value-and-dynamic-expression) | Conflicting static value and dynamic expression | ERROR |
 | [CF208](stage2-per-rule.md#cf208--unnecessary-action_parameters) | Unnecessary action_parameters | WARNING |
 | [CF209](stage2-per-rule.md#cf209--serve_error-content-exceeds-10kb-limit) | serve_error content exceeds 10KB limit | ERROR |
-| [CF210](stage2-per-rule.md#cf210--invalid-skip-phases-value) | Invalid skip phases value | WARNING |
-| [CF211](stage2-per-rule.md#cf211--invalid-skip-products-value) | Invalid skip products value | WARNING |
+| [CF210](stage2-per-rule.md#cf210--invalid-skip-phases-value) | Invalid skip phases value | ERROR |
+| [CF211](stage2-per-rule.md#cf211--invalid-skip-products-value) | Invalid skip products value | ERROR |
 | [CF212](stage2-per-rule.md#cf212--invalid-compress_response-algorithm) | Invalid compress_response algorithm | ERROR |
-| [CF213](stage2-per-rule.md#cf213--invalid-rate-limit-characteristic) | Invalid rate limit characteristic | WARNING |
+| [CF213](stage2-per-rule.md#cf213--invalid-rate-limit-characteristic) | Invalid rate limit characteristic | ERROR |
 | [CF214](stage2-per-rule.md#cf214--invalid-block-response-parameter) | Invalid block response parameter | ERROR |
 | [CF215](stage2-per-rule.md#cf215--missing-id-in-execute-action_parameters) | Missing id in execute action_parameters | ERROR |
 | [CF216](stage2-per-rule.md#cf216--invalid-execute-id-format) | Invalid execute id format | WARNING |
