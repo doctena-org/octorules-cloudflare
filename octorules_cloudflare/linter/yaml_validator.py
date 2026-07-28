@@ -16,7 +16,6 @@ from octorules.phases import (
     KNOWN_NON_PHASE_KEYS,
     PHASE_BY_NAME,
     PHASE_BY_PROVIDER_ID,
-    RENAMED_PHASES,
 )
 
 RULE_IDS = frozenset(
@@ -102,20 +101,9 @@ def _check_top_level_keys(rules_data: dict[str, Any], ctx: LintContext) -> None:
                 )
             )
             continue
-        if key in PHASE_BY_NAME and key not in CF_PHASE_NAMES and key not in RENAMED_PHASES:
+        if key in PHASE_BY_NAME and key not in CF_PHASE_NAMES:
             continue  # phase owned by another provider — not our business
-        if key in RENAMED_PHASES:
-            new_name = RENAMED_PHASES[key]
-            ctx.add(
-                LintResult(
-                    rule_id="CF010",
-                    severity=Severity.WARNING,
-                    message=f"Phase {key!r} has been renamed to {new_name!r}",
-                    phase=key,
-                    suggestion=f"Rename to {new_name!r}",
-                )
-            )
-        elif key in PHASE_BY_PROVIDER_ID:
+        if key in PHASE_BY_PROVIDER_ID:
             friendly = PHASE_BY_PROVIDER_ID[key].friendly_name
             ctx.add(
                 LintResult(

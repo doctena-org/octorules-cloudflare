@@ -589,8 +589,7 @@ class PageShieldFormatter:
     """Formatter for Page Shield policy plans."""
 
     def format_text(self, plans: list, use_color: bool) -> list[str]:
-        from octorules._color import Pen
-        from octorules.formatter import format_change
+        from octorules.formatter import Pen, format_change
 
         p = Pen(use_color)
         lines: list[str] = []
