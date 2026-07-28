@@ -203,7 +203,7 @@ class TestPrefetchHook:
             "security_level": "high",
             "challenge_passage": 1800,
         }
-        all_desired = {"cloudflare_zone_security": {"security_level": "medium"}}
+        all_desired = {"cloudflare.zone_security": {"security_level": "medium"}}
         result = _prefetch_zone_security(all_desired, _zs(), provider)
         assert result is not None
         current, desired = result
@@ -213,7 +213,7 @@ class TestPrefetchHook:
     def test_api_failure_handled_gracefully(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_zone_security_settings.side_effect = ProviderError("API down")
-        all_desired = {"cloudflare_zone_security": {"security_level": "high"}}
+        all_desired = {"cloudflare.zone_security": {"security_level": "high"}}
         result = _prefetch_zone_security(all_desired, _zs(), provider)
         current, _desired = result
         assert current == {}
@@ -221,7 +221,7 @@ class TestPrefetchHook:
     def test_auth_error_propagates(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_zone_security_settings.side_effect = ProviderAuthError("forbidden")
-        all_desired = {"cloudflare_zone_security": {"security_level": "high"}}
+        all_desired = {"cloudflare.zone_security": {"security_level": "high"}}
         with pytest.raises(ProviderAuthError):
             _prefetch_zone_security(all_desired, _zs(), provider)
 
@@ -239,8 +239,8 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_zone_security(zp, {}, _zs(), MagicMock(), ctx)
-        assert "cloudflare_zone_security" in zp.extension_plans
-        plan = zp.extension_plans["cloudflare_zone_security"][0]
+        assert "cloudflare.zone_security" in zp.extension_plans
+        plan = zp.extension_plans["cloudflare.zone_security"][0]
         assert plan.has_changes
 
     def test_no_plan_when_no_changes(self):
@@ -252,7 +252,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_zone_security(zp, {}, _zs(), MagicMock(), ctx)
-        assert "cloudflare_zone_security" not in zp.extension_plans
+        assert "cloudflare.zone_security" not in zp.extension_plans
 
     def test_none_ctx_is_noop(self):
         zp = MagicMock()
@@ -276,7 +276,7 @@ class TestApplyHook:
         )
         synced, error = _apply_zone_security(zp, [plan], _zs(), provider)
         assert error is None
-        assert "cloudflare_zone_security" in synced
+        assert "cloudflare.zone_security" in synced
         provider.update_zone_security_settings.assert_called_once()
         call_args = provider.update_zone_security_settings.call_args
         payload = call_args[0][1]
@@ -304,7 +304,7 @@ class TestApplyHook:
 class TestValidateExtension:
     def test_valid_settings(self):
         desired = {
-            "cloudflare_zone_security": {
+            "cloudflare.zone_security": {
                 "security_level": "high",
                 "challenge_passage": 1800,
                 "browser_integrity_check": "on",
@@ -315,7 +315,7 @@ class TestValidateExtension:
         assert errors == []
 
     def test_invalid_security_level(self):
-        desired = {"cloudflare_zone_security": {"security_level": "extreme"}}
+        desired = {"cloudflare.zone_security": {"security_level": "extreme"}}
         errors: list[str] = []
         _validate_zone_security(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -323,28 +323,28 @@ class TestValidateExtension:
         assert "extreme" in errors[0]
 
     def test_invalid_challenge_passage_type(self):
-        desired = {"cloudflare_zone_security": {"challenge_passage": "not_a_number"}}
+        desired = {"cloudflare.zone_security": {"challenge_passage": "not_a_number"}}
         errors: list[str] = []
         _validate_zone_security(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "challenge_passage" in errors[0]
 
     def test_invalid_challenge_passage_bool(self):
-        desired = {"cloudflare_zone_security": {"challenge_passage": True}}
+        desired = {"cloudflare.zone_security": {"challenge_passage": True}}
         errors: list[str] = []
         _validate_zone_security(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "challenge_passage" in errors[0]
 
     def test_challenge_passage_too_low(self):
-        desired = {"cloudflare_zone_security": {"challenge_passage": 100}}
+        desired = {"cloudflare.zone_security": {"challenge_passage": 100}}
         errors: list[str] = []
         _validate_zone_security(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "300" in errors[0]
 
     def test_challenge_passage_too_high(self):
-        desired = {"cloudflare_zone_security": {"challenge_passage": 100000}}
+        desired = {"cloudflare.zone_security": {"challenge_passage": 100000}}
         errors: list[str] = []
         _validate_zone_security(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -352,13 +352,13 @@ class TestValidateExtension:
 
     def test_challenge_passage_boundary_valid(self):
         for val in (300, 86400):
-            desired = {"cloudflare_zone_security": {"challenge_passage": val}}
+            desired = {"cloudflare.zone_security": {"challenge_passage": val}}
             errors: list[str] = []
             _validate_zone_security(desired, "zone", errors, [])
             assert errors == [], f"Expected no errors for {val}"
 
     def test_invalid_browser_integrity_check(self):
-        desired = {"cloudflare_zone_security": {"browser_integrity_check": "yes"}}
+        desired = {"cloudflare.zone_security": {"browser_integrity_check": "yes"}}
         errors: list[str] = []
         _validate_zone_security(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -371,12 +371,12 @@ class TestValidateExtension:
 
     def test_non_dict_config_is_ok(self):
         errors: list[str] = []
-        _validate_zone_security({"cloudflare_zone_security": "not-a-dict"}, "zone", errors, [])
+        _validate_zone_security({"cloudflare.zone_security": "not-a-dict"}, "zone", errors, [])
         assert errors == []
 
     def test_multiple_errors(self):
         desired = {
-            "cloudflare_zone_security": {
+            "cloudflare.zone_security": {
                 "security_level": "extreme",
                 "challenge_passage": 50,
                 "browser_integrity_check": "yes",
@@ -398,8 +398,8 @@ class TestDumpExtension:
             "challenge_passage": 1800,
         }
         result = _dump_zone_security(_zs(), provider)
-        assert "cloudflare_zone_security" in result
-        assert result["cloudflare_zone_security"]["security_level"] == "high"
+        assert "cloudflare.zone_security" in result
+        assert result["cloudflare.zone_security"]["security_level"] == "high"
 
     def test_dump_api_failure(self):
         provider = MagicMock(spec=CloudflareProvider)
@@ -651,7 +651,7 @@ class TestReadBackVerification:
                 MagicMock(), [plan], Scope(zone_id="z1", label="example.com"), provider
             )
         assert error is None
-        assert synced == ["cloudflare_zone_security"]
+        assert synced == ["cloudflare.zone_security"]
         provider.get_zone_security_settings.assert_called_once()
         assert "security_level" in caplog.text
         assert "reads back" in caplog.text

@@ -29,7 +29,7 @@ def _run_lint(
 # A clean zone with rules spanning multiple phases, custom rulesets,
 # lists, and page shield policies.  Should produce zero findings.
 _CLEAN_ZONE: dict = {
-    "redirect_rules": [
+    "cloudflare.redirect_rules": [
         {
             "ref": "www-redirect",
             "expression": 'http.host eq "www.example.com"',
@@ -42,7 +42,7 @@ _CLEAN_ZONE: dict = {
             },
         },
     ],
-    "waf_custom_rules": [
+    "cloudflare.waf_custom_rules": [
         {
             "ref": "block-bad-ua",
             "expression": 'http.user_agent contains "BadBot"',
@@ -54,7 +54,7 @@ _CLEAN_ZONE: dict = {
             "action": "managed_challenge",
         },
     ],
-    "request_header_rules": [
+    "cloudflare.request_header_rules": [
         {
             "ref": "add-true-client-ip",
             "expression": 'http.host eq "api.example.com"',
@@ -69,7 +69,7 @@ _CLEAN_ZONE: dict = {
             },
         },
     ],
-    "cache_rules": [
+    "cloudflare.cache_rules": [
         {
             "ref": "cache-static",
             "expression": 'starts_with(http.request.uri.path, "/static/")',
@@ -105,7 +105,7 @@ _CLEAN_ZONE: dict = {
             ],
         },
     ],
-    "page_shield_policies": [
+    "cloudflare.page_shield_policies": [
         {
             "description": "allow-self",
             "action": "allow",
@@ -119,7 +119,7 @@ _CLEAN_ZONE: dict = {
 # all four linter stages.
 _BAD_ZONE: dict = {
     # Stage 1 (YAML structure): CF003 (missing ref)
-    "redirect_rules": [
+    "cloudflare.redirect_rules": [
         # CF003: missing ref
         {"expression": 'http.host eq "old.example.com"'},
         # CF005: duplicate ref within phase
@@ -146,7 +146,7 @@ _BAD_ZONE: dict = {
             },
         },
     ],
-    "waf_custom_rules": [
+    "cloudflare.waf_custom_rules": [
         # Stage 2 (per-rule): CF200 (invalid action for phase)
         {
             "ref": "bad-action",
@@ -249,7 +249,7 @@ class TestLinterPipeline:
             }
             for i in range(11)  # free limit is 10
         ]
-        ctx = _run_lint({"redirect_rules": rules}, plan_tier="free")
+        ctx = _run_lint({"cloudflare.redirect_rules": rules}, plan_tier="free")
         cf501 = [r for r in ctx.results if r.rule_id == "CF501"]
         assert len(cf501) == 1
         assert "exceeding free plan limit" in cf501[0].message
@@ -258,7 +258,7 @@ class TestLinterPipeline:
         """Stage 3 (plan-tier): regex on free plan triggers CF500."""
         ctx = _run_lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "regex-rule",
                         "expression": 'http.request.uri.path matches "^/api/v[0-9]+"',
@@ -276,7 +276,7 @@ class TestLinterPipeline:
         """Stage 4 (cross-rule): duplicate expressions within a phase trigger CF100."""
         ctx = _run_lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "first",
                         "expression": 'http.request.uri.path eq "/api"',
@@ -325,7 +325,7 @@ class TestLinterPipeline:
         """Stage 4 (cross-rule): list reference to undefined list triggers CF102."""
         ctx = _run_lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "list-check",
                         "expression": "ip.src in $nonexistent_list",

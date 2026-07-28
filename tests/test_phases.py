@@ -29,21 +29,21 @@ class TestPhaseRegistry:
         assert len(ALL_PROVIDER_IDS) == len(set(ALL_PROVIDER_IDS))
 
     def test_get_phase_redirect(self):
-        phase = get_phase("redirect_rules")
+        phase = get_phase("cloudflare.redirect_rules")
         assert phase.provider_id == "http_request_dynamic_redirect"
         assert phase.default_action == "redirect"
 
     def test_get_phase_cache(self):
-        phase = get_phase("cache_rules")
+        phase = get_phase("cloudflare.cache_rules")
         assert phase.provider_id == "http_request_cache_settings"
         assert phase.default_action == "set_cache_settings"
 
     def test_waf_no_default_action(self):
-        phase = get_phase("waf_custom_rules")
+        phase = get_phase("cloudflare.waf_custom_rules")
         assert phase.default_action is None
 
     def test_rate_limiting_no_default_action(self):
-        phase = get_phase("rate_limiting_rules")
+        phase = get_phase("cloudflare.rate_limiting_rules")
         assert phase.default_action is None
 
     def test_unknown_phase_raises(self):
@@ -60,7 +60,7 @@ class TestPhaseRegistry:
 
     def test_get_phase_by_provider_id(self):
         phase = get_phase_by_provider_id("http_request_dynamic_redirect")
-        assert phase.friendly_name == "redirect_rules"
+        assert phase.friendly_name == "cloudflare.redirect_rules"
 
     def test_account_level_phases(self):
         account_phases = [p for p in PHASES if p.account_level]
@@ -112,29 +112,29 @@ class TestPhaseRegistry:
     @pytest.mark.parametrize(
         "name,provider_id",
         [
-            ("redirect_rules", "http_request_dynamic_redirect"),
-            ("url_rewrite_rules", "http_request_transform"),
-            ("request_header_rules", "http_request_late_transform"),
-            ("response_header_rules", "http_response_headers_transform"),
-            ("config_rules", "http_config_settings"),
-            ("origin_rules", "http_request_origin"),
-            ("cache_rules", "http_request_cache_settings"),
-            ("compression_rules", "http_response_compression"),
-            ("custom_error_rules", "http_custom_errors"),
-            ("waf_custom_rules", "http_request_firewall_custom"),
-            ("waf_managed_rules", "http_request_firewall_managed"),
-            ("rate_limiting_rules", "http_ratelimit"),
-            ("bot_fight_rules", "http_request_sbfm"),
-            ("sensitive_data_detection", "http_response_firewall_managed"),
-            ("http_ddos_rules", "ddos_l7"),
-            ("bulk_redirect_rules", "http_request_redirect"),
-            ("log_custom_fields", "http_log_custom_fields"),
-            ("network_ddos_rules", "ddos_l4"),
-            ("network_firewall_rules", "magic_transit"),
-            ("network_firewall_managed", "magic_transit_managed"),
-            ("network_firewall_ratelimit", "magic_transit_ratelimit"),
-            ("network_firewall_ids", "magic_transit_ids_managed"),
-            ("url_normalization", "http_request_sanitize"),
+            ("cloudflare.redirect_rules", "http_request_dynamic_redirect"),
+            ("cloudflare.url_rewrite_rules", "http_request_transform"),
+            ("cloudflare.request_header_rules", "http_request_late_transform"),
+            ("cloudflare.response_header_rules", "http_response_headers_transform"),
+            ("cloudflare.config_rules", "http_config_settings"),
+            ("cloudflare.origin_rules", "http_request_origin"),
+            ("cloudflare.cache_rules", "http_request_cache_settings"),
+            ("cloudflare.compression_rules", "http_response_compression"),
+            ("cloudflare.custom_error_rules", "http_custom_errors"),
+            ("cloudflare.waf_custom_rules", "http_request_firewall_custom"),
+            ("cloudflare.waf_managed_rules", "http_request_firewall_managed"),
+            ("cloudflare.rate_limiting_rules", "http_ratelimit"),
+            ("cloudflare.bot_fight_rules", "http_request_sbfm"),
+            ("cloudflare.sensitive_data_detection", "http_response_firewall_managed"),
+            ("cloudflare.http_ddos_rules", "ddos_l7"),
+            ("cloudflare.bulk_redirect_rules", "http_request_redirect"),
+            ("cloudflare.log_custom_fields", "http_log_custom_fields"),
+            ("cloudflare.network_ddos_rules", "ddos_l4"),
+            ("cloudflare.network_firewall_rules", "magic_transit"),
+            ("cloudflare.network_firewall_managed", "magic_transit_managed"),
+            ("cloudflare.network_firewall_ratelimit", "magic_transit_ratelimit"),
+            ("cloudflare.network_firewall_ids", "magic_transit_ids_managed"),
+            ("cloudflare.url_normalization", "http_request_sanitize"),
         ],
     )
     def test_phase_mapping(self, name, provider_id):
@@ -145,16 +145,20 @@ class TestPhaseRegistry:
 class TestZoneLevelFlag:
     def test_zone_level_default_true(self):
         """Most phases default to zone_level=True."""
-        phase = get_phase("redirect_rules")
+        phase = get_phase("cloudflare.redirect_rules")
         assert phase.zone_level is True
 
     def test_custom_error_rules_zone_and_account(self):
-        phase = get_phase("custom_error_rules")
+        phase = get_phase("cloudflare.custom_error_rules")
         assert phase.zone_level is True
         assert phase.account_level is True
 
     def test_waf_phases_both_zone_and_account(self):
-        for name in ("waf_custom_rules", "waf_managed_rules", "rate_limiting_rules"):
+        for name in (
+            "cloudflare.waf_custom_rules",
+            "cloudflare.waf_managed_rules",
+            "cloudflare.rate_limiting_rules",
+        ):
             phase = get_phase(name)
             assert phase.zone_level is True, f"{name} should be zone_level"
             assert phase.account_level is True, f"{name} should be account_level"
@@ -191,77 +195,77 @@ class TestZoneLevelFlag:
 
 class TestNewPhases:
     def test_bot_fight_rules(self):
-        phase = get_phase("bot_fight_rules")
+        phase = get_phase("cloudflare.bot_fight_rules")
         assert phase.provider_id == "http_request_sbfm"
         assert phase.default_action is None
         assert phase.zone_level is True
         assert phase.account_level is False
 
     def test_sensitive_data_detection(self):
-        phase = get_phase("sensitive_data_detection")
+        phase = get_phase("cloudflare.sensitive_data_detection")
         assert phase.provider_id == "http_response_firewall_managed"
         assert phase.default_action is None
         assert phase.zone_level is True
         assert phase.account_level is False
 
     def test_http_ddos_rules(self):
-        phase = get_phase("http_ddos_rules")
+        phase = get_phase("cloudflare.http_ddos_rules")
         assert phase.provider_id == "ddos_l7"
         assert phase.default_action is None
         assert phase.zone_level is True
         assert phase.account_level is True
 
     def test_bulk_redirect_rules(self):
-        phase = get_phase("bulk_redirect_rules")
+        phase = get_phase("cloudflare.bulk_redirect_rules")
         assert phase.provider_id == "http_request_redirect"
         assert phase.default_action == "redirect"
         assert phase.zone_level is False
         assert phase.account_level is True
 
     def test_log_custom_fields(self):
-        phase = get_phase("log_custom_fields")
+        phase = get_phase("cloudflare.log_custom_fields")
         assert phase.provider_id == "http_log_custom_fields"
         assert phase.default_action == "log_custom_field"
         assert phase.zone_level is True
         assert phase.account_level is False
 
     def test_network_ddos_rules(self):
-        phase = get_phase("network_ddos_rules")
+        phase = get_phase("cloudflare.network_ddos_rules")
         assert phase.provider_id == "ddos_l4"
         assert phase.default_action is None
         assert phase.zone_level is False
         assert phase.account_level is True
 
     def test_network_firewall_rules(self):
-        phase = get_phase("network_firewall_rules")
+        phase = get_phase("cloudflare.network_firewall_rules")
         assert phase.provider_id == "magic_transit"
         assert phase.default_action is None
         assert phase.zone_level is False
         assert phase.account_level is True
 
     def test_network_firewall_managed(self):
-        phase = get_phase("network_firewall_managed")
+        phase = get_phase("cloudflare.network_firewall_managed")
         assert phase.provider_id == "magic_transit_managed"
         assert phase.default_action is None
         assert phase.zone_level is False
         assert phase.account_level is True
 
     def test_network_firewall_ratelimit(self):
-        phase = get_phase("network_firewall_ratelimit")
+        phase = get_phase("cloudflare.network_firewall_ratelimit")
         assert phase.provider_id == "magic_transit_ratelimit"
         assert phase.default_action is None
         assert phase.zone_level is False
         assert phase.account_level is True
 
     def test_network_firewall_ids(self):
-        phase = get_phase("network_firewall_ids")
+        phase = get_phase("cloudflare.network_firewall_ids")
         assert phase.provider_id == "magic_transit_ids_managed"
         assert phase.default_action is None
         assert phase.zone_level is False
         assert phase.account_level is True
 
     def test_url_normalization(self):
-        phase = get_phase("url_normalization")
+        phase = get_phase("cloudflare.url_normalization")
         assert phase.provider_id == "http_request_sanitize"
         assert phase.default_action is None
         assert phase.zone_level is True
@@ -274,15 +278,15 @@ class TestAllFriendlyNamesIncludesNewPhases:
     @pytest.mark.parametrize(
         "name",
         [
-            "http_ddos_rules",
-            "bulk_redirect_rules",
-            "log_custom_fields",
-            "network_ddos_rules",
-            "network_firewall_rules",
-            "network_firewall_managed",
-            "network_firewall_ratelimit",
-            "network_firewall_ids",
-            "url_normalization",
+            "cloudflare.http_ddos_rules",
+            "cloudflare.bulk_redirect_rules",
+            "cloudflare.log_custom_fields",
+            "cloudflare.network_ddos_rules",
+            "cloudflare.network_firewall_rules",
+            "cloudflare.network_firewall_managed",
+            "cloudflare.network_firewall_ratelimit",
+            "cloudflare.network_firewall_ids",
+            "cloudflare.url_normalization",
         ],
     )
     def test_new_phase_in_all_friendly_names(self, name):
@@ -303,9 +307,9 @@ class TestRemovedPhaseAlias:
             get_phase("waf_managed_exceptions")
 
     def test_canonical_name_still_registered(self):
-        phase = get_phase("waf_managed_rules")
+        phase = get_phase("cloudflare.waf_managed_rules")
         assert phase.provider_id == "http_request_firewall_managed"
-        assert "waf_managed_rules" in ALL_FRIENDLY_NAMES
+        assert "cloudflare.waf_managed_rules" in ALL_FRIENDLY_NAMES
 
 
 class TestCfPrepareRuleLoggingDefault:
@@ -318,7 +322,7 @@ class TestCfPrepareRuleLoggingDefault:
     def test_injects_logging_default_on_skip_rules(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("waf_custom_rules")
+        phase = get_phase("cloudflare.waf_custom_rules")
         rule = {"ref": "r1", "expression": "true", "action": "skip"}
         result = _cf_prepare_rule(rule, phase)
         assert result["logging"] == {"enabled": True}
@@ -326,7 +330,7 @@ class TestCfPrepareRuleLoggingDefault:
     def test_preserves_explicit_logging_false_on_skip_rules(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("waf_custom_rules")
+        phase = get_phase("cloudflare.waf_custom_rules")
         rule = {
             "ref": "r1",
             "expression": "true",
@@ -339,7 +343,7 @@ class TestCfPrepareRuleLoggingDefault:
     def test_no_injection_for_non_skip_actions(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("redirect_rules")
+        phase = get_phase("cloudflare.redirect_rules")
         result = _cf_prepare_rule({"ref": "r1", "expression": "true"}, phase)
         assert "logging" not in result
 
@@ -349,7 +353,7 @@ class TestCfPrepareRuleLoggingDefault:
         never returns the field for non-skip actions."""
         from octorules.planner import diff_phase
 
-        phase = get_phase("redirect_rules")
+        phase = get_phase("cloudflare.redirect_rules")
         desired = [{"ref": "r1", "expression": "true", "action": "redirect", "enabled": True}]
         current = [{"ref": "r1", "expression": "true", "action": "redirect", "enabled": True}]
         plan = diff_phase(phase, desired, current)
@@ -361,7 +365,7 @@ class TestCfPrepareRuleLoggingDefault:
         stores and returns that default for skip rules."""
         from octorules.planner import diff_phase
 
-        phase = get_phase("waf_custom_rules")
+        phase = get_phase("cloudflare.waf_custom_rules")
         desired = [{"ref": "r1", "expression": "true", "action": "skip", "enabled": True}]
         current = [
             {
@@ -409,7 +413,7 @@ class TestCfPrepareRuleNoMutation:
     def test_prepare_rule_does_not_mutate_input(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("redirect_rules")
+        phase = get_phase("cloudflare.redirect_rules")
         original = {"ref": "r1", "expression": "  http.host eq  'a.com'  "}
         original_copy = original.copy()
         result = _cf_prepare_rule(original, phase)
@@ -423,7 +427,7 @@ class TestCfPrepareRuleNoMutation:
     def test_prepare_rule_missing_expression(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("redirect_rules")
+        phase = get_phase("cloudflare.redirect_rules")
         rule = {"ref": "no-expr"}
         with pytest.raises(ValueError, match="missing required 'expression' field"):
             _cf_prepare_rule(rule, phase)
@@ -431,15 +435,15 @@ class TestCfPrepareRuleNoMutation:
     def test_prepare_rule_missing_expression_includes_ref_and_phase(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("waf_custom_rules")
+        phase = get_phase("cloudflare.waf_custom_rules")
         rule = {"ref": "my-rule-id"}
-        with pytest.raises(ValueError, match=r"'my-rule-id'.*'waf_custom_rules'"):
+        with pytest.raises(ValueError, match=r"'my-rule-id'.*'cloudflare.waf_custom_rules'"):
             _cf_prepare_rule(rule, phase)
 
     def test_prepare_rule_does_not_mutate_ratelimit(self):
         from octorules_cloudflare import _cf_prepare_rule
 
-        phase = get_phase("rate_limiting_rules")
+        phase = get_phase("cloudflare.rate_limiting_rules")
         # counting_expression lives inside the rule-level `ratelimit:` block
         # per cloudflare-python BlockRule.ratelimit (sibling of action_parameters).
         rl = {"counting_expression": "  ip.src  eq  1.2.3.4  "}
@@ -494,91 +498,91 @@ class TestPhaseConsistency:
 class TestGetPhaseByNewProviderIds:
     def test_get_phase_by_provider_id_sbfm(self):
         phase = get_phase_by_provider_id("http_request_sbfm")
-        assert phase.friendly_name == "bot_fight_rules"
+        assert phase.friendly_name == "cloudflare.bot_fight_rules"
 
     def test_get_phase_by_provider_id_response_firewall_managed(self):
         phase = get_phase_by_provider_id("http_response_firewall_managed")
-        assert phase.friendly_name == "sensitive_data_detection"
+        assert phase.friendly_name == "cloudflare.sensitive_data_detection"
 
     def test_get_phase_by_provider_id_request_firewall_managed(self):
         """http_request_firewall_managed should map to waf_managed_rules (not exceptions)."""
         phase = get_phase_by_provider_id("http_request_firewall_managed")
-        assert phase.friendly_name == "waf_managed_rules"
+        assert phase.friendly_name == "cloudflare.waf_managed_rules"
 
     def test_get_phase_by_provider_id_ddos_l7(self):
         phase = get_phase_by_provider_id("ddos_l7")
-        assert phase.friendly_name == "http_ddos_rules"
+        assert phase.friendly_name == "cloudflare.http_ddos_rules"
 
     def test_get_phase_by_provider_id_http_request_redirect(self):
         phase = get_phase_by_provider_id("http_request_redirect")
-        assert phase.friendly_name == "bulk_redirect_rules"
+        assert phase.friendly_name == "cloudflare.bulk_redirect_rules"
 
     def test_get_phase_by_provider_id_http_log_custom_fields(self):
         phase = get_phase_by_provider_id("http_log_custom_fields")
-        assert phase.friendly_name == "log_custom_fields"
+        assert phase.friendly_name == "cloudflare.log_custom_fields"
 
     def test_get_phase_by_provider_id_ddos_l4(self):
         phase = get_phase_by_provider_id("ddos_l4")
-        assert phase.friendly_name == "network_ddos_rules"
+        assert phase.friendly_name == "cloudflare.network_ddos_rules"
 
     def test_get_phase_by_provider_id_magic_transit(self):
         phase = get_phase_by_provider_id("magic_transit")
-        assert phase.friendly_name == "network_firewall_rules"
+        assert phase.friendly_name == "cloudflare.network_firewall_rules"
 
     def test_get_phase_by_provider_id_magic_transit_managed(self):
         phase = get_phase_by_provider_id("magic_transit_managed")
-        assert phase.friendly_name == "network_firewall_managed"
+        assert phase.friendly_name == "cloudflare.network_firewall_managed"
 
     def test_get_phase_by_provider_id_magic_transit_ratelimit(self):
         phase = get_phase_by_provider_id("magic_transit_ratelimit")
-        assert phase.friendly_name == "network_firewall_ratelimit"
+        assert phase.friendly_name == "cloudflare.network_firewall_ratelimit"
 
     def test_get_phase_by_provider_id_magic_transit_ids_managed(self):
         phase = get_phase_by_provider_id("magic_transit_ids_managed")
-        assert phase.friendly_name == "network_firewall_ids"
+        assert phase.friendly_name == "cloudflare.network_firewall_ids"
 
     def test_get_phase_by_provider_id_http_request_sanitize(self):
         phase = get_phase_by_provider_id("http_request_sanitize")
-        assert phase.friendly_name == "url_normalization"
+        assert phase.friendly_name == "cloudflare.url_normalization"
 
 
 class TestSuggestPhase:
     def test_close_typo(self):
-        assert suggest_phase("redirect_rule") == "redirect_rules"
+        assert suggest_phase("redirect_rule") == "cloudflare.redirect_rules"
 
     def test_missing_suffix(self):
-        assert suggest_phase("cache_rule") == "cache_rules"
+        assert suggest_phase("cache_rule") == "cloudflare.cache_rules"
 
     def test_swapped_word(self):
-        assert suggest_phase("origin_rule") == "origin_rules"
+        assert suggest_phase("origin_rule") == "cloudflare.origin_rules"
 
     def test_no_match(self):
         assert suggest_phase("zzz_totally_wrong") is None
 
     def test_exact_match(self):
-        assert suggest_phase("redirect_rules") == "redirect_rules"
+        assert suggest_phase("cloudflare.redirect_rules") == "cloudflare.redirect_rules"
 
     def test_partial_prefix(self):
-        # "waf_custom" is close enough to "waf_custom_rules"
-        assert suggest_phase("waf_custom") == "waf_custom_rules"
+        # "waf_custom" is close enough to "cloudflare.waf_custom_rules"
+        assert suggest_phase("waf_custom") == "cloudflare.waf_custom_rules"
 
     def test_provider_id_suggests_friendly_name(self):
-        assert suggest_phase("http_request_dynamic_redirect") == "redirect_rules"
+        assert suggest_phase("http_request_dynamic_redirect") == "cloudflare.redirect_rules"
 
     def test_provider_id_cache_suggests_friendly(self):
-        assert suggest_phase("http_request_cache_settings") == "cache_rules"
+        assert suggest_phase("http_request_cache_settings") == "cloudflare.cache_rules"
 
     def test_provider_id_ddos_l7_suggests_friendly(self):
-        assert suggest_phase("ddos_l7") == "http_ddos_rules"
+        assert suggest_phase("ddos_l7") == "cloudflare.http_ddos_rules"
 
     def test_provider_id_magic_transit_suggests_friendly(self):
-        assert suggest_phase("magic_transit") == "network_firewall_rules"
+        assert suggest_phase("magic_transit") == "cloudflare.network_firewall_rules"
 
     def test_bulk_redirect_typo(self):
-        assert suggest_phase("bulk_redirect_rule") == "bulk_redirect_rules"
+        assert suggest_phase("bulk_redirect_rule") == "cloudflare.bulk_redirect_rules"
 
     def test_network_firewall_typo(self):
-        assert suggest_phase("network_firewall_rule") == "network_firewall_rules"
+        assert suggest_phase("network_firewall_rule") == "cloudflare.network_firewall_rules"
 
 
 class TestUnknownPhaseMessage:
@@ -589,7 +593,7 @@ class TestUnknownPhaseMessage:
     def test_without_suggestion(self):
         msg = unknown_phase_message("zzz_totally_wrong")
         assert "Valid phases:" in msg
-        assert "redirect_rules" in msg
+        assert "cloudflare.redirect_rules" in msg
 
     def test_provider_id_suggests_friendly(self):
         msg = unknown_phase_message("http_request_dynamic_redirect")

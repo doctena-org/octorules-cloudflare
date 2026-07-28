@@ -22,7 +22,7 @@ def lint_config(tmp_path):
     # Valid rules file
     rules_file = rules_dir / "example.com.yaml"
     rules_file.write_text(
-        "redirect_rules:\n"
+        "cloudflare:\n  redirect_rules:\n"
         "  - ref: test-redirect\n"
         "    expression: 'http.host eq \"example.com\"'\n"
         "    action_parameters:\n"
@@ -35,7 +35,7 @@ def lint_config(tmp_path):
     # Rules file with issues
     bad_rules_file = rules_dir / "bad.example.com.yaml"
     bad_rules_file.write_text(
-        "redirect_rules:\n"
+        "cloudflare:\n  redirect_rules:\n"
         "  - expression: 'true'\n"  # missing ref
         "  - ref: test\n"  # missing expression
     )

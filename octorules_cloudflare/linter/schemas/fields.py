@@ -105,21 +105,21 @@ _f("cf.zone.plan", FieldType.STRING)
 # Phases where response fields are available
 RESPONSE_PHASES = frozenset(
     {
-        "response_header_rules",
-        "compression_rules",
-        "sensitive_data_detection",
-        "custom_error_rules",
-        "log_custom_fields",
+        "cloudflare.response_header_rules",
+        "cloudflare.compression_rules",
+        "cloudflare.sensitive_data_detection",
+        "cloudflare.custom_error_rules",
+        "cloudflare.log_custom_fields",
     }
 )
 
 # Phases where request body fields are available
 BODY_PHASES = frozenset(
     {
-        "waf_custom_rules",
-        "waf_managed_rules",
-        "rate_limiting_rules",
-        "custom_error_rules",
+        "cloudflare.waf_custom_rules",
+        "cloudflare.waf_managed_rules",
+        "cloudflare.rate_limiting_rules",
+        "cloudflare.custom_error_rules",
     }
 )
 

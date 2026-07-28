@@ -105,7 +105,7 @@ def diff_leaked_credentials(current: dict, desired: dict) -> LeakedCredentialPla
 # Extension hooks
 # ---------------------------------------------------------------------------
 _prefetch_leaked_credentials = make_prefetch_hook(
-    "cloudflare_leaked_credential_check", "get_leaked_credential_check"
+    "cloudflare.leaked_credential_check", "get_leaked_credential_check"
 )
 
 
@@ -117,7 +117,7 @@ def _finalize_leaked_credentials(zp, all_desired, scope, provider, ctx):
     current, desired = ctx
     plan = diff_leaked_credentials(current, desired)
     if plan.has_changes:
-        zp.extension_plans.setdefault("cloudflare_leaked_credential_check", []).append(plan)
+        zp.extension_plans.setdefault("cloudflare.leaked_credential_check", []).append(plan)
 
 
 def _apply_leaked_credentials(zp, plans, scope, provider):
@@ -138,7 +138,7 @@ def _apply_leaked_credentials(zp, plans, scope, provider):
                     provider.get_leaked_credential_check,
                     scope,
                     {"enabled": change.desired},
-                    "cloudflare_leaked_credential_check",
+                    "cloudflare.leaked_credential_check",
                 )
                 synced.append("cloudflare_leaked_credential_check:enabled")
 
@@ -151,7 +151,7 @@ def _apply_leaked_credentials(zp, plans, scope, provider):
 
 def _validate_leaked_credentials(desired, zone_name, errors, lines):
     """Validate cloudflare_leaked_credential_check offline."""
-    config = desired.get("cloudflare_leaked_credential_check")
+    config = desired.get("cloudflare.leaked_credential_check")
     if not isinstance(config, dict):
         return
 
@@ -187,7 +187,7 @@ def _validate_leaked_credentials(desired, zone_name, errors, lines):
 
 
 _dump_leaked_credentials = make_dump_hook(
-    "cloudflare_leaked_credential_check", "get_leaked_credential_check"
+    "cloudflare.leaked_credential_check", "get_leaked_credential_check"
 )
 
 
@@ -210,7 +210,7 @@ class LeakedCredentialFormatter(SettingsFormatter):
 class LeakedCredentialsExtension(ProviderExtension):
     """Leaked-credential detection settings."""
 
-    section = "cloudflare_leaked_credential_check"
+    section = "cloudflare.leaked_credential_check"
     formatter = LeakedCredentialFormatter()
 
     def prefetch(self, desired, scope, provider):
@@ -243,6 +243,6 @@ def register_leaked_credentials() -> None:
     )
 
     register_plan_zone_hook(_prefetch_leaked_credentials, _finalize_leaked_credentials)
-    register_apply_extension("cloudflare_leaked_credential_check", _apply_leaked_credentials)
-    register_format_extension("cloudflare_leaked_credential_check", LeakedCredentialFormatter())
+    register_apply_extension("cloudflare.leaked_credential_check", _apply_leaked_credentials)
+    register_format_extension("cloudflare.leaked_credential_check", LeakedCredentialFormatter())
     register_validate_extension(_validate_leaked_credentials)

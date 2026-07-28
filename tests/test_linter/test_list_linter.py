@@ -453,5 +453,5 @@ class TestCF478IPOverlap:
 
 class TestNoListsSection:
     def test_no_lists_no_errors(self):
-        ctx = _lint({"waf_custom_rules": []})
+        ctx = _lint({"cloudflare.waf_custom_rules": []})
         assert len(ctx.results) == 0

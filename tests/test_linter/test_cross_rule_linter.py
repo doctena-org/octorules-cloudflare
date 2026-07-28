@@ -16,7 +16,7 @@ class TestDuplicateExpressions:
     def test_cf100_duplicate_expression(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host eq "example.com"'},
                     {"ref": "rule2", "expression": 'http.host eq "example.com"'},
                 ]
@@ -30,7 +30,7 @@ class TestDuplicateExpressions:
     def test_cf100_whitespace_normalized(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host   eq   "example.com"'},
                     {"ref": "rule2", "expression": 'http.host eq "example.com"'},
                 ]
@@ -41,7 +41,7 @@ class TestDuplicateExpressions:
     def test_cf100_different_expressions_ok(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host eq "a.com"'},
                     {"ref": "rule2", "expression": 'http.host eq "b.com"'},
                 ]
@@ -54,7 +54,7 @@ class TestDuplicateExpressions:
         # are NOT duplicates
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "rule1",
                         "expression": '(cf.zone.plan eq "ENT")',
@@ -75,7 +75,7 @@ class TestDuplicateExpressions:
     def test_cf100_same_expr_same_action_params_id_flagged(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "rule1",
                         "expression": '(cf.zone.plan eq "ENT")',
@@ -96,10 +96,10 @@ class TestDuplicateExpressions:
     def test_cf100_across_phases_not_flagged(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host eq "example.com"'},
                 ],
-                "rate_limiting_rules": [
+                "cloudflare.rate_limiting_rules": [
                     {"ref": "rule2", "expression": 'http.host eq "example.com"'},
                 ],
             }
@@ -111,7 +111,7 @@ class TestUnreachableRules:
     def test_cf101_unreachable_after_block_true(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "blocker", "expression": "true", "action": "block"},
                     {"ref": "after", "expression": 'http.host eq "a.com"', "action": "log"},
                 ]
@@ -122,7 +122,7 @@ class TestUnreachableRules:
     def test_cf101_not_triggered_with_non_true(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host eq "a.com"', "action": "block"},
                     {"ref": "rule2", "expression": 'http.host eq "b.com"', "action": "log"},
                 ]
@@ -133,7 +133,7 @@ class TestUnreachableRules:
     def test_cf101_not_triggered_with_non_terminating(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "true", "action": "log"},
                     {"ref": "rule2", "expression": 'http.host eq "a.com"', "action": "block"},
                 ]
@@ -144,7 +144,7 @@ class TestUnreachableRules:
     def test_cf101_disabled_rule_ignored(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "disabled", "expression": "true", "action": "block", "enabled": False},
                     {"ref": "after", "expression": 'http.host eq "a.com"', "action": "log"},
                 ]
@@ -155,7 +155,7 @@ class TestUnreachableRules:
     def test_cf101_parenthesized_true(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "blocker", "expression": "(true)", "action": "block"},
                     {"ref": "after", "expression": 'http.host eq "a.com"', "action": "log"},
                 ]
@@ -168,7 +168,7 @@ class TestListReferences:
     def test_cf102_unresolved_list_reference(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $unknown_list"},
                 ],
                 "lists": [],
@@ -181,7 +181,7 @@ class TestListReferences:
     def test_cf102_resolved_list_reference_ok(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $my_ips"},
                 ],
                 "lists": [{"name": "my_ips"}],
@@ -192,7 +192,7 @@ class TestListReferences:
     def test_cf102_no_list_refs_no_findings(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host eq "example.com"'},
                 ],
             }
@@ -202,7 +202,7 @@ class TestListReferences:
     def test_cf102_multiple_refs_partial_resolution(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $known"},
                     {"ref": "rule2", "expression": "ip.src in $unknown"},
                 ],
@@ -218,7 +218,7 @@ class TestManagedLists:
     def test_cf103_invalid_managed_list(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $cf.invalid_list"},
                 ],
             }
@@ -228,7 +228,7 @@ class TestManagedLists:
     def test_cf103_valid_managed_list(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $cf.anonymizer"},
                 ],
             }
@@ -238,7 +238,7 @@ class TestManagedLists:
     def test_cf103_user_list_not_flagged(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $my_custom_list"},
                 ],
                 "lists": [{"name": "my_custom_list"}],
@@ -250,7 +250,7 @@ class TestManagedLists:
         # Managed list names (with dots) should not trigger CF102
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $cf.anonymizer"},
                 ],
                 "lists": [],
@@ -263,7 +263,7 @@ class TestListTypeMismatch:
     def test_cf104_ip_field_with_asn_list(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $my_asns"},
                 ],
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
@@ -274,7 +274,7 @@ class TestListTypeMismatch:
     def test_cf104_asn_field_with_ip_list(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src.asnum in $my_ips"},
                 ],
                 "lists": [{"name": "my_ips", "kind": "ip", "items": []}],
@@ -285,7 +285,7 @@ class TestListTypeMismatch:
     def test_cf104_correct_ip_field_with_ip_list(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $my_ips"},
                 ],
                 "lists": [{"name": "my_ips", "kind": "ip", "items": []}],
@@ -296,7 +296,7 @@ class TestListTypeMismatch:
     def test_cf104_correct_asn_field_with_asn_list(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.geoip.asnum in $my_asns"},
                 ],
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
@@ -307,7 +307,7 @@ class TestListTypeMismatch:
     def test_cf104_not_in_also_detected(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src not in $my_asns"},
                 ],
                 "lists": [{"name": "my_asns", "kind": "asn", "items": []}],
@@ -318,7 +318,7 @@ class TestListTypeMismatch:
     def test_cf104_no_lists_section(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $my_list"},
                 ],
             }
@@ -329,7 +329,7 @@ class TestListTypeMismatch:
         """Unknown list reference is handled by CF102, not CF104."""
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $unknown"},
                 ],
                 "lists": [{"name": "my_ips", "kind": "ip", "items": []}],
@@ -341,7 +341,7 @@ class TestListTypeMismatch:
         """CF104 detects type mismatch for $cf.* managed lists (all are ip kind)."""
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src.asnum in $cf.anonymizer"},
                 ],
             }
@@ -355,7 +355,7 @@ class TestListTypeMismatch:
         """CF104 does not fire when managed list field matches (ip.src with ip kind)."""
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src in $cf.anonymizer"},
                 ],
             }
@@ -366,7 +366,7 @@ class TestListTypeMismatch:
         """CF104 detects managed list type mismatch with 'not in' operator."""
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.geoip.asnum not in $cf.vpn"},
                 ],
             }
@@ -377,7 +377,7 @@ class TestListTypeMismatch:
         """CF104 fires for managed lists even without a 'lists' section."""
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": "ip.src.asnum in $cf.malware"},
                 ],
             }
@@ -445,7 +445,7 @@ class TestRewriteNotTerminating:
     def test_cf101_not_triggered_for_rewrite(self):
         ctx = _lint(
             {
-                "url_rewrite_rules": [
+                "cloudflare.url_rewrite_rules": [
                     {"ref": "rewriter", "expression": "true", "action": "rewrite"},
                     {"ref": "after", "expression": 'http.host eq "a.com"', "action": "rewrite"},
                 ]
@@ -461,7 +461,7 @@ class TestRewriteNotTerminating:
         """
         ctx = _lint(
             {
-                "url_rewrite_rules": [
+                "cloudflare.url_rewrite_rules": [
                     {"ref": "rw1", "expression": "true", "action": "rewrite"},
                     {"ref": "rw2", "expression": "true", "action": "rewrite"},
                     {"ref": "rw3", "expression": "true", "action": "rewrite"},
@@ -478,7 +478,7 @@ class TestRewriteNotTerminating:
         """
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "blk1", "expression": "true", "action": "block"},
                     {"ref": "blk2", "expression": "true", "action": "block"},
                     {"ref": "blk3", "expression": "true", "action": "block"},
@@ -496,12 +496,12 @@ class TestPhaseFilter:
     def test_filter_skips_unmatched_phase(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {"ref": "rule1", "expression": 'http.host eq "a.com"'},
                     {"ref": "rule2", "expression": 'http.host eq "a.com"'},
                 ]
             },
-            phase_filter=["redirect_rules"],
+            phase_filter=["cloudflare.redirect_rules"],
         )
         assert_no_lint(ctx, "CF100")
 
@@ -516,7 +516,7 @@ class TestDuplicateManagedRulesetExecute:
     def test_cf105_two_executes_same_ruleset_fires(self):
         ctx = _lint(
             {
-                "waf_managed_rules": [
+                "cloudflare.waf_managed_rules": [
                     {
                         "ref": "rule-A",
                         "action": "execute",
@@ -543,7 +543,7 @@ class TestDuplicateManagedRulesetExecute:
     def test_cf105_single_execute_no_fire(self):
         ctx = _lint(
             {
-                "waf_managed_rules": [
+                "cloudflare.waf_managed_rules": [
                     {
                         "ref": "rule-A",
                         "action": "execute",
@@ -558,7 +558,7 @@ class TestDuplicateManagedRulesetExecute:
     def test_cf105_two_executes_different_ids_no_fire(self):
         ctx = _lint(
             {
-                "waf_managed_rules": [
+                "cloudflare.waf_managed_rules": [
                     {
                         "ref": "rule-A",
                         "action": "execute",
@@ -581,7 +581,7 @@ class TestDuplicateManagedRulesetExecute:
         # must not crash on it nor produce a spurious finding.
         ctx = _lint(
             {
-                "waf_managed_rules": [
+                "cloudflare.waf_managed_rules": [
                     {"ref": "rule-A", "action": "execute", "expression": "true"},
                     {
                         "ref": "rule-B",
@@ -601,7 +601,7 @@ class TestDuplicateManagedRulesetExecute:
         # the cross-rule check should still group per-phase.)
         ctx = _lint(
             {
-                "waf_managed_rules": [
+                "cloudflare.waf_managed_rules": [
                     {
                         "ref": "rule-A",
                         "action": "execute",
@@ -609,7 +609,7 @@ class TestDuplicateManagedRulesetExecute:
                         "expression": "true",
                     },
                 ],
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "rule-B",
                         "action": "execute",
@@ -628,7 +628,7 @@ class TestDuplicateManagedRulesetExecute:
         # this — the constraint is on the ruleset id, not the overrides.
         ctx = _lint(
             {
-                "waf_managed_rules": [
+                "cloudflare.waf_managed_rules": [
                     {
                         "ref": "rule-A",
                         "action": "execute",

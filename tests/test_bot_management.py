@@ -245,7 +245,7 @@ class TestUnsupportedFields:
         current = {"enable_js": False}
         desired = {"fight_mode": False, "enable_js": False}
         _finalize_bot_management(zp, {}, _scope(), MagicMock(), (current, desired))
-        plan = zp.extension_plans["cloudflare_bot_management"][0]
+        plan = zp.extension_plans["cloudflare.bot_management"][0]
         assert not plan.has_changes
         assert plan.unsupported == ["fight_mode"]
 
@@ -351,7 +351,7 @@ class TestPrefetchHook:
             "fight_mode": True,
             "enable_js": False,
         }
-        all_desired = {"cloudflare_bot_management": {"fight_mode": False}}
+        all_desired = {"cloudflare.bot_management": {"fight_mode": False}}
         result = _prefetch_bot_management(all_desired, _scope(), provider)
         assert result is not None
         current, desired = result
@@ -363,7 +363,7 @@ class TestPrefetchHook:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_bot_management.side_effect = ProviderError("API down")
-        all_desired = {"cloudflare_bot_management": {"fight_mode": True}}
+        all_desired = {"cloudflare.bot_management": {"fight_mode": True}}
         result = _prefetch_bot_management(all_desired, _scope(), provider)
         current, _desired = result
         assert current == {}
@@ -374,7 +374,7 @@ class TestPrefetchHook:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_bot_management.side_effect = ProviderAuthError("forbidden")
-        all_desired = {"cloudflare_bot_management": {"fight_mode": True}}
+        all_desired = {"cloudflare.bot_management": {"fight_mode": True}}
         with pytest.raises(ProviderAuthError):
             _prefetch_bot_management(all_desired, _scope(), provider)
 
@@ -392,8 +392,8 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_bot_management(zp, {}, _scope(), MagicMock(), ctx)
-        assert "cloudflare_bot_management" in zp.extension_plans
-        plan = zp.extension_plans["cloudflare_bot_management"][0]
+        assert "cloudflare.bot_management" in zp.extension_plans
+        plan = zp.extension_plans["cloudflare.bot_management"][0]
         assert plan.has_changes
 
     def test_no_plan_when_no_changes(self):
@@ -405,7 +405,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_bot_management(zp, {}, _scope(), MagicMock(), ctx)
-        assert "cloudflare_bot_management" not in zp.extension_plans
+        assert "cloudflare.bot_management" not in zp.extension_plans
 
     def test_none_ctx_is_noop(self):
         zp = MagicMock()
@@ -429,7 +429,7 @@ class TestApplyHook:
         )
         synced, error = _apply_bot_management(zp, [plan], _scope(), provider)
         assert error is None
-        assert "cloudflare_bot_management" in synced
+        assert "cloudflare.bot_management" in synced
         provider.update_bot_management.assert_called_once()
         call_args = provider.update_bot_management.call_args
         payload = call_args[0][1]
@@ -444,7 +444,7 @@ class TestApplyHook:
         with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
             synced, error = _apply_bot_management(MagicMock(), [plan], _scope(), provider)
         assert error is None
-        assert synced == ["cloudflare_bot_management"]
+        assert synced == ["cloudflare.bot_management"]
         provider.get_bot_management.assert_called_once()
         assert "fight_mode" in caplog.text
         assert "reads back" in caplog.text
@@ -466,7 +466,7 @@ class TestApplyHook:
         with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
             synced, error = _apply_bot_management(MagicMock(), [plan], _scope(), provider)
         assert error is None
-        assert synced == ["cloudflare_bot_management"]
+        assert synced == ["cloudflare.bot_management"]
         assert "skipping verification" in caplog.text
 
     def test_no_changes_skipped(self):
@@ -490,7 +490,7 @@ class TestApplyHook:
 class TestValidateExtension:
     def test_valid_settings(self):
         desired = {
-            "cloudflare_bot_management": {
+            "cloudflare.bot_management": {
                 "fight_mode": True,
                 "enable_js": False,
                 "ai_bots_protection": "block",
@@ -502,7 +502,7 @@ class TestValidateExtension:
         assert errors == []
 
     def test_invalid_ai_bots_protection(self):
-        desired = {"cloudflare_bot_management": {"ai_bots_protection": "allow"}}
+        desired = {"cloudflare.bot_management": {"ai_bots_protection": "allow"}}
         errors: list[str] = []
         _validate_bot_management(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -510,7 +510,7 @@ class TestValidateExtension:
         assert "allow" in errors[0]
 
     def test_invalid_bool_field(self):
-        desired = {"cloudflare_bot_management": {"fight_mode": "yes"}}
+        desired = {"cloudflare.bot_management": {"fight_mode": "yes"}}
         errors: list[str] = []
         _validate_bot_management(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -519,7 +519,7 @@ class TestValidateExtension:
 
     def test_invalid_multiple_bool_fields(self):
         desired = {
-            "cloudflare_bot_management": {
+            "cloudflare.bot_management": {
                 "fight_mode": "yes",
                 "enable_js": 1,
                 "suppress_session_score": "no",
@@ -530,7 +530,7 @@ class TestValidateExtension:
         assert len(errors) == 3
 
     def test_validate_invalid_crawler_protection(self):
-        desired = {"cloudflare_bot_management": {"crawler_protection": "bogus"}}
+        desired = {"cloudflare.bot_management": {"crawler_protection": "bogus"}}
         errors: list[str] = []
         _validate_bot_management(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -538,13 +538,13 @@ class TestValidateExtension:
         assert "'bogus'" in errors[0]
 
     def test_validate_valid_crawler_protection(self):
-        desired = {"cloudflare_bot_management": {"crawler_protection": "enabled"}}
+        desired = {"cloudflare.bot_management": {"crawler_protection": "enabled"}}
         errors: list[str] = []
         _validate_bot_management(desired, "zone", errors, [])
         assert errors == []
 
     def test_validate_invalid_auto_update_model(self):
-        desired = {"cloudflare_bot_management": {"auto_update_model": "yes"}}
+        desired = {"cloudflare.bot_management": {"auto_update_model": "yes"}}
         errors: list[str] = []
         _validate_bot_management(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -552,7 +552,7 @@ class TestValidateExtension:
         assert "boolean" in errors[0]
 
     def test_read_only_field_rejected(self):
-        desired = {"cloudflare_bot_management": {"using_latest_model": True}}
+        desired = {"cloudflare.bot_management": {"using_latest_model": True}}
         errors: list[str] = []
         _validate_bot_management(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -565,7 +565,7 @@ class TestValidateExtension:
 
     def test_non_dict_config_is_ok(self):
         errors: list[str] = []
-        _validate_bot_management({"cloudflare_bot_management": "not-a-dict"}, "zone", errors, [])
+        _validate_bot_management({"cloudflare.bot_management": "not-a-dict"}, "zone", errors, [])
         assert errors == []
 
 
@@ -581,8 +581,8 @@ class TestDumpExtension:
             "ai_bots_protection": "block",
         }
         result = _dump_bot_management(_scope(), provider)
-        assert "cloudflare_bot_management" in result
-        assert result["cloudflare_bot_management"]["fight_mode"] is True
+        assert "cloudflare.bot_management" in result
+        assert result["cloudflare.bot_management"]["fight_mode"] is True
 
     def test_dump_api_failure(self):
         from octorules.provider.exceptions import ProviderError

@@ -21,7 +21,7 @@ from octorules.planner import (
 
 from octorules_cloudflare.page_shield import PageShieldFormatter, PageShieldPolicyPlan
 
-REDIRECT_PHASE = get_phase("redirect_rules")
+REDIRECT_PHASE = get_phase("cloudflare.redirect_rules")
 
 
 def _format_text(zp):

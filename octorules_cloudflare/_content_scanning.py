@@ -103,7 +103,7 @@ def diff_content_scanning(current: dict, desired: dict) -> ContentScanningPlan:
 # Extension hooks
 # ---------------------------------------------------------------------------
 _prefetch_content_scanning = make_prefetch_hook(
-    "cloudflare_content_scanning", "get_content_scanning"
+    "cloudflare.content_scanning", "get_content_scanning"
 )
 
 
@@ -115,7 +115,7 @@ def _finalize_content_scanning(zp, all_desired, scope, provider, ctx):
     current, desired = ctx
     plan = diff_content_scanning(current, desired)
     if plan.has_changes:
-        zp.extension_plans.setdefault("cloudflare_content_scanning", []).append(plan)
+        zp.extension_plans.setdefault("cloudflare.content_scanning", []).append(plan)
 
 
 def _apply_content_scanning(zp, plans, scope, provider):
@@ -136,7 +136,7 @@ def _apply_content_scanning(zp, plans, scope, provider):
                     provider.get_content_scanning,
                     scope,
                     {"enabled": change.desired},
-                    "cloudflare_content_scanning",
+                    "cloudflare.content_scanning",
                 )
                 synced.append("cloudflare_content_scanning:enabled")
 
@@ -149,7 +149,7 @@ def _apply_content_scanning(zp, plans, scope, provider):
 
 def _validate_content_scanning(desired, zone_name, errors, lines):
     """Validate cloudflare_content_scanning offline."""
-    config = desired.get("cloudflare_content_scanning")
+    config = desired.get("cloudflare.content_scanning")
     if not isinstance(config, dict):
         return
 
@@ -183,7 +183,7 @@ def _validate_content_scanning(desired, zone_name, errors, lines):
                     )
 
 
-_dump_content_scanning = make_dump_hook("cloudflare_content_scanning", "get_content_scanning")
+_dump_content_scanning = make_dump_hook("cloudflare.content_scanning", "get_content_scanning")
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ class ContentScanningFormatter(SettingsFormatter):
 class ContentScanningExtension(ProviderExtension):
     """Content scanning / anti-malware settings."""
 
-    section = "cloudflare_content_scanning"
+    section = "cloudflare.content_scanning"
     formatter = ContentScanningFormatter()
 
     def prefetch(self, desired, scope, provider):
@@ -238,6 +238,6 @@ def register_content_scanning() -> None:
     )
 
     register_plan_zone_hook(_prefetch_content_scanning, _finalize_content_scanning)
-    register_apply_extension("cloudflare_content_scanning", _apply_content_scanning)
-    register_format_extension("cloudflare_content_scanning", ContentScanningFormatter())
+    register_apply_extension("cloudflare.content_scanning", _apply_content_scanning)
+    register_format_extension("cloudflare.content_scanning", ContentScanningFormatter())
     register_validate_extension(_validate_content_scanning)

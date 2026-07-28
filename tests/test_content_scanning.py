@@ -224,7 +224,7 @@ class TestPrefetchHook:
             "enabled": True,
             "custom_expressions": [{"payload": "test"}],
         }
-        all_desired = {"cloudflare_content_scanning": {"enabled": True}}
+        all_desired = {"cloudflare.content_scanning": {"enabled": True}}
         result = _prefetch_content_scanning(all_desired, _zs(), provider)
         assert result is not None
         current, desired = result
@@ -234,7 +234,7 @@ class TestPrefetchHook:
     def test_api_failure_handled_gracefully(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderError("API down")
-        all_desired = {"cloudflare_content_scanning": {"enabled": True}}
+        all_desired = {"cloudflare.content_scanning": {"enabled": True}}
         result = _prefetch_content_scanning(all_desired, _zs(), provider)
         current, _desired = result
         assert current == {}
@@ -242,7 +242,7 @@ class TestPrefetchHook:
     def test_auth_error_propagates(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_content_scanning.side_effect = ProviderAuthError("forbidden")
-        all_desired = {"cloudflare_content_scanning": {"enabled": True}}
+        all_desired = {"cloudflare.content_scanning": {"enabled": True}}
         with pytest.raises(ProviderAuthError):
             _prefetch_content_scanning(all_desired, _zs(), provider)
 
@@ -260,7 +260,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_content_scanning(zp, {}, _zs(), MagicMock(), ctx)
-        assert "cloudflare_content_scanning" in zp.extension_plans
+        assert "cloudflare.content_scanning" in zp.extension_plans
 
     def test_no_plan_when_no_changes(self):
         zp = MagicMock()
@@ -271,7 +271,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_content_scanning(zp, {}, _zs(), MagicMock(), ctx)
-        assert "cloudflare_content_scanning" not in zp.extension_plans
+        assert "cloudflare.content_scanning" not in zp.extension_plans
 
     def test_none_ctx_is_noop(self):
         zp = MagicMock()
@@ -326,7 +326,7 @@ class TestApplyHook:
 class TestValidateExtension:
     def test_valid_config(self):
         desired = {
-            "cloudflare_content_scanning": {
+            "cloudflare.content_scanning": {
                 "enabled": True,
                 "custom_expressions": [
                     {"payload": 'lookup_json_string(http.request.body.raw, "file")'}
@@ -338,21 +338,21 @@ class TestValidateExtension:
         assert errors == []
 
     def test_invalid_enabled(self):
-        desired = {"cloudflare_content_scanning": {"enabled": "yes"}}
+        desired = {"cloudflare.content_scanning": {"enabled": "yes"}}
         errors: list[str] = []
         _validate_content_scanning(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "enabled" in errors[0]
 
     def test_invalid_expressions_not_list(self):
-        desired = {"cloudflare_content_scanning": {"custom_expressions": "not-a-list"}}
+        desired = {"cloudflare.content_scanning": {"custom_expressions": "not-a-list"}}
         errors: list[str] = []
         _validate_content_scanning(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "list" in errors[0]
 
     def test_invalid_expression_not_dict(self):
-        desired = {"cloudflare_content_scanning": {"custom_expressions": ["not-a-dict"]}}
+        desired = {"cloudflare.content_scanning": {"custom_expressions": ["not-a-dict"]}}
         errors: list[str] = []
         _validate_content_scanning(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -360,7 +360,7 @@ class TestValidateExtension:
 
     def test_invalid_expression_missing_payload(self):
         desired = {
-            "cloudflare_content_scanning": {"custom_expressions": [{"not_payload": "value"}]}
+            "cloudflare.content_scanning": {"custom_expressions": [{"not_payload": "value"}]}
         }
         errors: list[str] = []
         _validate_content_scanning(desired, "zone", errors, [])
@@ -368,7 +368,7 @@ class TestValidateExtension:
         assert "payload" in errors[0]
 
     def test_invalid_expression_empty_payload(self):
-        desired = {"cloudflare_content_scanning": {"custom_expressions": [{"payload": ""}]}}
+        desired = {"cloudflare.content_scanning": {"custom_expressions": [{"payload": ""}]}}
         errors: list[str] = []
         _validate_content_scanning(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -382,7 +382,7 @@ class TestValidateExtension:
     def test_non_dict_config_is_ok(self):
         errors: list[str] = []
         _validate_content_scanning(
-            {"cloudflare_content_scanning": "not-a-dict"}, "zone", errors, []
+            {"cloudflare.content_scanning": "not-a-dict"}, "zone", errors, []
         )
         assert errors == []
 
@@ -398,7 +398,7 @@ class TestDumpExtension:
             "custom_expressions": [{"payload": "test"}],
         }
         result = _dump_content_scanning(_zs(), provider)
-        assert "cloudflare_content_scanning" in result
+        assert "cloudflare.content_scanning" in result
 
     def test_dump_api_failure(self):
         provider = MagicMock(spec=CloudflareProvider)

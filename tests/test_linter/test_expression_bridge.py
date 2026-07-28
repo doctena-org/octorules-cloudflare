@@ -18,22 +18,22 @@ class TestMagicFirewallScheme:
 
     def test_scheme_for_phase_maps_l4_phases(self):
         for p in [
-            "network_ddos_rules",
-            "network_firewall_rules",
-            "network_firewall_managed",
-            "network_firewall_ratelimit",
-            "network_firewall_ids",
+            "cloudflare.network_ddos_rules",
+            "cloudflare.network_firewall_rules",
+            "cloudflare.network_firewall_managed",
+            "cloudflare.network_firewall_ratelimit",
+            "cloudflare.network_firewall_ids",
         ]:
             assert _scheme_for_phase(p) == "magic_firewall"
 
     def test_scheme_for_phase_defaults_for_http(self):
-        assert _scheme_for_phase("waf_custom_rules") is None
+        assert _scheme_for_phase("cloudflare.waf_custom_rules") is None
         assert _scheme_for_phase(None) is None
 
     def test_l4_expression_valid_on_magic_phase(self):
         info = parse_expression(
             'ip.proto eq "tcp" && tcp.dstport in {22 3389}',
-            phase="network_firewall_rules",
+            phase="cloudflare.network_firewall_rules",
         )
         assert info.parse_error == ""
         assert "ip.proto" in info.fields_used
@@ -41,12 +41,12 @@ class TestMagicFirewallScheme:
 
     def test_l4_field_rejected_on_http_phase(self):
         # ip.proto is not in the HTTP scheme — must still be flagged there.
-        info = parse_expression('ip.proto eq "tcp"', phase="waf_custom_rules")
+        info = parse_expression('ip.proto eq "tcp"', phase="cloudflare.waf_custom_rules")
         assert info.parse_error
 
     def test_http_field_rejected_on_magic_phase(self):
         # http.host is not in the L4 scheme.
-        info = parse_expression('http.host eq "x"', phase="network_firewall_rules")
+        info = parse_expression('http.host eq "x"', phase="cloudflare.network_firewall_rules")
         assert info.parse_error
 
 
@@ -268,7 +268,7 @@ class TestWirefilterBridge:
         """
         info = parse_expression(
             'http.request.uri.path eq "/test"',
-            phase="url_rewrite_rules",
+            phase="cloudflare.url_rewrite_rules",
         )
         assert info.parse_error == ""
         assert "http.request.uri.path" in info.fields_used
@@ -277,7 +277,7 @@ class TestWirefilterBridge:
         """starts_with(http.request.uri.path, ...) works in transform phases."""
         info = parse_expression(
             'starts_with(http.request.uri.path, "/api")',
-            phase="request_header_rules",
+            phase="cloudflare.request_header_rules",
         )
         assert info.parse_error == ""
         assert "http.request.uri.path" in info.fields_used

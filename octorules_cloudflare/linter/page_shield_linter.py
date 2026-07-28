@@ -18,7 +18,7 @@ from octorules.phases import Phase
 RULE_IDS = frozenset({"CF015", "CF016", "CF460", "CF461", "CF462", "CF463"})
 
 # Synthetic phase for page_shield_policies expression analysis
-_PS_PHASE = Phase("page_shield_policies", "page_shield", "allow")
+_PS_PHASE = Phase("cloudflare.page_shield_policies", "page_shield", "allow")
 
 # Required fields on each policy entry
 _REQUIRED_FIELDS = ("description", "action", "expression", "enabled", "value")
@@ -29,11 +29,11 @@ _VALID_ACTIONS = frozenset({"allow", "log"})
 
 def lint_page_shield_policies(rules_data: dict[str, Any], ctx: LintContext) -> None:
     """Run all Page Shield policy checks on the rules data."""
-    policies = rules_data.get("page_shield_policies")
+    policies = rules_data.get("cloudflare.page_shield_policies")
     if not isinstance(policies, list):
         return
 
-    if ctx.phase_filter and "page_shield_policies" not in ctx.phase_filter:
+    if ctx.phase_filter and "cloudflare.page_shield_policies" not in ctx.phase_filter:
         return
 
     seen_descriptions: set[str] = set()
@@ -44,7 +44,7 @@ def lint_page_shield_policies(rules_data: dict[str, Any], ctx: LintContext) -> N
                     rule_id="CF462",
                     severity=Severity.ERROR,
                     message=f"Policy at index {i} must be a mapping, got {type(policy).__name__}",
-                    phase="page_shield_policies",
+                    phase="cloudflare.page_shield_policies",
                 )
             )
             continue
@@ -76,7 +76,7 @@ def _check_policy_structure(
                     rule_id="CF460",
                     severity=Severity.ERROR,
                     message=f"Policy is missing required '{field_name}' field",
-                    phase="page_shield_policies",
+                    phase="cloudflare.page_shield_policies",
                     ref=desc_label,
                 )
             )
@@ -89,7 +89,7 @@ def _check_policy_structure(
                 rule_id="CF461",
                 severity=Severity.ERROR,
                 message=f"Invalid action {action!r} — must be 'allow' or 'log'",
-                phase="page_shield_policies",
+                phase="cloudflare.page_shield_policies",
                 ref=desc_label,
             )
         )
@@ -102,7 +102,7 @@ def _check_policy_structure(
                 rule_id="CF462",
                 severity=Severity.ERROR,
                 message=f"'description' must be a string, got {type(desc).__name__}",
-                phase="page_shield_policies",
+                phase="cloudflare.page_shield_policies",
                 ref=desc_label,
             )
         )
@@ -116,7 +116,7 @@ def _check_policy_structure(
                 message=(
                     f"'enabled' must be a boolean, got {type(enabled).__name__} ({enabled!r})"
                 ),
-                phase="page_shield_policies",
+                phase="cloudflare.page_shield_policies",
                 ref=desc_label,
                 field="enabled",
             )
@@ -129,7 +129,7 @@ def _check_policy_structure(
                 rule_id="CF462",
                 severity=Severity.ERROR,
                 message=f"'value' must be a string, got {type(value).__name__}",
-                phase="page_shield_policies",
+                phase="cloudflare.page_shield_policies",
                 ref=desc_label,
                 field="value",
             )
@@ -142,7 +142,7 @@ def _check_policy_structure(
                 rule_id="CF463",
                 severity=Severity.WARNING,
                 message=f"Duplicate description {desc!r} — descriptions are identity keys",
-                phase="page_shield_policies",
+                phase="cloudflare.page_shield_policies",
                 ref=desc_label,
             )
         )
@@ -152,7 +152,7 @@ def _check_policy_structure(
     if isinstance(expr, str):
         check_catch_all(
             expr,
-            "page_shield_policies",
+            "cloudflare.page_shield_policies",
             desc_label,
             ctx,
             entity="policy",

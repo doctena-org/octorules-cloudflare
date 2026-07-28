@@ -192,22 +192,22 @@ LOG_SCHEMA = ActionSchema(requires_parameters=False)
 PHASE_PARAMETER_OVERRIDES: dict[str, frozenset[str]] = {
     # response_header_rules only supports header transforms — URI rewrites
     # are not available in the response phase (the request URI is already gone).
-    "response_header_rules": frozenset({"headers"}),
+    "cloudflare.response_header_rules": frozenset({"headers"}),
 }
 
 # --- Valid actions per phase ---
 
 VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
-    "redirect_rules": {"redirect"},
-    "url_rewrite_rules": {"rewrite"},
-    "request_header_rules": {"rewrite"},
-    "response_header_rules": {"rewrite"},
-    "config_rules": {"set_config"},
-    "origin_rules": {"route"},
-    "cache_rules": {"set_cache_settings"},
-    "compression_rules": {"compress_response"},
-    "custom_error_rules": {"serve_error"},
-    "waf_custom_rules": {
+    "cloudflare.redirect_rules": {"redirect"},
+    "cloudflare.url_rewrite_rules": {"rewrite"},
+    "cloudflare.request_header_rules": {"rewrite"},
+    "cloudflare.response_header_rules": {"rewrite"},
+    "cloudflare.config_rules": {"set_config"},
+    "cloudflare.origin_rules": {"route"},
+    "cloudflare.cache_rules": {"set_cache_settings"},
+    "cloudflare.compression_rules": {"compress_response"},
+    "cloudflare.custom_error_rules": {"serve_error"},
+    "cloudflare.waf_custom_rules": {
         "block",
         "challenge",
         "js_challenge",
@@ -217,8 +217,8 @@ VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
         "execute",
         "score",
     },
-    "waf_managed_rules": {"execute", "skip", "block", "log"},
-    "rate_limiting_rules": {
+    "cloudflare.waf_managed_rules": {"execute", "skip", "block", "log"},
+    "cloudflare.rate_limiting_rules": {
         "block",
         "challenge",
         "js_challenge",
@@ -226,18 +226,24 @@ VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
         "log",
         "execute",
     },
-    "bot_fight_rules": {"block", "challenge", "js_challenge", "managed_challenge"},
-    "sensitive_data_detection": {"log"},
-    "http_ddos_rules": {"block", "challenge", "log", "ddos_dynamic", "force_connection_close"},
-    "bulk_redirect_rules": {"redirect"},
-    "log_custom_fields": {"log_custom_field"},
-    "url_normalization": {"none"},
+    "cloudflare.bot_fight_rules": {"block", "challenge", "js_challenge", "managed_challenge"},
+    "cloudflare.sensitive_data_detection": {"log"},
+    "cloudflare.http_ddos_rules": {
+        "block",
+        "challenge",
+        "log",
+        "ddos_dynamic",
+        "force_connection_close",
+    },
+    "cloudflare.bulk_redirect_rules": {"redirect"},
+    "cloudflare.log_custom_fields": {"log_custom_field"},
+    "cloudflare.url_normalization": {"none"},
     # Network-level phases
-    "network_ddos_rules": {"block", "log"},
-    "network_firewall_rules": {"block", "log"},
-    "network_firewall_managed": {"block", "log"},
-    "network_firewall_ratelimit": {"block", "log"},
-    "network_firewall_ids": {"block", "log"},
+    "cloudflare.network_ddos_rules": {"block", "log"},
+    "cloudflare.network_firewall_rules": {"block", "log"},
+    "cloudflare.network_firewall_managed": {"block", "log"},
+    "cloudflare.network_firewall_ratelimit": {"block", "log"},
+    "cloudflare.network_firewall_ids": {"block", "log"},
 }
 
 # --- Action → schema mapping ---

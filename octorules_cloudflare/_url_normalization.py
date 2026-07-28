@@ -110,7 +110,7 @@ def diff_url_normalization(current: dict, desired: dict) -> UrlNormalizationPlan
 # Extension hooks
 # ---------------------------------------------------------------------------
 _prefetch_url_normalization = make_prefetch_hook(
-    "cloudflare_url_normalization", "get_url_normalization"
+    "cloudflare.url_normalization_settings", "get_url_normalization"
 )
 
 
@@ -122,9 +122,9 @@ def _finalize_url_normalization(zp, all_desired, scope, provider, ctx):
     current, desired = ctx
     plan = diff_url_normalization(current, desired)
     if plan.unsupported:
-        warn_unsupported("cloudflare_url_normalization", scope, plan.unsupported)
+        warn_unsupported("cloudflare.url_normalization_settings", scope, plan.unsupported)
     if plan.has_changes or plan.unsupported:
-        zp.extension_plans.setdefault("cloudflare_url_normalization", []).append(plan)
+        zp.extension_plans.setdefault("cloudflare.url_normalization_settings", []).append(plan)
 
 
 def _apply_url_normalization(zp, plans, scope, provider):
@@ -142,16 +142,16 @@ def _apply_url_normalization(zp, plans, scope, provider):
                 provider.get_url_normalization,
                 scope,
                 desired_values,
-                "cloudflare_url_normalization",
+                "cloudflare.url_normalization_settings",
             )
-            synced.append("cloudflare_url_normalization")
+            synced.append("cloudflare.url_normalization_settings")
 
     return synced, None
 
 
 def _validate_url_normalization(desired, zone_name, errors, lines):
     """Validate cloudflare_url_normalization offline."""
-    settings = desired.get("cloudflare_url_normalization")
+    settings = desired.get("cloudflare.url_normalization_settings")
     if not isinstance(settings, dict):
         return
 
@@ -170,7 +170,9 @@ def _validate_url_normalization(desired, zone_name, errors, lines):
         )
 
 
-_dump_url_normalization = make_dump_hook("cloudflare_url_normalization", "get_url_normalization")
+_dump_url_normalization = make_dump_hook(
+    "cloudflare.url_normalization_settings", "get_url_normalization"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +184,7 @@ class UrlNormalizationFormatter(SettingsFormatter):
     def __init__(self) -> None:
         super().__init__(
             plan_type=UrlNormalizationPlan,
-            prefix="url_normalization",
+            prefix="cloudflare.url_normalization",
         )
 
 
@@ -192,7 +194,7 @@ class UrlNormalizationFormatter(SettingsFormatter):
 class UrlNormalizationExtension(ProviderExtension):
     """Zone URL-normalization settings."""
 
-    section = "cloudflare_url_normalization"
+    section = "cloudflare.url_normalization_settings"
     formatter = UrlNormalizationFormatter()
 
     def prefetch(self, desired, scope, provider):
@@ -225,6 +227,6 @@ def register_url_normalization() -> None:
     )
 
     register_plan_zone_hook(_prefetch_url_normalization, _finalize_url_normalization)
-    register_apply_extension("cloudflare_url_normalization", _apply_url_normalization)
-    register_format_extension("cloudflare_url_normalization", UrlNormalizationFormatter())
+    register_apply_extension("cloudflare.url_normalization_settings", _apply_url_normalization)
+    register_format_extension("cloudflare.url_normalization_settings", UrlNormalizationFormatter())
     register_validate_extension(_validate_url_normalization)

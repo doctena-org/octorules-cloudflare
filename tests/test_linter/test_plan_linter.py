@@ -17,7 +17,7 @@ class TestRegexAvailability:
     def test_cf500_regex_on_free_plan(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "test",
                         "expression": 'http.request.uri.path matches "^/api"',
@@ -32,7 +32,7 @@ class TestRegexAvailability:
     def test_cf500_regex_on_pro_plan(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "test",
                         "expression": 'http.request.uri.path matches "^/api"',
@@ -47,7 +47,7 @@ class TestRegexAvailability:
     def test_cf500_regex_on_business_plan_ok(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "test",
                         "expression": 'http.request.uri.path matches "^/api"',
@@ -62,7 +62,7 @@ class TestRegexAvailability:
     def test_cf500_regex_on_enterprise_plan_ok(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "test",
                         "expression": 'http.request.uri.path matches "^/api"',
@@ -80,14 +80,14 @@ class TestRuleLimits:
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(11)
         ]
-        ctx = _lint({"redirect_rules": rules}, plan_tier="free")
+        ctx = _lint({"cloudflare.redirect_rules": rules}, plan_tier="free")
         assert_lint(ctx, "CF501")
 
     def test_cf501_within_free_limit(self):
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(10)
         ]
-        ctx = _lint({"redirect_rules": rules}, plan_tier="free")
+        ctx = _lint({"cloudflare.redirect_rules": rules}, plan_tier="free")
         assert_no_lint(ctx, "CF501")
 
     def test_cf501_enterprise_within_limit(self):
@@ -96,22 +96,22 @@ class TestRuleLimits:
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(200)
         ]
-        ctx = _lint({"redirect_rules": rules}, plan_tier="enterprise")
+        ctx = _lint({"cloudflare.redirect_rules": rules}, plan_tier="enterprise")
         assert_no_lint(ctx, "CF501")
 
     def test_cf501_enterprise_over_limit(self):
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(301)
         ]
-        ctx = _lint({"redirect_rules": rules}, plan_tier="enterprise")
+        ctx = _lint({"cloudflare.redirect_rules": rules}, plan_tier="enterprise")
         assert_lint(ctx, "CF501")
 
     def test_cf501_rate_limiting_free_limit_is_1(self):
         rules = [{"ref": f"rl-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(1)]
-        ctx = _lint({"rate_limiting_rules": rules}, plan_tier="free")
+        ctx = _lint({"cloudflare.rate_limiting_rules": rules}, plan_tier="free")
         assert_no_lint(ctx, "CF501")
         rules.append({"ref": "rl-1", "expression": 'http.host eq "extra.com"'})
-        ctx = _lint({"rate_limiting_rules": rules}, plan_tier="free")
+        ctx = _lint({"cloudflare.rate_limiting_rules": rules}, plan_tier="free")
         assert_lint(ctx, "CF501")
 
     @pytest.mark.parametrize(
@@ -122,20 +122,20 @@ class TestRuleLimits:
         rules = [
             {"ref": f"rl-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(limit)
         ]
-        ctx = _lint({"rate_limiting_rules": rules}, plan_tier=plan)
+        ctx = _lint({"cloudflare.rate_limiting_rules": rules}, plan_tier=plan)
         assert_no_lint(ctx, "CF501")
         rules.append({"ref": "rl-extra", "expression": 'http.host eq "extra.com"'})
-        ctx = _lint({"rate_limiting_rules": rules}, plan_tier=plan)
+        ctx = _lint({"cloudflare.rate_limiting_rules": rules}, plan_tier=plan)
         assert_lint(ctx, "CF501")
 
     def test_cf501_enterprise_waf_custom_limit_is_1000(self):
         rules = [
             {"ref": f"rule-{i}", "expression": f'http.host eq "host{i}.com"'} for i in range(1000)
         ]
-        ctx = _lint({"waf_custom_rules": rules}, plan_tier="enterprise")
+        ctx = _lint({"cloudflare.waf_custom_rules": rules}, plan_tier="enterprise")
         assert_no_lint(ctx, "CF501")
         rules.append({"ref": "rule-1000", "expression": 'http.host eq "extra.com"'})
-        ctx = _lint({"waf_custom_rules": rules}, plan_tier="enterprise")
+        ctx = _lint({"cloudflare.waf_custom_rules": rules}, plan_tier="enterprise")
         assert_lint(ctx, "CF501")
 
 

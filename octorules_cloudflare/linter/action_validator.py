@@ -225,7 +225,7 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
 
     # CF223: skip in account-scoped waf_custom_rules is rejected by CF
     # with API error 20016 (kind=root rulesets don't support skip).
-    if action == "skip" and phase_name == "waf_custom_rules":
+    if action == "skip" and phase_name == "cloudflare.waf_custom_rules":
         expression = rule.get("expression", "")
         if isinstance(expression, str) and _ACCOUNT_SCOPE_MARKER.search(expression):
             ctx.add(
@@ -265,7 +265,7 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
     # which is independent of action_parameters. Dispatched here (before the
     # action_params-is-None early return) so a rule with `ratelimit:` set
     # and no `action_parameters` is still linted.
-    if phase_name == "rate_limiting_rules" and action not in ("execute", "skip"):
+    if phase_name == "cloudflare.rate_limiting_rules" and action not in ("execute", "skip"):
         _lint_rate_limit_params(rule.get("ratelimit"), action, phase_name, ref, ctx)
 
     if action_params is None:
@@ -323,19 +323,23 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
 
     # Phase-specific validation (rate_limiting_rules is handled earlier
     # since `ratelimit:` is a rule-level field independent of action_parameters).
-    if phase_name in ("redirect_rules", "bulk_redirect_rules"):
+    if phase_name in ("cloudflare.redirect_rules", "cloudflare.bulk_redirect_rules"):
         _lint_redirect_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "cache_rules":
+    elif phase_name == "cloudflare.cache_rules":
         _lint_cache_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "config_rules":
+    elif phase_name == "cloudflare.config_rules":
         _lint_config_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "origin_rules":
+    elif phase_name == "cloudflare.origin_rules":
         _lint_origin_params(action_params, phase_name, ref, ctx)
-    elif phase_name in ("url_rewrite_rules", "request_header_rules", "response_header_rules"):
+    elif phase_name in (
+        "cloudflare.url_rewrite_rules",
+        "cloudflare.request_header_rules",
+        "cloudflare.response_header_rules",
+    ):
         _lint_transform_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "custom_error_rules":
+    elif phase_name == "cloudflare.custom_error_rules":
         _lint_serve_error_params(action_params, phase_name, ref, ctx)
-    elif phase_name == "compression_rules":
+    elif phase_name == "cloudflare.compression_rules":
         _lint_compress_response_params(action_params, phase_name, ref, ctx)
 
     # Action-specific validation (cross-phase)
@@ -1117,7 +1121,7 @@ def _check_restricted_header(
     and the visitor-IP headers cannot be set/modified but can be removed.
     """
     if (
-        phase_name != "request_header_rules"
+        phase_name != "cloudflare.request_header_rules"
         or not isinstance(op, str)
         or not isinstance(header_name, str)
     ):
@@ -1268,7 +1272,9 @@ def _lint_transform_params(params: dict, phase_name: str, ref: str, ctx: LintCon
                         )
                     # CF445: request headers don't support 'add' operation
                     elif (
-                        isinstance(op, str) and op == "add" and phase_name == "request_header_rules"
+                        isinstance(op, str)
+                        and op == "add"
+                        and phase_name == "cloudflare.request_header_rules"
                     ):
                         ctx.add(
                             LintResult(

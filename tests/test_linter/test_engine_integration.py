@@ -10,7 +10,7 @@ class TestLintZoneFile:
     def test_valid_rules_no_errors(self):
         ctx = lint_zone_file(
             {
-                "redirect_rules": [
+                "cloudflare.redirect_rules": [
                     {
                         "ref": "test",
                         "expression": 'http.host eq "example.com"',
@@ -29,7 +29,7 @@ class TestLintZoneFile:
         assert len(errors) == 0
 
     def test_missing_ref_caught(self):
-        ctx = lint_zone_file({"redirect_rules": [{"expression": "true"}]})
+        ctx = lint_zone_file({"cloudflare.redirect_rules": [{"expression": "true"}]})
         m001 = [r for r in ctx.results if r.rule_id == "CF003"]
         assert len(m001) == 1
 
@@ -41,14 +41,14 @@ class TestLintZoneFile:
 
     def test_severity_filter_works(self):
         ctx = lint_zone_file(
-            {"redirect_rules": [{"expression": "true"}]},
+            {"cloudflare.redirect_rules": [{"expression": "true"}]},
             severity_filter=Severity.ERROR,
         )
         assert all(r.severity == Severity.ERROR for r in ctx.results)
 
     def test_file_path_and_zone_name(self):
         ctx = lint_zone_file(
-            {"redirect_rules": []},
+            {"cloudflare.redirect_rules": []},
             file_path="/tmp/test.yaml",
             zone_name="example.com",
         )
@@ -58,7 +58,7 @@ class TestLintZoneFile:
     def test_invalid_action_caught(self):
         ctx = lint_zone_file(
             {
-                "redirect_rules": [
+                "cloudflare.redirect_rules": [
                     {
                         "ref": "test",
                         "expression": "true",
@@ -72,7 +72,11 @@ class TestLintZoneFile:
 
     def test_response_field_in_request_phase(self):
         ctx = lint_zone_file(
-            {"redirect_rules": [{"ref": "test", "expression": "http.response.code eq 200"}]}
+            {
+                "cloudflare.redirect_rules": [
+                    {"ref": "test", "expression": "http.response.code eq 200"}
+                ]
+            }
         )
         b001 = [r for r in ctx.results if r.rule_id == "CF019"]
         assert len(b001) == 1
@@ -151,7 +155,7 @@ class TestLintZoneFile:
         """Page Shield policies with plan-gated fields should fire CF021 on free tier."""
         ctx = lint_zone_file(
             {
-                "page_shield_policies": [
+                "cloudflare.page_shield_policies": [
                     {
                         "description": "bot-check",
                         "action": "allow",
@@ -170,7 +174,7 @@ class TestLintZoneFile:
     def test_regex_anchor_in_literal(self):
         ctx = lint_zone_file(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "test",
                         "expression": 'http.request.uri.path eq "^/api"',
@@ -185,7 +189,7 @@ class TestLintZoneFile:
     def test_lint_zone_file_with_suppressions(self):
         ctx = lint_zone_file(
             {
-                "request_header_rules": [
+                "cloudflare.request_header_rules": [
                     {"ref": "catch-all", "expression": "(true)"},
                 ]
             },

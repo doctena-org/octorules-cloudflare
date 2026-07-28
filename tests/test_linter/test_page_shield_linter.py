@@ -22,7 +22,7 @@ def _valid_policy(**overrides):
 def _lint(policies, **ctx_kwargs):
     """Lint a page_shield_policies list and return the context."""
     ctx = LintContext(**ctx_kwargs)
-    rules_data = {"page_shield_policies": policies}
+    rules_data = {"cloudflare.page_shield_policies": policies}
     lint_page_shield_policies(rules_data, ctx)
     return ctx
 
@@ -148,7 +148,7 @@ class TestCatchAllExpressions:
         ctx = _lint([_valid_policy(expression="true")])
         assert_lint(ctx, "CF015")
         m013 = [r for r in ctx.results if r.rule_id == "CF015"]
-        assert m013[0].phase == "page_shield_policies"
+        assert m013[0].phase == "cloudflare.page_shield_policies"
 
     def test_cf015_always_true_parenthesized(self):
         ctx = _lint([_valid_policy(expression="(true)")])
@@ -158,7 +158,7 @@ class TestCatchAllExpressions:
         ctx = _lint([_valid_policy(expression="false")])
         assert_lint(ctx, "CF016")
         m014 = [r for r in ctx.results if r.rule_id == "CF016"]
-        assert m014[0].phase == "page_shield_policies"
+        assert m014[0].phase == "cloudflare.page_shield_policies"
 
 
 # ── Expression analysis delegation ──────────────────────────────────────────
@@ -186,14 +186,14 @@ class TestPhaseFilter:
     def test_phase_filter_excludes_page_shield(self):
         ctx = _lint(
             [_valid_policy(action="block")],
-            phase_filter=["waf_custom_rules"],
+            phase_filter=["cloudflare.waf_custom_rules"],
         )
         assert len(ctx.results) == 0
 
     def test_phase_filter_includes_page_shield(self):
         ctx = _lint(
             [_valid_policy(action="block")],
-            phase_filter=["page_shield_policies"],
+            phase_filter=["cloudflare.page_shield_policies"],
         )
         assert_lint(ctx, "CF461")
 
@@ -202,7 +202,7 @@ class TestPhaseFilter:
 class TestIntegration:
     def test_lint_zone_file_catches_page_shield_errors(self):
         rules_data = {
-            "page_shield_policies": [
+            "cloudflare.page_shield_policies": [
                 _valid_policy(action="block"),
             ],
         }
@@ -211,10 +211,10 @@ class TestIntegration:
 
     def test_lint_zone_file_page_shield_alongside_phases(self):
         rules_data = {
-            "page_shield_policies": [
+            "cloudflare.page_shield_policies": [
                 _valid_policy(action="block"),
             ],
-            "waf_custom_rules": [
+            "cloudflare.waf_custom_rules": [
                 {
                     "ref": "test-rule",
                     "expression": "true",
@@ -234,13 +234,13 @@ class TestEdgeCases:
     def test_no_page_shield_key(self):
         """No page_shield_policies key should produce no findings."""
         ctx = LintContext()
-        lint_page_shield_policies({"waf_custom_rules": []}, ctx)
+        lint_page_shield_policies({"cloudflare.waf_custom_rules": []}, ctx)
         assert len(ctx.results) == 0
 
     def test_page_shield_not_a_list(self):
         """Non-list value should produce no findings (early return)."""
         ctx = LintContext()
-        lint_page_shield_policies({"page_shield_policies": "not a list"}, ctx)
+        lint_page_shield_policies({"cloudflare.page_shield_policies": "not a list"}, ctx)
         assert len(ctx.results) == 0
 
     def test_empty_policies_list(self):

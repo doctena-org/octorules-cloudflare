@@ -45,7 +45,7 @@ class TestVerifySettingsApplied:
                 lambda scope: {"enable_js": True, "fight_mode": False},
                 _scope(),
                 {"enable_js": True},
-                "cloudflare_bot_management",
+                "cloudflare.bot_management",
             )
         assert failed == []
         assert caplog.text == ""
@@ -56,7 +56,7 @@ class TestVerifySettingsApplied:
                 lambda scope: {"security_level": "medium"},
                 _scope(),
                 {"security_level": "under_attack"},
-                "cloudflare_zone_security",
+                "cloudflare.zone_security",
             )
         assert failed == ["security_level"]
         assert "security_level" in caplog.text
@@ -69,7 +69,7 @@ class TestVerifySettingsApplied:
                 lambda scope: {"enable_js": True},
                 _scope(),
                 {"fight_mode": True},
-                "cloudflare_bot_management",
+                "cloudflare.bot_management",
             )
         assert failed == ["fight_mode"]
         assert "reads back as absent" in caplog.text
@@ -80,7 +80,7 @@ class TestVerifySettingsApplied:
 
         with caplog.at_level(logging.WARNING, logger=_LOGGER):
             failed = verify_settings_applied(
-                boom, _scope(), {"enable_js": True}, "cloudflare_bot_management"
+                boom, _scope(), {"enable_js": True}, "cloudflare.bot_management"
             )
         assert failed == []
         assert "skipping verification" in caplog.text
@@ -99,12 +99,12 @@ class TestVerifySettingsApplied:
 class TestWarnUnsupported:
     def test_warns_per_field_with_zone_label(self, caplog):
         with caplog.at_level(logging.WARNING, logger=_LOGGER):
-            warn_unsupported("cloudflare_bot_management", _scope(), ["a_field", "b_field"])
+            warn_unsupported("cloudflare.bot_management", _scope(), ["a_field", "b_field"])
         assert caplog.text.count("not exposed on zone example.com") == 2
         assert "a_field" in caplog.text
         assert "b_field" in caplog.text
 
     def test_no_warning_for_empty_list(self, caplog):
         with caplog.at_level(logging.WARNING, logger=_LOGGER):
-            warn_unsupported("cloudflare_bot_management", _scope(), [])
+            warn_unsupported("cloudflare.bot_management", _scope(), [])
         assert caplog.text == ""

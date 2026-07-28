@@ -46,7 +46,7 @@ _MAX_DESCRIPTION_LENGTH = 500
 # a log warning — for a managed-WAF section that silently unmanages it.
 # Lint keeps flagging these as errors for as long as the table has entries.
 _REMOVED_PHASE_ALIASES: dict[str, str] = {
-    "waf_managed_exceptions": "waf_managed_rules",
+    "waf_managed_exceptions": "cloudflare.waf_managed_rules",
 }
 
 # Zone files nest Cloudflare sections under this namespace; core flattens

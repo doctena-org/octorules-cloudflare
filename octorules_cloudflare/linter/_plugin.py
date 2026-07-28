@@ -71,7 +71,7 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
     lint_custom_rulesets(rules_data, ctx)
     custom_rulesets = rules_data.get("custom_rulesets")
     if isinstance(custom_rulesets, list):
-        waf_phase = PHASE_BY_NAME.get("waf_custom_rules")
+        waf_phase = PHASE_BY_NAME.get("cloudflare.waf_custom_rules")
         if waf_phase and (not ctx.phase_filter or "custom_rulesets" in ctx.phase_filter):
             for entry in custom_rulesets:
                 if not isinstance(entry, dict):

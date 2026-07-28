@@ -225,7 +225,7 @@ class TestPrefetchHook:
             "enabled": True,
             "detections": [{"username": "u1", "password": "p1"}],
         }
-        all_desired = {"cloudflare_leaked_credential_check": {"enabled": True}}
+        all_desired = {"cloudflare.leaked_credential_check": {"enabled": True}}
         result = _prefetch_leaked_credentials(all_desired, _zs(), provider)
         assert result is not None
         current, desired = result
@@ -235,7 +235,7 @@ class TestPrefetchHook:
     def test_api_failure_handled_gracefully(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderError("API down")
-        all_desired = {"cloudflare_leaked_credential_check": {"enabled": True}}
+        all_desired = {"cloudflare.leaked_credential_check": {"enabled": True}}
         result = _prefetch_leaked_credentials(all_desired, _zs(), provider)
         current, _desired = result
         assert current == {}
@@ -243,7 +243,7 @@ class TestPrefetchHook:
     def test_auth_error_propagates(self):
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_leaked_credential_check.side_effect = ProviderAuthError("forbidden")
-        all_desired = {"cloudflare_leaked_credential_check": {"enabled": True}}
+        all_desired = {"cloudflare.leaked_credential_check": {"enabled": True}}
         with pytest.raises(ProviderAuthError):
             _prefetch_leaked_credentials(all_desired, _zs(), provider)
 
@@ -261,7 +261,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_leaked_credentials(zp, {}, _zs(), MagicMock(), ctx)
-        assert "cloudflare_leaked_credential_check" in zp.extension_plans
+        assert "cloudflare.leaked_credential_check" in zp.extension_plans
 
     def test_no_plan_when_no_changes(self):
         zp = MagicMock()
@@ -272,7 +272,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_leaked_credentials(zp, {}, _zs(), MagicMock(), ctx)
-        assert "cloudflare_leaked_credential_check" not in zp.extension_plans
+        assert "cloudflare.leaked_credential_check" not in zp.extension_plans
 
     def test_none_ctx_is_noop(self):
         zp = MagicMock()
@@ -327,7 +327,7 @@ class TestApplyHook:
 class TestValidateExtension:
     def test_valid_config(self):
         desired = {
-            "cloudflare_leaked_credential_check": {
+            "cloudflare.leaked_credential_check": {
                 "enabled": True,
                 "detections": [
                     {
@@ -342,28 +342,28 @@ class TestValidateExtension:
         assert errors == []
 
     def test_invalid_enabled(self):
-        desired = {"cloudflare_leaked_credential_check": {"enabled": "yes"}}
+        desired = {"cloudflare.leaked_credential_check": {"enabled": "yes"}}
         errors: list[str] = []
         _validate_leaked_credentials(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "enabled" in errors[0]
 
     def test_invalid_detections_not_list(self):
-        desired = {"cloudflare_leaked_credential_check": {"detections": "not-a-list"}}
+        desired = {"cloudflare.leaked_credential_check": {"detections": "not-a-list"}}
         errors: list[str] = []
         _validate_leaked_credentials(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "list" in errors[0]
 
     def test_invalid_detection_not_dict(self):
-        desired = {"cloudflare_leaked_credential_check": {"detections": ["not-a-dict"]}}
+        desired = {"cloudflare.leaked_credential_check": {"detections": ["not-a-dict"]}}
         errors: list[str] = []
         _validate_leaked_credentials(desired, "zone", errors, [])
         assert len(errors) == 1
         assert "dict" in errors[0]
 
     def test_invalid_detection_missing_username(self):
-        desired = {"cloudflare_leaked_credential_check": {"detections": [{"password": "p_expr"}]}}
+        desired = {"cloudflare.leaked_credential_check": {"detections": [{"password": "p_expr"}]}}
         errors: list[str] = []
         _validate_leaked_credentials(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -371,7 +371,7 @@ class TestValidateExtension:
 
     def test_invalid_detection_empty_password(self):
         desired = {
-            "cloudflare_leaked_credential_check": {
+            "cloudflare.leaked_credential_check": {
                 "detections": [{"username": "u_expr", "password": ""}]
             }
         }
@@ -388,7 +388,7 @@ class TestValidateExtension:
     def test_non_dict_config_is_ok(self):
         errors: list[str] = []
         _validate_leaked_credentials(
-            {"cloudflare_leaked_credential_check": "not-a-dict"}, "zone", errors, []
+            {"cloudflare.leaked_credential_check": "not-a-dict"}, "zone", errors, []
         )
         assert errors == []
 
@@ -404,7 +404,7 @@ class TestDumpExtension:
             "detections": [{"username": "u1", "password": "p1"}],
         }
         result = _dump_leaked_credentials(_zs(), provider)
-        assert "cloudflare_leaked_credential_check" in result
+        assert "cloudflare.leaked_credential_check" in result
 
     def test_dump_api_failure(self):
         provider = MagicMock(spec=CloudflareProvider)

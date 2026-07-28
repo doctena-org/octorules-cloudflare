@@ -8,7 +8,7 @@ from octorules.testing.lint import assert_lint
 from octorules_cloudflare.linter.action_validator import lint_actions
 
 
-def _lint_rule(rule, phase_name="redirect_rules", **ctx_kwargs):
+def _lint_rule(rule, phase_name="cloudflare.redirect_rules", **ctx_kwargs):
     phase = PHASE_BY_NAME[phase_name]
     ctx = LintContext(**ctx_kwargs)
     lint_actions(rule, phase, ctx)
@@ -21,15 +21,24 @@ def _ids(ctx):
 
 class TestActionValidity:
     def test_cf200_invalid_action_for_phase(self):
-        ctx = _lint_rule({"ref": "t", "expression": "true", "action": "block"}, "redirect_rules")
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "true", "action": "block"}, "cloudflare.redirect_rules"
+        )
         assert len(ctx.results) == 1
         c001 = assert_lint(
-            ctx, "CF200", count=1, severity=Severity.ERROR, phase="redirect_rules", ref="t"
+            ctx,
+            "CF200",
+            count=1,
+            severity=Severity.ERROR,
+            phase="cloudflare.redirect_rules",
+            ref="t",
         )
         assert "block" in c001[0].message
 
     def test_cf200_valid_action(self):
-        ctx = _lint_rule({"ref": "t", "expression": "true", "action": "redirect"}, "redirect_rules")
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "true", "action": "redirect"}, "cloudflare.redirect_rules"
+        )
         assert "CF200" not in _ids(ctx)
 
     def test_cf200_score_valid_in_waf_custom_rules(self):
@@ -41,7 +50,7 @@ class TestActionValidity:
                 "action": "score",
                 "action_parameters": {"increment": 5},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF200" not in _ids(ctx)
 
@@ -49,7 +58,7 @@ class TestActionValidity:
         """'ddos_dynamic' action is valid for http_ddos_rules (no false positive)."""
         ctx = _lint_rule(
             {"ref": "t", "expression": "true", "action": "ddos_dynamic"},
-            "http_ddos_rules",
+            "cloudflare.http_ddos_rules",
         )
         assert "CF200" not in _ids(ctx)
 
@@ -57,12 +66,12 @@ class TestActionValidity:
         """'force_connection_close' action is valid for http_ddos_rules (no false positive)."""
         ctx = _lint_rule(
             {"ref": "t", "expression": "true", "action": "force_connection_close"},
-            "http_ddos_rules",
+            "cloudflare.http_ddos_rules",
         )
         assert "CF200" not in _ids(ctx)
 
     def test_cf201_missing_action_no_default(self):
-        ctx = _lint_rule({"ref": "t", "expression": "true"}, "waf_custom_rules")
+        ctx = _lint_rule({"ref": "t", "expression": "true"}, "cloudflare.waf_custom_rules")
         assert "CF201" in _ids(ctx)
         c002 = [r for r in ctx.results if r.rule_id == "CF201"]
         assert len(c002) == 1
@@ -70,12 +79,14 @@ class TestActionValidity:
 
     def test_cf201_no_error_with_default(self):
         # redirect_rules has default action "redirect"
-        ctx = _lint_rule({"ref": "t", "expression": "true"}, "redirect_rules")
+        ctx = _lint_rule({"ref": "t", "expression": "true"}, "cloudflare.redirect_rules")
         assert "CF201" not in _ids(ctx)
 
     def test_cf201_non_string_action(self):
         """Non-string action should report CF201 instead of silently skipping."""
-        ctx = _lint_rule({"ref": "t", "expression": "true", "action": 123}, "waf_custom_rules")
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "true", "action": 123}, "cloudflare.waf_custom_rules"
+        )
         assert "CF201" in _ids(ctx)
         assert len(ctx.results) == 1
         assert "must be a string" in ctx.results[0].message
@@ -83,10 +94,15 @@ class TestActionValidity:
     def test_cf202_missing_action_parameters(self):
         ctx = _lint_rule(
             {"ref": "t", "expression": "true", "action": "redirect"},
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         c003 = assert_lint(
-            ctx, "CF202", count=1, severity=Severity.ERROR, phase="redirect_rules", ref="t"
+            ctx,
+            "CF202",
+            count=1,
+            severity=Severity.ERROR,
+            phase="cloudflare.redirect_rules",
+            ref="t",
         )
         assert "action_parameters" in c003[0].message.lower()
 
@@ -98,7 +114,7 @@ class TestActionValidity:
                 "action": "redirect",
                 "action_parameters": {"from_value": {}, "bogus_key": True},
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF203" in _ids(ctx)
 
@@ -114,7 +130,7 @@ class TestActionValidity:
                     "read_timeout": 300,
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -123,7 +139,7 @@ class TestActionValidity:
         [
             (
                 "set_cache_settings",
-                "cache_rules",
+                "cloudflare.cache_rules",
                 {
                     "shared_dictionary": {},
                     "strip_etags": True,
@@ -133,7 +149,7 @@ class TestActionValidity:
             ),
             (
                 "set_config",
-                "config_rules",
+                "cloudflare.config_rules",
                 {
                     "content_converter": True,
                     "disable_pay_per_crawl": True,
@@ -142,8 +158,8 @@ class TestActionValidity:
                     "response_body_buffering": "standard",
                 },
             ),
-            ("skip", "waf_custom_rules", {"phase": "current"}),
-            ("serve_error", "custom_error_rules", {"asset_name": "custom_error_page"}),
+            ("skip", "cloudflare.waf_custom_rules", {"phase": "current"}),
+            ("serve_error", "cloudflare.custom_error_rules", {"asset_name": "custom_error_page"}),
         ],
     )
     def test_cf203_accepts_sdk_5x_action_params(self, action, phase, params):
@@ -171,7 +187,7 @@ class TestCF223SkipInAccountScope:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" in _ids(ctx)
         results = [r for r in ctx.results if r.rule_id == "CF223"]
@@ -187,7 +203,7 @@ class TestCF223SkipInAccountScope:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" not in _ids(ctx)
 
@@ -198,7 +214,7 @@ class TestCF223SkipInAccountScope:
                 "expression": self._ACCOUNT_EXPR,
                 "action": "block",
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" not in _ids(ctx)
 
@@ -210,7 +226,7 @@ class TestCF223SkipInAccountScope:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF223" not in _ids(ctx)
 
@@ -222,7 +238,7 @@ class TestCF223SkipInAccountScope:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" not in _ids(ctx)
 
@@ -234,7 +250,7 @@ class TestCF223SkipInAccountScope:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" in _ids(ctx)
 
@@ -244,7 +260,7 @@ class TestCF223SkipInAccountScope:
         case separately."""
         ctx = _lint_rule(
             {"ref": "t", "action": "skip", "action_parameters": {"ruleset": "current"}},
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" not in _ids(ctx)
 
@@ -258,7 +274,7 @@ class TestCF223SkipInAccountScope:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF223" not in _ids(ctx)
 
@@ -280,7 +296,7 @@ class TestCF224ExpressionLengthCap:
 
         ctx = _lint_rule(
             {"ref": "t", "expression": self._expr_of_normalized_length(MAX_EXPRESSION_LENGTH)},
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF224" not in _ids(ctx)
 
@@ -289,7 +305,7 @@ class TestCF224ExpressionLengthCap:
 
         ctx = _lint_rule(
             {"ref": "t", "expression": self._expr_of_normalized_length(MAX_EXPRESSION_LENGTH - 1)},
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF224" not in _ids(ctx)
 
@@ -298,7 +314,7 @@ class TestCF224ExpressionLengthCap:
 
         ctx = _lint_rule(
             {"ref": "t", "expression": self._expr_of_normalized_length(MAX_EXPRESSION_LENGTH + 1)},
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF224" in _ids(ctx)
         result = next(r for r in ctx.results if r.rule_id == "CF224")
@@ -310,7 +326,7 @@ class TestCF224ExpressionLengthCap:
         ips = " ".join(f"10.{i // 256 % 256}.{i % 256}.1" for i in range(500))
         ctx = _lint_rule(
             {"ref": "t", "expression": f"(ip.src in {{{ips}}})"},
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF224" in _ids(ctx)
 
@@ -318,7 +334,7 @@ class TestCF224ExpressionLengthCap:
         """The remediation: a stored-list reference stays short."""
         ctx = _lint_rule(
             {"ref": "t", "expression": "(ip.src in $block_known_attackers)"},
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF224" not in _ids(ctx)
 
@@ -333,15 +349,15 @@ class TestCF224ExpressionLengthCap:
         raw = "(ip.src in {\n" + (" " * 5000) + "1.2.3.4\n})"
         assert len(raw) > MAX_EXPRESSION_LENGTH
         assert len(normalize_expression(raw)) < MAX_EXPRESSION_LENGTH
-        ctx = _lint_rule({"ref": "t", "expression": raw}, "waf_custom_rules")
+        ctx = _lint_rule({"ref": "t", "expression": raw}, "cloudflare.waf_custom_rules")
         assert "CF224" not in _ids(ctx)
 
     def test_does_not_crash_on_non_string_expression(self):
-        ctx = _lint_rule({"ref": "t", "expression": 123}, "waf_custom_rules")
+        ctx = _lint_rule({"ref": "t", "expression": 123}, "cloudflare.waf_custom_rules")
         assert "CF224" not in _ids(ctx)
 
     def test_does_not_crash_on_missing_expression(self):
-        ctx = _lint_rule({"ref": "t", "action": "block"}, "waf_custom_rules")
+        ctx = _lint_rule({"ref": "t", "action": "block"}, "cloudflare.waf_custom_rules")
         assert "CF224" not in _ids(ctx)
 
 
@@ -354,7 +370,7 @@ class TestDefaultActionParamValidation:
                 "expression": "true",
                 "action_parameters": {"bogus_key": True},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF203" in _ids(ctx)
 
@@ -365,7 +381,7 @@ class TestDefaultActionParamValidation:
                 "expression": "true",
                 "action_parameters": {"ssl": "full"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -377,7 +393,7 @@ class TestDefaultActionParamValidation:
                 "expression": "true",
                 "action_parameters": {"disable_railgun": True},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF203" in _ids(ctx)
 
@@ -395,7 +411,7 @@ class TestPhaseParameterOverrides:
                     "uri": {"path": {"value": "/index.html"}},
                 },
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         assert_lint(ctx, "CF203", count=1, severity=Severity.WARNING)
         assert "uri" in ctx.results[0].message
@@ -412,7 +428,7 @@ class TestPhaseParameterOverrides:
                     },
                 },
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -426,7 +442,7 @@ class TestPhaseParameterOverrides:
                     "uri": {"path": {"value": "/new-path"}},
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -440,7 +456,7 @@ class TestPhaseParameterOverrides:
                     "uri": {"path": {"value": "/new-path"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -457,7 +473,7 @@ class TestPhaseParameterOverrides:
                     },
                 },
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         c004s = [r for r in ctx.results if r.rule_id == "CF203"]
         assert len(c004s) == 1
@@ -473,7 +489,7 @@ class TestC005InvalidParamsType:
                 "action": "redirect",
                 "action_parameters": "not-a-dict",
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF204" in _ids(ctx)
 
@@ -485,7 +501,7 @@ class TestC005InvalidParamsType:
                 "action": "redirect",
                 "action_parameters": ["bad"],
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF204" in _ids(ctx)
 
@@ -497,7 +513,7 @@ class TestC005InvalidParamsType:
                 "action": "redirect",
                 "action_parameters": {"from_value": {}},
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF204" not in _ids(ctx)
 
@@ -511,7 +527,7 @@ class TestC009UnnecessaryParams:
                 "action": "log",
                 "action_parameters": {"something": True},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF208" in _ids(ctx)
 
@@ -523,7 +539,7 @@ class TestC009UnnecessaryParams:
                 "action": "redirect",
                 "action_parameters": {"from_value": {}},
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF208" not in _ids(ctx)
 
@@ -537,7 +553,7 @@ class TestRedirectParams:
                 "action": "redirect",
                 "action_parameters": {"from_value": {"status_code": 301}},
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF431" in _ids(ctx)
 
@@ -554,7 +570,7 @@ class TestRedirectParams:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF207" in _ids(ctx)
 
@@ -570,7 +586,7 @@ class TestRedirectParams:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF206" in _ids(ctx)
 
@@ -587,7 +603,7 @@ class TestRedirectParams:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF430" in _ids(ctx)
 
@@ -604,7 +620,7 @@ class TestRedirectParams:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF205" in _ids(ctx)
 
@@ -621,7 +637,7 @@ class TestRedirectParams:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert len(ctx.results) == 0
         assert not ctx.has_errors
@@ -636,7 +652,7 @@ class TestCacheParams:
                 "action": "set_cache_settings",
                 "action_parameters": {"edge_ttl": {"mode": "bogus"}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF410" in _ids(ctx)
 
@@ -648,7 +664,7 @@ class TestCacheParams:
                 "action": "set_cache_settings",
                 "action_parameters": {"edge_ttl": {"mode": "override_origin"}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF411" in _ids(ctx)
 
@@ -660,7 +676,7 @@ class TestCacheParams:
                 "action": "set_cache_settings",
                 "action_parameters": {"edge_ttl": {"mode": "override_origin", "default": -1}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF412" in _ids(ctx)
 
@@ -675,7 +691,7 @@ class TestCacheParams:
                     "edge_ttl": {"mode": "override_origin", "default": 3600},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         i004 = assert_lint(ctx, "CF413", count=1, severity=Severity.WARNING)
         assert "bypass" in i004[0].message.lower() or "cache" in i004[0].message.lower()
@@ -691,7 +707,7 @@ class TestCacheParams:
                     "edge_ttl": {"mode": "override_origin", "default": 86400},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         errors = [r for r in ctx.results if r.severity == Severity.ERROR]
         assert len(errors) == 0
@@ -706,7 +722,7 @@ class TestBrowserTtl:
                 "action": "set_cache_settings",
                 "action_parameters": {"browser_ttl": {"mode": "bogus"}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF410" in _ids(ctx)
 
@@ -718,7 +734,7 @@ class TestBrowserTtl:
                 "action": "set_cache_settings",
                 "action_parameters": {"browser_ttl": {"mode": "override_origin"}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF411" in _ids(ctx)
 
@@ -732,7 +748,7 @@ class TestBrowserTtl:
                     "browser_ttl": {"mode": "override_origin", "default": -5},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF412" in _ids(ctx)
 
@@ -746,7 +762,7 @@ class TestBrowserTtl:
                     "browser_ttl": {"mode": "override_origin", "default": 3600},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         errors = [r for r in ctx.results if r.severity == Severity.ERROR]
         assert len(errors) == 0
@@ -762,7 +778,7 @@ class TestBrowserTtl:
                     "browser_ttl": {"mode": "bypass_by_default"},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF410" not in _ids(ctx)
 
@@ -776,7 +792,7 @@ class TestServeErrorParams:
                 "action": "serve_error",
                 "action_parameters": {"status_code": 200, "content": "hi"},
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF205" in _ids(ctx)
 
@@ -788,7 +804,7 @@ class TestServeErrorParams:
                 "action": "serve_error",
                 "action_parameters": {"status_code": 503, "content": "Maintenance"},
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF205" not in _ids(ctx)
 
@@ -802,7 +818,7 @@ class TestConfigParams:
                 "action": "set_config",
                 "action_parameters": {"security_level": "bogus"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF420" in _ids(ctx)
 
@@ -814,7 +830,7 @@ class TestConfigParams:
                 "action": "set_config",
                 "action_parameters": {"ssl": "bogus"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF421" in _ids(ctx)
 
@@ -827,7 +843,7 @@ class TestConfigParams:
                 "action": "set_config",
                 "action_parameters": {"ssl": False},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF421" in _ids(ctx)
         diag = next(r for r in ctx.results if r.rule_id == "CF421")
@@ -841,7 +857,7 @@ class TestConfigParams:
                 "action": "set_config",
                 "action_parameters": {"polish": "bogus"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF422" in _ids(ctx)
 
@@ -854,7 +870,7 @@ class TestConfigParams:
                 "action": "set_config",
                 "action_parameters": {"polish": "webp"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF422" not in _ids(ctx)
 
@@ -866,7 +882,7 @@ class TestConfigParams:
                 "action": "set_config",
                 "action_parameters": {"security_level": "off"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF423" in _ids(ctx)
 
@@ -880,7 +896,7 @@ class TestConfigParams:
                     "action": "set_config",
                     "action_parameters": {"security_level": level},
                 },
-                "config_rules",
+                "cloudflare.config_rules",
             )
             assert "CF420" in _ids(ctx), level
             diag = next(r for r in ctx.results if r.rule_id == "CF420")
@@ -896,7 +912,7 @@ class TestConfigParams:
                     "action": "set_config",
                     "action_parameters": {"security_level": level},
                 },
-                "config_rules",
+                "cloudflare.config_rules",
             )
             assert "CF420" not in _ids(ctx), level
 
@@ -914,7 +930,7 @@ class TestRateLimitParams:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF400" in _ids(ctx)
 
@@ -926,7 +942,7 @@ class TestRateLimitParams:
                 "action": "block",
                 "ratelimit": {"period": 60, "requests_per_period": 100},
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF401" in _ids(ctx)
 
@@ -947,7 +963,7 @@ class TestRateLimitParams:
                 },
                 "enabled": True,
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF401" not in _ids(ctx)
         assert "CF402" not in _ids(ctx)
@@ -961,7 +977,7 @@ class TestRateLimitParams:
                 "action": "block",
                 "ratelimit": {"period": 60, "characteristics": ["ip.src"]},
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF402" in _ids(ctx)
 
@@ -977,7 +993,7 @@ class TestRateLimitParams:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF402" not in _ids(ctx)
 
@@ -994,7 +1010,7 @@ class TestRateLimitParams:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF403" in _ids(ctx)
 
@@ -1011,7 +1027,7 @@ class TestRateLimitParams:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF404" in _ids(ctx)
 
@@ -1025,7 +1041,7 @@ class TestOriginParams:
                 "action": "route",
                 "action_parameters": {"origin": {"port": 99999}},
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF450" in _ids(ctx)
 
@@ -1037,7 +1053,7 @@ class TestOriginParams:
                 "action": "route",
                 "action_parameters": {"origin": {"port": 8443}},
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF450" not in _ids(ctx)
 
@@ -1050,7 +1066,7 @@ class TestOriginParams:
                 "action": "route",
                 "action_parameters": {"origin": {"port": True}},
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF450" in _ids(ctx)
         n001 = [r for r in ctx.results if r.rule_id == "CF450"]
@@ -1064,7 +1080,7 @@ class TestOriginParams:
                 "action": "route",
                 "action_parameters": {"origin": {"port": "8443"}},
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF450" in _ids(ctx)
 
@@ -1083,7 +1099,7 @@ class TestD006CountingExpression:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF405" in _ids(ctx)
 
@@ -1100,7 +1116,7 @@ class TestD006CountingExpression:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF405" not in _ids(ctx)
 
@@ -1117,7 +1133,7 @@ class TestD006CountingExpression:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF405" not in _ids(ctx)
 
@@ -1133,7 +1149,7 @@ class TestL004HeaderOperation:
                     "headers": {"x-custom": {"operation": "replace", "value": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF442" in _ids(ctx)
 
@@ -1147,7 +1163,7 @@ class TestL004HeaderOperation:
                     "headers": {"x-custom": {"operation": "set", "value": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF442" not in _ids(ctx)
 
@@ -1161,7 +1177,7 @@ class TestL004HeaderOperation:
                     "headers": {"x-custom": {"operation": "remove"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF442" not in _ids(ctx)
 
@@ -1177,7 +1193,7 @@ class TestTransformParams:
                     "uri": {"path": {"value": "/new", "expression": "concat()"}},
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF207" in _ids(ctx)
 
@@ -1191,7 +1207,7 @@ class TestTransformParams:
                     "headers": {"": {"operation": "set", "value": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF440" in _ids(ctx)
 
@@ -1205,7 +1221,7 @@ class TestTransformParams:
                     "headers": {"x-custom": {"value": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF441" in _ids(ctx)
 
@@ -1225,7 +1241,7 @@ class TestTransformParams:
                     },
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF207" in _ids(ctx)
 
@@ -1241,7 +1257,7 @@ class TestL005HeaderMissingValue:
                     "headers": {"x-custom": {"operation": "set"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF443" in _ids(ctx)
 
@@ -1255,7 +1271,7 @@ class TestL005HeaderMissingValue:
                     "headers": {"x-custom": {"operation": "add"}},
                 },
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         assert "CF443" in _ids(ctx)
 
@@ -1269,7 +1285,7 @@ class TestL005HeaderMissingValue:
                     "headers": {"x-custom": {"operation": "set", "value": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF443" not in _ids(ctx)
 
@@ -1288,7 +1304,7 @@ class TestL005HeaderMissingValue:
                     },
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF443" not in _ids(ctx)
 
@@ -1302,7 +1318,7 @@ class TestL005HeaderMissingValue:
                     "headers": {"x-custom": {"operation": "remove"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF443" not in _ids(ctx)
 
@@ -1318,7 +1334,7 @@ class TestL005HeaderRemoveSpuriousValue:
                     "headers": {"x-custom": {"operation": "remove", "value": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF446" in _ids(ctx)
 
@@ -1332,7 +1348,7 @@ class TestL005HeaderRemoveSpuriousValue:
                     "headers": {"x-custom": {"operation": "remove", "expression": "x"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF446" in _ids(ctx)
 
@@ -1346,7 +1362,7 @@ class TestL005HeaderRemoveSpuriousValue:
                     "headers": {"x-custom": {"operation": "remove"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF446" not in _ids(ctx)
 
@@ -1364,45 +1380,47 @@ class TestCF447RestrictedHeaders:
         }
 
     def test_cf447_cf_prefix_set_rejected(self):
-        ctx = _lint_rule(self._rule("cf-custom", "set"), "request_header_rules")
+        ctx = _lint_rule(self._rule("cf-custom", "set"), "cloudflare.request_header_rules")
         assert "CF447" in _ids(ctx)
 
     def test_cf447_x_cf_prefix_remove_rejected(self):
-        ctx = _lint_rule(self._rule("x-cf-foo", "remove"), "request_header_rules")
+        ctx = _lint_rule(self._rule("x-cf-foo", "remove"), "cloudflare.request_header_rules")
         assert "CF447" in _ids(ctx)
 
     def test_cf447_cf_connecting_ip_remove_ok(self):
-        ctx = _lint_rule(self._rule("cf-connecting-ip", "remove"), "request_header_rules")
+        ctx = _lint_rule(
+            self._rule("cf-connecting-ip", "remove"), "cloudflare.request_header_rules"
+        )
         assert "CF447" not in _ids(ctx)
 
     def test_cf447_cf_connecting_ip_set_rejected(self):
-        ctx = _lint_rule(self._rule("cf-connecting-ip", "set"), "request_header_rules")
+        ctx = _lint_rule(self._rule("cf-connecting-ip", "set"), "cloudflare.request_header_rules")
         assert "CF447" in _ids(ctx)
 
     def test_cf447_cookie_set_rejected(self):
-        ctx = _lint_rule(self._rule("cookie", "set"), "request_header_rules")
+        ctx = _lint_rule(self._rule("cookie", "set"), "cloudflare.request_header_rules")
         assert "CF447" in _ids(ctx)
 
     def test_cf447_cookie_remove_ok(self):
-        ctx = _lint_rule(self._rule("cookie", "remove"), "request_header_rules")
+        ctx = _lint_rule(self._rule("cookie", "remove"), "cloudflare.request_header_rules")
         assert "CF447" not in _ids(ctx)
 
     def test_cf447_xff_set_rejected(self):
-        ctx = _lint_rule(self._rule("X-Forwarded-For", "set"), "request_header_rules")
+        ctx = _lint_rule(self._rule("X-Forwarded-For", "set"), "cloudflare.request_header_rules")
         assert "CF447" in _ids(ctx)
 
     def test_cf447_xff_remove_ok(self):
-        ctx = _lint_rule(self._rule("X-Forwarded-For", "remove"), "request_header_rules")
+        ctx = _lint_rule(self._rule("X-Forwarded-For", "remove"), "cloudflare.request_header_rules")
         assert "CF447" not in _ids(ctx)
 
     def test_cf447_custom_x_true_client_ip_ok(self):
         # X-True-Client-IP != the reserved true-client-ip; must not false-fire.
-        ctx = _lint_rule(self._rule("X-True-Client-IP", "set"), "request_header_rules")
+        ctx = _lint_rule(self._rule("X-True-Client-IP", "set"), "cloudflare.request_header_rules")
         assert "CF447" not in _ids(ctx)
 
     def test_cf447_response_phase_unaffected(self):
         # The cf-*/cookie/IP restrictions are request-side only.
-        ctx = _lint_rule(self._rule("cf-custom", "set"), "response_header_rules")
+        ctx = _lint_rule(self._rule("cf-custom", "set"), "cloudflare.response_header_rules")
         assert "CF447" not in _ids(ctx)
 
 
@@ -1416,7 +1434,7 @@ class TestNonStringHeaderName:
                 "action": "rewrite",
                 "action_parameters": {"headers": {123: {"operation": "set", "value": "x"}}},
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF440" in _ids(ctx)
 
@@ -1430,7 +1448,7 @@ class TestCF448HeaderNameCharset:
                 "action": "rewrite",
                 "action_parameters": {"headers": {"X Spaced": {"operation": "set", "value": "1"}}},
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         assert "CF448" in _ids(ctx)
 
@@ -1444,7 +1462,7 @@ class TestCF448HeaderNameCharset:
                     "headers": {"X-My_Header-1": {"operation": "set", "value": "1"}}
                 },
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         assert "CF448" not in _ids(ctx)
 
@@ -1460,7 +1478,7 @@ class TestL006TransformExpressionLinting:
                     "uri": {"path": {"expression": "invalid expression !!!"}},
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF444" in _ids(ctx)
 
@@ -1474,7 +1492,7 @@ class TestL006TransformExpressionLinting:
                     "uri": {"path": {"expression": 'concat("/prefix", http.request.uri.path)'}},
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         # CF444 should not fire for a valid expression (wirefilter may still
         # reject concat syntax, so we just check it doesn't crash)
@@ -1495,7 +1513,7 @@ class TestL006TransformExpressionLinting:
                     },
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF444" in _ids(ctx)
 
@@ -1509,7 +1527,7 @@ class TestL006TransformExpressionLinting:
                     "uri": {"path": {"expression": ""}},
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF444" not in _ids(ctx)
 
@@ -1523,7 +1541,7 @@ class TestL006TransformExpressionLinting:
                     "uri": {"path": {"value": "/new-path"}},
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF444" not in _ids(ctx)
 
@@ -1545,7 +1563,7 @@ class TestL006TransformExpressionLinting:
                     },
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF444" not in _ids(ctx)
 
@@ -1564,7 +1582,7 @@ class TestL006TransformExpressionLinting:
                     },
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF444" not in _ids(ctx)
 
@@ -1585,7 +1603,7 @@ class TestL006TransformExpressionLinting:
                     },
                 },
             },
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF444" not in _ids(ctx)
 
@@ -1602,7 +1620,7 @@ class TestC010ServeErrorContentSize:
                     "status_code": 503,
                 },
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF209" in _ids(ctx)
 
@@ -1617,7 +1635,7 @@ class TestC010ServeErrorContentSize:
                     "status_code": 503,
                 },
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF209" not in _ids(ctx)
 
@@ -1632,7 +1650,7 @@ class TestC010ServeErrorContentSize:
                     "status_code": 503,
                 },
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF209" not in _ids(ctx)
 
@@ -1644,7 +1662,7 @@ class TestC010ServeErrorContentSize:
                 "action": "serve_error",
                 "action_parameters": {"status_code": 503},
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF209" not in _ids(ctx)
 
@@ -1658,7 +1676,7 @@ class TestC011C012SkipParams:
                 "action": "skip",
                 "action_parameters": {"phases": ["bogus_phase"]},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF210" in _ids(ctx)
 
@@ -1670,7 +1688,7 @@ class TestC011C012SkipParams:
                 "action": "skip",
                 "action_parameters": {"phases": ["http_request_firewall_custom"]},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF210" not in _ids(ctx)
 
@@ -1682,7 +1700,7 @@ class TestC011C012SkipParams:
                 "action": "skip",
                 "action_parameters": {"products": ["bogus_product"]},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF211" in _ids(ctx)
 
@@ -1694,7 +1712,7 @@ class TestC011C012SkipParams:
                 "action": "skip",
                 "action_parameters": {"products": ["waf", "rateLimit"]},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF211" not in _ids(ctx)
 
@@ -1709,7 +1727,7 @@ class TestC011C012SkipParams:
                     "products": ["waf", "invalid"],
                 },
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF210" in _ids(ctx)
         assert "CF211" in _ids(ctx)
@@ -1726,7 +1744,7 @@ class TestC013CompressResponseAlgorithms:
                     "algorithms": [{"name": "deflate"}],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         assert "CF212" in _ids(ctx)
 
@@ -1746,7 +1764,7 @@ class TestC013CompressResponseAlgorithms:
                     ],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         assert "CF212" not in _ids(ctx)
 
@@ -1761,7 +1779,7 @@ class TestC013CompressResponseAlgorithms:
                     "algorithms": [{"name": "default"}],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         assert "CF212" not in _ids(ctx)
 
@@ -1775,7 +1793,7 @@ class TestC013CompressResponseAlgorithms:
                     "algorithms": [{"name": "gzip"}, {"name": "lz4"}],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         c013 = [r for r in ctx.results if r.rule_id == "CF212"]
         assert len(c013) == 1
@@ -1795,7 +1813,7 @@ class TestC014RateLimitCharacteristics:
                     "characteristics": ["bogus.field"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF213" in _ids(ctx)
 
@@ -1811,7 +1829,7 @@ class TestC014RateLimitCharacteristics:
                     "characteristics": ["ip.src", "cf.colo.id"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF213" not in _ids(ctx)
 
@@ -1827,7 +1845,7 @@ class TestC014RateLimitCharacteristics:
                     "characteristics": ["ip.src", "cf.unique_visitor_id"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF225" in _ids(ctx)
 
@@ -1844,7 +1862,7 @@ class TestC014RateLimitCharacteristics:
                         "characteristics": [char, "cf.colo.id"],
                     },
                 },
-                "rate_limiting_rules",
+                "cloudflare.rate_limiting_rules",
             )
             assert "CF225" not in _ids(ctx)
 
@@ -1861,7 +1879,7 @@ class TestC014RateLimitCharacteristics:
                     "mitigation_timeout": 600,
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
             plan_tier="business",
         )
         assert "CF409" in _ids(ctx)
@@ -1879,7 +1897,7 @@ class TestC014RateLimitCharacteristics:
                     "mitigation_timeout": 0,
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
             plan_tier="business",
         )
         assert "CF409" not in _ids(ctx)
@@ -1897,7 +1915,7 @@ class TestC014RateLimitCharacteristics:
                     "mitigation_timeout": 60,
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
             plan_tier="enterprise",
         )
         assert "CF409" not in _ids(ctx)
@@ -1915,7 +1933,7 @@ class TestC014RateLimitCharacteristics:
                     "mitigation_timeout": 60,
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
             plan_tier="business",
         )
         assert "CF409" not in _ids(ctx)
@@ -1932,7 +1950,7 @@ class TestC014RateLimitCharacteristics:
                     "characteristics": ['http.request.headers["x-api-key"]'],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF213" not in _ids(ctx)
 
@@ -1948,7 +1966,7 @@ class TestC014RateLimitCharacteristics:
                     "characteristics": ["ip.src", "bad.field"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         c014 = [r for r in ctx.results if r.rule_id == "CF213"]
         assert len(c014) == 1
@@ -1972,7 +1990,7 @@ class TestBlockResponseValidation:
                     }
                 },
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF214" not in _ids(ctx)
 
@@ -1984,7 +2002,7 @@ class TestBlockResponseValidation:
                 "action": "block",
                 "action_parameters": {"response": {"status_code": 200}},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         c015 = [r for r in ctx.results if r.rule_id == "CF214"]
         assert len(c015) == 1
@@ -1998,7 +2016,7 @@ class TestBlockResponseValidation:
                 "action": "block",
                 "action_parameters": {"response": {"status_code": 500}},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         c015 = [r for r in ctx.results if r.rule_id == "CF214"]
         assert len(c015) == 1
@@ -2013,7 +2031,7 @@ class TestBlockResponseValidation:
                     "action": "block",
                     "action_parameters": {"response": {"status_code": code}},
                 },
-                "waf_custom_rules",
+                "cloudflare.waf_custom_rules",
             )
             assert "CF214" not in _ids(ctx), f"status_code {code} should be valid"
 
@@ -2025,7 +2043,7 @@ class TestBlockResponseValidation:
                 "action": "block",
                 "action_parameters": {"response": {"status_code": 403, "content_type": 123}},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         c015 = [r for r in ctx.results if r.rule_id == "CF214"]
         assert any("content_type" in r.message for r in c015)
@@ -2038,7 +2056,7 @@ class TestBlockResponseValidation:
                 "action": "block",
                 "action_parameters": {"response": {"status_code": 403, "content": 42}},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         c015 = [r for r in ctx.results if r.rule_id == "CF214"]
         assert any("content must be a string" in r.message for r in c015)
@@ -2051,7 +2069,7 @@ class TestBlockResponseValidation:
                 "expression": "true",
                 "action": "block",
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF214" not in _ids(ctx)
 
@@ -2064,7 +2082,7 @@ class TestBlockResponseValidation:
                 "action": "block",
                 "action_parameters": {"response": "text"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         # CF214 shouldn't fire on non-dict response (silently skips)
         assert "CF214" not in _ids(ctx)
@@ -2079,7 +2097,7 @@ class TestExecuteValidation:
                 "action": "execute",
                 "action_parameters": {"overrides": {}},
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF215" in _ids(ctx)
 
@@ -2091,7 +2109,7 @@ class TestExecuteValidation:
                 "action": "execute",
                 "action_parameters": {"id": "not-valid-hex"},
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF216" in _ids(ctx)
 
@@ -2103,7 +2121,7 @@ class TestExecuteValidation:
                 "action": "execute",
                 "action_parameters": {"id": "abc12345def67890abc12345def67890"},
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF215" not in _ids(ctx)
         assert "CF216" not in _ids(ctx)
@@ -2119,7 +2137,7 @@ class TestCompressionOrdering:
                     "algorithms": [{"name": "none"}, {"name": "gzip"}],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         assert "CF217" in _ids(ctx)
 
@@ -2132,7 +2150,7 @@ class TestCompressionOrdering:
                     "algorithms": [{"name": "auto"}, {"name": "brotli"}],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         assert "CF217" in _ids(ctx)
 
@@ -2145,7 +2163,7 @@ class TestCompressionOrdering:
                     "algorithms": [{"name": "brotli"}, {"name": "gzip"}, {"name": "none"}],
                 },
             },
-            "compression_rules",
+            "cloudflare.compression_rules",
         )
         assert "CF217" not in _ids(ctx)
 
@@ -2158,7 +2176,7 @@ class TestSSLOffWarning:
                 "expression": "true",
                 "action_parameters": {"ssl": "off"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF424" in _ids(ctx)
 
@@ -2169,7 +2187,7 @@ class TestSSLOffWarning:
                 "expression": "true",
                 "action_parameters": {"ssl": "full"},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF424" not in _ids(ctx)
 
@@ -2185,7 +2203,7 @@ class TestRequestHeaderAdd:
                     "headers": {"x-custom": {"operation": "add", "value": "v"}},
                 },
             },
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         assert "CF445" in _ids(ctx)
 
@@ -2199,7 +2217,7 @@ class TestRequestHeaderAdd:
                     "headers": {"x-custom": {"operation": "add", "value": "v"}},
                 },
             },
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         assert "CF445" not in _ids(ctx)
 
@@ -2224,7 +2242,7 @@ class TestCF406CharacteristicsPerPlan:
                     ],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
             plan_tier="free",
         )
         assert "CF406" in _ids(ctx)
@@ -2242,7 +2260,7 @@ class TestCF406CharacteristicsPerPlan:
                     "characteristics": ["ip.src", "cf.colo.id"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
             plan_tier="enterprise",
         )
         assert "CF406" not in _ids(ctx)
@@ -2261,7 +2279,7 @@ class TestCF407RequestsPerPeriodRange:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF407" in _ids(ctx)
 
@@ -2277,7 +2295,7 @@ class TestCF407RequestsPerPeriodRange:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF407" in _ids(ctx)
 
@@ -2293,7 +2311,7 @@ class TestCF407RequestsPerPeriodRange:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF407" not in _ids(ctx)
 
@@ -2310,7 +2328,7 @@ class TestCF407RequestsPerPeriodRange:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF407" not in _ids(ctx)
 
@@ -2327,7 +2345,7 @@ class TestCF407RequestsPerPeriodRange:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF407" not in _ids(ctx)
 
@@ -2345,7 +2363,7 @@ class TestCF408ScorePerPeriod:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF408" in _ids(ctx)
 
@@ -2361,7 +2379,7 @@ class TestCF408ScorePerPeriod:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF408" in _ids(ctx)
 
@@ -2377,7 +2395,7 @@ class TestCF408ScorePerPeriod:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF408" in _ids(ctx)
 
@@ -2393,7 +2411,7 @@ class TestCF408ScorePerPeriod:
                     "characteristics": ["ip.src"],
                 },
             },
-            "rate_limiting_rules",
+            "cloudflare.rate_limiting_rules",
         )
         assert "CF408" not in _ids(ctx)
 
@@ -2408,7 +2426,7 @@ class TestCF410TTLModeType:
                 "action": "set_cache_settings",
                 "action_parameters": {"edge_ttl": {"mode": 123}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF410" in _ids(ctx)
 
@@ -2421,7 +2439,7 @@ class TestCF410TTLModeType:
                 "action": "set_cache_settings",
                 "action_parameters": {"edge_ttl": {"mode": True}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF410" in _ids(ctx)
 
@@ -2434,7 +2452,7 @@ class TestCF410TTLModeType:
                 "action": "set_cache_settings",
                 "action_parameters": {"edge_ttl": {"default": 300}},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF410" not in _ids(ctx)
 
@@ -2450,7 +2468,7 @@ class TestCF414CacheTTLUpperBound:
                     "edge_ttl": {"mode": "override_origin", "default": 31536001},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF414" in _ids(ctx)
 
@@ -2464,7 +2482,7 @@ class TestCF414CacheTTLUpperBound:
                     "edge_ttl": {"mode": "override_origin", "default": 31536000},
                 },
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF414" not in _ids(ctx)
 
@@ -2483,7 +2501,7 @@ class TestCF432RedirectTargetURL:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF432" in _ids(ctx)
 
@@ -2500,7 +2518,7 @@ class TestCF432RedirectTargetURL:
                     }
                 },
             },
-            "redirect_rules",
+            "cloudflare.redirect_rules",
         )
         assert "CF432" not in _ids(ctx)
 
@@ -2520,7 +2538,7 @@ class TestCF218ExecuteOverridesStructure:
                     },
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert_lint(ctx, "CF218", count=1, severity=Severity.ERROR)
         assert "index 0" in ctx.results[0].message
@@ -2541,7 +2559,7 @@ class TestCF218ExecuteOverridesStructure:
                     },
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF218" not in _ids(ctx)
 
@@ -2556,7 +2574,7 @@ class TestCF219SkipRulesetId:
                 "action": "skip",
                 "action_parameters": {"rulesets": [""]},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert_lint(ctx, "CF219", count=1, severity=Severity.WARNING)
 
@@ -2571,7 +2589,7 @@ class TestCF219SkipRulesetId:
                     "rulesets": ["abc12345def67890abc12345def67890"],
                 },
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF219" not in _ids(ctx)
 
@@ -2588,7 +2606,7 @@ class TestCF451OriginWeight:
                     "origin": {"host": "example.com", "weight": 1.5},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert_lint(ctx, "CF451", count=1, severity=Severity.ERROR)
 
@@ -2603,7 +2621,7 @@ class TestCF451OriginWeight:
                     "origin": {"host": "example.com", "weight": 0.5},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF451" not in _ids(ctx)
 
@@ -2618,7 +2636,7 @@ class TestCF451OriginWeight:
                     "origin": {"host": "example.com", "weight": 0.0},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF451" not in _ids(ctx)
 
@@ -2633,7 +2651,7 @@ class TestCF451OriginWeight:
                     "origin": {"host": "example.com", "weight": 1.0},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF451" not in _ids(ctx)
 
@@ -2648,7 +2666,7 @@ class TestCF451OriginWeight:
                     "origin": {"host": "example.com", "weight": -0.1},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert_lint(ctx, "CF451", count=1, severity=Severity.ERROR)
 
@@ -2663,7 +2681,7 @@ class TestCF452OriginRouteRequiredFields:
                 "action": "route",
                 "action_parameters": {"origin": {"port": 8443}},
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert_lint(ctx, "CF452", count=1, severity=Severity.ERROR)
 
@@ -2678,7 +2696,7 @@ class TestCF452OriginRouteRequiredFields:
                     "origin": {"host": "backend.example.com", "port": 8443},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF452" not in _ids(ctx)
 
@@ -2693,7 +2711,7 @@ class TestCF452OriginRouteRequiredFields:
                     "origin": {"sni": {"value": "backend.example.com"}, "port": 8443},
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert_lint(ctx, "CF452", count=1, severity=Severity.ERROR)
 
@@ -2712,7 +2730,7 @@ class TestCF452OriginRouteRequiredFields:
                     },
                 },
             },
-            "origin_rules",
+            "cloudflare.origin_rules",
         )
         assert "CF452" not in _ids(ctx)
 
@@ -2731,7 +2749,7 @@ class TestCF220SensitivityLevel:
                     "overrides": {"sensitivity_level": "bogus"},
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert_lint(ctx, "CF220", count=1, severity=Severity.ERROR)
 
@@ -2747,7 +2765,7 @@ class TestCF220SensitivityLevel:
                         "overrides": {"sensitivity_level": level},
                     },
                 },
-                "waf_managed_rules",
+                "cloudflare.waf_managed_rules",
             )
             assert "CF220" not in _ids(ctx)
 
@@ -2766,7 +2784,7 @@ class TestCF220SensitivityLevel:
                     },
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert_lint(ctx, "CF220", count=1, severity=Severity.ERROR)
 
@@ -2785,7 +2803,7 @@ class TestCF220SensitivityLevel:
                     },
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF220" not in _ids(ctx)
 
@@ -2801,7 +2819,7 @@ class TestCF220SensitivityLevel:
                     "overrides": {"rules": [{"id": "abc123"}]},
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF220" not in _ids(ctx)
 
@@ -2821,7 +2839,7 @@ class TestCF221ServeErrorContentType:
                     "status_code": 503,
                 },
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert_lint(ctx, "CF221", count=1, severity=Severity.ERROR)
 
@@ -2838,7 +2856,7 @@ class TestCF221ServeErrorContentType:
                         "status_code": 503,
                     },
                 },
-                "custom_error_rules",
+                "cloudflare.custom_error_rules",
             )
             assert "CF221" not in _ids(ctx)
 
@@ -2854,7 +2872,7 @@ class TestCF221ServeErrorContentType:
                     "status_code": 503,
                 },
             },
-            "custom_error_rules",
+            "cloudflare.custom_error_rules",
         )
         assert "CF221" not in _ids(ctx)
 
@@ -2870,7 +2888,7 @@ class TestCF222SkipRulesetValue:
                 "action": "skip",
                 "action_parameters": {"ruleset": "all"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert_lint(ctx, "CF222", count=1, severity=Severity.ERROR)
 
@@ -2882,7 +2900,7 @@ class TestCF222SkipRulesetValue:
                 "action": "skip",
                 "action_parameters": {"ruleset": "current"},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF222" not in _ids(ctx)
 
@@ -2895,7 +2913,7 @@ class TestCF222SkipRulesetValue:
                 "action": "skip",
                 "action_parameters": {"phases": ["http_request_firewall_custom"]},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF222" not in _ids(ctx)
 
@@ -2917,7 +2935,7 @@ class TestLogCustomFieldKeys:
                     "transformed_request_fields": [{"name": "quux"}],
                 },
             },
-            "log_custom_fields",
+            "cloudflare.log_custom_fields",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -2931,7 +2949,7 @@ class TestLogCustomFieldKeys:
                     "raw_response_fields": [{"name": "x"}],
                 },
             },
-            "log_custom_fields",
+            "cloudflare.log_custom_fields",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -2945,7 +2963,7 @@ class TestLogCustomFieldKeys:
                     "transformed_request_fields": [{"name": "x"}],
                 },
             },
-            "log_custom_fields",
+            "cloudflare.log_custom_fields",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -2961,7 +2979,7 @@ class TestSetConfigStaleKeys:
                 "action": "set_config",
                 "action_parameters": {"h2_prioritization": True},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF203" in _ids(ctx)
 
@@ -2973,7 +2991,7 @@ class TestSetConfigStaleKeys:
                 "action": "set_config",
                 "action_parameters": {"cache_deception_armor": True},
             },
-            "config_rules",
+            "cloudflare.config_rules",
         )
         assert "CF203" in _ids(ctx)
 
@@ -2992,7 +3010,7 @@ class TestExecuteVersionRemoved:
                     "version": "latest",
                 },
             },
-            "waf_managed_rules",
+            "cloudflare.waf_managed_rules",
         )
         assert "CF203" in _ids(ctx)
 
@@ -3008,7 +3026,7 @@ class TestScoreIncrementOptional:
                 "action": "score",
                 "action_parameters": {},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         # No CF205 or other error about missing required keys
         ids = _ids(ctx)
@@ -3023,7 +3041,7 @@ class TestScoreIncrementOptional:
                 "action": "score",
                 "action_parameters": {"increment": 5},
             },
-            "waf_custom_rules",
+            "cloudflare.waf_custom_rules",
         )
         assert "CF203" not in _ids(ctx)
 
@@ -3039,7 +3057,7 @@ class TestCF415CacheVary:
                 "action": "set_cache_settings",
                 "action_parameters": {"vary": vary},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
 
     def test_valid_default_and_headers(self):
@@ -3062,7 +3080,7 @@ class TestCF415CacheVary:
                 "action": "set_cache_settings",
                 "action_parameters": {"cache": True},
             },
-            "cache_rules",
+            "cloudflare.cache_rules",
         )
         assert "CF415" not in _ids(ctx)
 

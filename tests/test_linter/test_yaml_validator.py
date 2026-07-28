@@ -14,7 +14,7 @@ def _lint(rules_data, **kwargs):
 
 class TestTopLevelKeys:
     def test_valid_phase_names(self):
-        ctx = _lint({"redirect_rules": [], "cache_rules": []})
+        ctx = _lint({"cloudflare.redirect_rules": [], "cloudflare.cache_rules": []})
         assert len(ctx.results) == 0
 
     def test_unknown_phase_key_is_left_to_core(self):
@@ -30,7 +30,7 @@ class TestTopLevelKeys:
         the old name as an ERROR, not a deprecation warning."""
         ctx = _lint({"waf_managed_exceptions": []})
         m008 = assert_lint(ctx, "CF010", count=1, severity=Severity.ERROR)
-        assert "waf_managed_rules" in m008[0].message
+        assert "cloudflare.waf_managed_rules" in m008[0].message
         assert "no longer accepted" in m008[0].message
 
     def test_removed_phase_name_is_error_when_nested(self):
@@ -42,94 +42,108 @@ class TestTopLevelKeys:
         ctx = _lint({"cloudflare:waf_managed_exceptions": []})
         m008 = assert_lint(ctx, "CF010", count=1, severity=Severity.ERROR)
         assert "'waf_managed_exceptions'" in m008[0].message
-        assert "waf_managed_rules" in m008[0].message
+        assert "cloudflare.waf_managed_rules" in m008[0].message
         assert "no longer accepted" in m008[0].message
 
     def test_provider_id_identifier(self):
         ctx = _lint({"http_request_dynamic_redirect": []})
         m012 = assert_lint(ctx, "CF014", count=1, severity=Severity.WARNING)
-        assert "redirect_rules" in m012[0].suggestion
+        assert "cloudflare.redirect_rules" in m012[0].suggestion
 
     def test_known_non_phase_keys_ignored(self):
-        ctx = _lint({"custom_rulesets": [], "lists": [], "page_shield_policies": []})
+        ctx = _lint({"custom_rulesets": [], "lists": [], "cloudflare.page_shield_policies": []})
         assert len(ctx.results) == 0
 
 
 class TestPhaseRules:
     def test_phase_not_a_list(self):
-        ctx = _lint({"redirect_rules": "not-a-list"})
+        ctx = _lint({"cloudflare.redirect_rules": "not-a-list"})
         m010 = [r for r in ctx.results if r.rule_id == "CF012"]
         assert len(m010) == 1
 
     def test_rule_not_a_dict(self):
-        ctx = _lint({"redirect_rules": ["string-not-dict"]})
+        ctx = _lint({"cloudflare.redirect_rules": ["string-not-dict"]})
         m011 = [r for r in ctx.results if r.rule_id == "CF013"]
         assert len(m011) == 1
 
 
 class TestRuleFields:
     def test_missing_ref(self):
-        ctx = _lint({"redirect_rules": [{"expression": "true"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"expression": "true"}]})
         m001 = [r for r in ctx.results if r.rule_id == "CF003"]
         assert len(m001) == 1
 
     def test_invalid_ref_type(self):
-        ctx = _lint({"redirect_rules": [{"ref": 123, "expression": "true"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": 123, "expression": "true"}]})
         m004 = [r for r in ctx.results if r.rule_id == "CF006"]
         assert len(m004) == 1
 
     def test_empty_ref(self):
-        ctx = _lint({"redirect_rules": [{"ref": "", "expression": "true"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "", "expression": "true"}]})
         m004 = [r for r in ctx.results if r.rule_id == "CF006"]
         assert len(m004) == 1
 
     def test_missing_expression(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test"}]})
         m002 = [r for r in ctx.results if r.rule_id == "CF004"]
         assert len(m002) == 1
 
     def test_invalid_expression_type(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": 42}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": 42}]})
         m005 = [r for r in ctx.results if r.rule_id == "CF007"]
         assert len(m005) == 1
 
     def test_empty_expression(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": ""}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": ""}]})
         m005 = [r for r in ctx.results if r.rule_id == "CF007"]
         assert len(m005) == 1
 
     def test_duplicate_refs(self):
         ctx = _lint(
             {
-                "redirect_rules": [
+                "cloudflare.redirect_rules": [
                     {"ref": "dup", "expression": "true"},
                     {"ref": "dup", "expression": "false"},
                 ]
             }
         )
-        m003 = assert_lint(ctx, "CF005", count=1, severity=Severity.ERROR, phase="redirect_rules")
+        m003 = assert_lint(
+            ctx, "CF005", count=1, severity=Severity.ERROR, phase="cloudflare.redirect_rules"
+        )
         assert "dup" in m003[0].message
 
     def test_invalid_enabled_type(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": "true", "enabled": "yes"}]})
+        ctx = _lint(
+            {"cloudflare.redirect_rules": [{"ref": "test", "expression": "true", "enabled": "yes"}]}
+        )
         m006 = [r for r in ctx.results if r.rule_id == "CF008"]
         assert len(m006) == 1
 
     def test_valid_enabled_bool(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": "true", "enabled": False}]})
+        ctx = _lint(
+            {"cloudflare.redirect_rules": [{"ref": "test", "expression": "true", "enabled": False}]}
+        )
         m006 = [r for r in ctx.results if r.rule_id == "CF008"]
         assert len(m006) == 0
 
     def test_description_too_long(self):
         ctx = _lint(
-            {"redirect_rules": [{"ref": "test", "expression": "true", "description": "x" * 501}]}
+            {
+                "cloudflare.redirect_rules": [
+                    {"ref": "test", "expression": "true", "description": "x" * 501}
+                ]
+            }
         )
         m009 = [r for r in ctx.results if r.rule_id == "CF011"]
         assert len(m009) == 1
 
     def test_description_ok_length(self):
         ctx = _lint(
-            {"redirect_rules": [{"ref": "test", "expression": "true", "description": "x" * 500}]}
+            {
+                "cloudflare.redirect_rules": [
+                    {"ref": "test", "expression": "true", "description": "x" * 500}
+                ]
+            }
         )
         m009 = [r for r in ctx.results if r.rule_id == "CF011"]
         assert len(m009) == 0
@@ -139,7 +153,7 @@ class TestValidRule:
     def test_no_errors_for_valid_rule(self):
         ctx = _lint(
             {
-                "redirect_rules": [
+                "cloudflare.redirect_rules": [
                     {"ref": "my-rule", "expression": 'http.host eq "example.com"', "enabled": True}
                 ]
             }
@@ -150,32 +164,41 @@ class TestValidRule:
 
 class TestAlwaysTrueFalse:
     def test_cf015_always_true(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": "true"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": "true"}]})
         m013 = assert_lint(
-            ctx, "CF015", count=1, severity=Severity.WARNING, ref="test", phase="redirect_rules"
+            ctx,
+            "CF015",
+            count=1,
+            severity=Severity.WARNING,
+            ref="test",
+            phase="cloudflare.redirect_rules",
         )
         assert "always true" in m013[0].message
 
     def test_cf015_always_true_parens(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": "(true)"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": "(true)"}]})
         m013 = [r for r in ctx.results if r.rule_id == "CF015"]
         assert len(m013) == 1
 
     def test_cf015_not_triggered_for_complex_expr(self):
         ctx = _lint(
-            {"redirect_rules": [{"ref": "test", "expression": 'http.host eq "example.com"'}]}
+            {
+                "cloudflare.redirect_rules": [
+                    {"ref": "test", "expression": 'http.host eq "example.com"'}
+                ]
+            }
         )
         m013 = [r for r in ctx.results if r.rule_id == "CF015"]
         assert len(m013) == 0
 
     def test_cf016_always_false(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": "false"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": "false"}]})
         m014 = [r for r in ctx.results if r.rule_id == "CF016"]
         assert len(m014) == 1
         assert "never match" in m014[0].message
 
     def test_cf016_always_false_parens(self):
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": "(false)"}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": "(false)"}]})
         m014 = [r for r in ctx.results if r.rule_id == "CF016"]
         assert len(m014) == 1
 
@@ -187,23 +210,23 @@ class TestExpressionLength:
         # the 4096-char API cap still errored. CF224 (action_validator)
         # owns the cap and measures the normalized form the API receives.
         long_raw = 'http.host eq "a.com" or\n' * 200  # raw >> 4096
-        ctx = _lint({"redirect_rules": [{"ref": "test", "expression": long_raw}]})
+        ctx = _lint({"cloudflare.redirect_rules": [{"ref": "test", "expression": long_raw}]})
         assert not [r for r in ctx.results if r.rule_id == "CF017"]
 
 
 class TestPhaseFilter:
     def test_phase_filter_skips_unmatched(self):
         ctx = _lint(
-            {"redirect_rules": [{"expression": "true"}]},  # missing ref
-            phase_filter=["cache_rules"],
+            {"cloudflare.redirect_rules": [{"expression": "true"}]},  # missing ref
+            phase_filter=["cloudflare.cache_rules"],
         )
         m001 = [r for r in ctx.results if r.rule_id == "CF003"]
         assert len(m001) == 0
 
     def test_phase_filter_includes_matched(self):
         ctx = _lint(
-            {"redirect_rules": [{"expression": "true"}]},  # missing ref
-            phase_filter=["redirect_rules"],
+            {"cloudflare.redirect_rules": [{"expression": "true"}]},  # missing ref
+            phase_filter=["cloudflare.redirect_rules"],
         )
         m001 = [r for r in ctx.results if r.rule_id == "CF003"]
         assert len(m001) == 1
@@ -213,7 +236,7 @@ class TestDisabledRule:
     def test_cf018_disabled_rule(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "disabled-rule",
                         "expression": 'http.host eq "example.com"',
@@ -229,14 +252,14 @@ class TestDisabledRule:
             count=1,
             severity=Severity.INFO,
             ref="disabled-rule",
-            phase="waf_custom_rules",
+            phase="cloudflare.waf_custom_rules",
         )
         assert "disabled" in m016[0].message.lower()
 
     def test_cf018_enabled_rule_no_warning(self):
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "active-rule",
                         "expression": 'http.host eq "example.com"',
@@ -253,7 +276,7 @@ class TestDisabledRule:
         """No 'enabled' key at all — rule is implicitly enabled."""
         ctx = _lint(
             {
-                "waf_custom_rules": [
+                "cloudflare.waf_custom_rules": [
                     {
                         "ref": "implicit-enabled",
                         "expression": 'http.host eq "example.com"',

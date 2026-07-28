@@ -23,40 +23,40 @@ class TestCloudflareNamespace:
         # Expected mapping (nested key -> canonical flat key)
         expected = {
             # Phases (bare identity mapping)
-            "redirect_rules": "redirect_rules",
-            "url_rewrite_rules": "url_rewrite_rules",
-            "request_header_rules": "request_header_rules",
-            "response_header_rules": "response_header_rules",
-            "config_rules": "config_rules",
-            "origin_rules": "origin_rules",
-            "cache_rules": "cache_rules",
-            "compression_rules": "compression_rules",
-            "custom_error_rules": "custom_error_rules",
-            "waf_custom_rules": "waf_custom_rules",
-            "waf_managed_rules": "waf_managed_rules",
-            "rate_limiting_rules": "rate_limiting_rules",
-            "bot_fight_rules": "bot_fight_rules",
-            "sensitive_data_detection": "sensitive_data_detection",
-            "http_ddos_rules": "http_ddos_rules",
-            "bulk_redirect_rules": "bulk_redirect_rules",
-            "log_custom_fields": "log_custom_fields",
-            "network_ddos_rules": "network_ddos_rules",
-            "network_firewall_rules": "network_firewall_rules",
-            "network_firewall_managed": "network_firewall_managed",
-            "network_firewall_ratelimit": "network_firewall_ratelimit",
-            "network_firewall_ids": "network_firewall_ids",
-            "url_normalization": "url_normalization",
+            "redirect_rules": "cloudflare.redirect_rules",
+            "url_rewrite_rules": "cloudflare.url_rewrite_rules",
+            "request_header_rules": "cloudflare.request_header_rules",
+            "response_header_rules": "cloudflare.response_header_rules",
+            "config_rules": "cloudflare.config_rules",
+            "origin_rules": "cloudflare.origin_rules",
+            "cache_rules": "cloudflare.cache_rules",
+            "compression_rules": "cloudflare.compression_rules",
+            "custom_error_rules": "cloudflare.custom_error_rules",
+            "waf_custom_rules": "cloudflare.waf_custom_rules",
+            "waf_managed_rules": "cloudflare.waf_managed_rules",
+            "rate_limiting_rules": "cloudflare.rate_limiting_rules",
+            "bot_fight_rules": "cloudflare.bot_fight_rules",
+            "sensitive_data_detection": "cloudflare.sensitive_data_detection",
+            "http_ddos_rules": "cloudflare.http_ddos_rules",
+            "bulk_redirect_rules": "cloudflare.bulk_redirect_rules",
+            "log_custom_fields": "cloudflare.log_custom_fields",
+            "network_ddos_rules": "cloudflare.network_ddos_rules",
+            "network_firewall_rules": "cloudflare.network_firewall_rules",
+            "network_firewall_managed": "cloudflare.network_firewall_managed",
+            "network_firewall_ratelimit": "cloudflare.network_firewall_ratelimit",
+            "network_firewall_ids": "cloudflare.network_firewall_ids",
+            "url_normalization": "cloudflare.url_normalization",
             # Non-phase sections
-            "custom_rulesets": "custom_rulesets",
-            "lists": "lists",
-            "page_shield_policies": "page_shield_policies",
+            "custom_rulesets": "cloudflare.custom_rulesets",
+            "lists": "cloudflare.lists",
+            "page_shield_policies": "cloudflare.page_shield_policies",
             # Settings (drop cloudflare_ prefix)
-            "bot_management": "cloudflare_bot_management",
-            "zone_security": "cloudflare_zone_security",
-            "leaked_credential_check": "cloudflare_leaked_credential_check",
-            "content_scanning": "cloudflare_content_scanning",
+            "bot_management": "cloudflare.bot_management",
+            "zone_security": "cloudflare.zone_security",
+            "leaked_credential_check": "cloudflare.leaked_credential_check",
+            "content_scanning": "cloudflare.content_scanning",
             # Exception: url_normalization_settings (because url_normalization is a phase)
-            "url_normalization_settings": "cloudflare_url_normalization",
+            "url_normalization_settings": "cloudflare.url_normalization_settings",
         }
 
         assert ns == expected, f"Mismatch in namespace mapping:\nExpected: {expected}\nGot: {ns}"
@@ -80,12 +80,12 @@ class TestCloudflareNamespace:
         normalized = normalize_zone_format(nested)
 
         # Should flatten to canonical keys
-        assert "waf_custom_rules" in normalized
-        assert normalized["waf_custom_rules"][0]["ref"] == "test-rule"
-        assert "cloudflare_bot_management" in normalized
-        assert normalized["cloudflare_bot_management"]["fight_mode"] is True
-        assert "cloudflare_url_normalization" in normalized
-        assert normalized["cloudflare_url_normalization"]["scope"] == "incoming"
+        assert "cloudflare.waf_custom_rules" in normalized
+        assert normalized["cloudflare.waf_custom_rules"][0]["ref"] == "test-rule"
+        assert "cloudflare.bot_management" in normalized
+        assert normalized["cloudflare.bot_management"]["fight_mode"] is True
+        assert "cloudflare.url_normalization_settings" in normalized
+        assert normalized["cloudflare.url_normalization_settings"]["scope"] == "incoming"
 
     def test_normalize_zone_format_nested_with_lists(self) -> None:
         """Nested zone format with lists and custom_rulesets."""
@@ -115,5 +115,5 @@ class TestCloudflareNamespace:
         # Flat keys should be present
         assert "lists" in normalized
         assert normalized["lists"][0]["name"] == "test_list"
-        assert "page_shield_policies" in normalized
-        assert normalized["page_shield_policies"][0]["description"] == "Test CSP"
+        assert "cloudflare.page_shield_policies" in normalized
+        assert normalized["cloudflare.page_shield_policies"][0]["description"] == "Test CSP"

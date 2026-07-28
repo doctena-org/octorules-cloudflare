@@ -62,7 +62,10 @@ def _cf_prepare_rule(rule: dict, phase: Phase) -> dict:
 # Cloudflare phase definitions — registered with octorules core at import.
 # ---------------------------------------------------------------------------
 
-# (friendly_name, provider_id, default_action, zone_level, account_level)
+# (member name, provider_id, default_action, zone_level, account_level)
+# The registered phase name is "cloudflare.<member>" — same spelling a zone
+# file uses inside the `cloudflare:` block, and the same one register_namespace
+# derives, so the two cannot drift apart.
 _CF_PHASE_SPECS: list[tuple] = [
     ("redirect_rules", "http_request_dynamic_redirect", "redirect", True, False),
     ("url_rewrite_rules", "http_request_transform", "rewrite", True, False),
@@ -91,7 +94,7 @@ _CF_PHASE_SPECS: list[tuple] = [
 
 _CF_PHASES: list[Phase] = [
     Phase(
-        name,
+        f"cloudflare.{name}",
         pid,
         action,
         zone_level=zl,
@@ -110,50 +113,46 @@ CF_PHASE_NAMES: frozenset[str] = frozenset(p.friendly_name for p in _CF_PHASES)
 register_phases(_CF_PHASES)
 
 # Register non-phase keys (config sections that aren't phase-based rulesets).
-for _key in ("custom_rulesets", "lists", "page_shield_policies"):
+for _key in ("custom_rulesets", "lists", "cloudflare.page_shield_policies"):
     register_non_phase_key(_key)
 
 # Register namespace for nested zone-file format (cloudflare: block).
 # Maps bare nested key names to canonical flat keys.
 from octorules.phases import register_namespace  # noqa: E402
 
-_CLOUDFLARE_NAMESPACE_MAPPING = {
-    # Phases (already bare — no transformation needed)
-    "redirect_rules": "redirect_rules",
-    "url_rewrite_rules": "url_rewrite_rules",
-    "request_header_rules": "request_header_rules",
-    "response_header_rules": "response_header_rules",
-    "config_rules": "config_rules",
-    "origin_rules": "origin_rules",
-    "cache_rules": "cache_rules",
-    "compression_rules": "compression_rules",
-    "custom_error_rules": "custom_error_rules",
-    "waf_custom_rules": "waf_custom_rules",
-    "waf_managed_rules": "waf_managed_rules",
-    "rate_limiting_rules": "rate_limiting_rules",
-    "bot_fight_rules": "bot_fight_rules",
-    "sensitive_data_detection": "sensitive_data_detection",
-    "http_ddos_rules": "http_ddos_rules",
-    "bulk_redirect_rules": "bulk_redirect_rules",
-    "log_custom_fields": "log_custom_fields",
-    "network_ddos_rules": "network_ddos_rules",
-    "network_firewall_rules": "network_firewall_rules",
-    "network_firewall_managed": "network_firewall_managed",
-    "network_firewall_ratelimit": "network_firewall_ratelimit",
-    "network_firewall_ids": "network_firewall_ids",
-    "url_normalization": "url_normalization",
-    # Non-phase sections
-    "custom_rulesets": "custom_rulesets",
-    "lists": "lists",
-    "page_shield_policies": "page_shield_policies",
-    # Settings (drop cloudflare_ prefix)
-    "bot_management": "cloudflare_bot_management",
-    "zone_security": "cloudflare_zone_security",
-    "leaked_credential_check": "cloudflare_leaked_credential_check",
-    "content_scanning": "cloudflare_content_scanning",
-    # EXCEPTION: url_normalization_settings (because url_normalization is a phase)
-    "url_normalization_settings": "cloudflare_url_normalization",
-}
+_CLOUDFLARE_NAMESPACE_MAPPING: tuple[str, ...] = (
+    "redirect_rules",
+    "url_rewrite_rules",
+    "request_header_rules",
+    "response_header_rules",
+    "config_rules",
+    "origin_rules",
+    "cache_rules",
+    "compression_rules",
+    "custom_error_rules",
+    "waf_custom_rules",
+    "waf_managed_rules",
+    "rate_limiting_rules",
+    "bot_fight_rules",
+    "sensitive_data_detection",
+    "http_ddos_rules",
+    "bulk_redirect_rules",
+    "log_custom_fields",
+    "network_ddos_rules",
+    "network_firewall_rules",
+    "network_firewall_managed",
+    "network_firewall_ratelimit",
+    "network_firewall_ids",
+    "url_normalization",
+    "custom_rulesets",
+    "lists",
+    "page_shield_policies",
+    "bot_management",
+    "zone_security",
+    "leaked_credential_check",
+    "content_scanning",
+    "url_normalization_settings",
+)
 register_namespace("cloudflare", _CLOUDFLARE_NAMESPACE_MAPPING)
 
 # Auto-register CF-specific lint rules and the lint plugin.
@@ -170,13 +169,13 @@ from octorules_cloudflare.audit import register_cloudflare_audit  # noqa: E402
 register_cloudflare_audit()
 
 # Register bot management extension hooks.
-register_non_phase_key("cloudflare_bot_management")
+register_non_phase_key("cloudflare.bot_management")
 from octorules_cloudflare._bot_management import register_bot_management  # noqa: E402
 
 register_bot_management()
 
 # Register URL normalization extension hooks.
-register_non_phase_key("cloudflare_url_normalization")
+register_non_phase_key("cloudflare.url_normalization_settings")
 from octorules_cloudflare._url_normalization import (  # noqa: E402
     register_url_normalization,
 )
@@ -184,13 +183,13 @@ from octorules_cloudflare._url_normalization import (  # noqa: E402
 register_url_normalization()
 
 # Register zone security settings extension hooks.
-register_non_phase_key("cloudflare_zone_security")
+register_non_phase_key("cloudflare.zone_security")
 from octorules_cloudflare._zone_security import register_zone_security  # noqa: E402
 
 register_zone_security()
 
 # Register leaked credential check extension hooks.
-register_non_phase_key("cloudflare_leaked_credential_check")
+register_non_phase_key("cloudflare.leaked_credential_check")
 from octorules_cloudflare._leaked_credentials import (  # noqa: E402
     register_leaked_credentials,
 )
@@ -198,7 +197,7 @@ from octorules_cloudflare._leaked_credentials import (  # noqa: E402
 register_leaked_credentials()
 
 # Register content scanning extension hooks.
-register_non_phase_key("cloudflare_content_scanning")
+register_non_phase_key("cloudflare.content_scanning")
 from octorules_cloudflare._content_scanning import register_content_scanning  # noqa: E402
 
 register_content_scanning()

@@ -10,7 +10,7 @@ from octorules_cloudflare.linter.ast_linter import (
 )
 
 
-def _lint(expression, phase_name="waf_custom_rules", ref="test"):
+def _lint(expression, phase_name="cloudflare.waf_custom_rules", ref="test"):
     rule = {"ref": ref, "expression": expression}
     phase = PHASE_BY_NAME[phase_name]
     ctx = LintContext()
@@ -126,7 +126,7 @@ class TestValueConstraints:
         # Integer 200 belongs to http.response.code, not cf.waf.score
         ctx = _lint(
             "cf.waf.score gt 50 and http.response.code eq 200",
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         g005 = [r for r in ctx.results if r.rule_id == "CF524"]
         assert len(g005) == 0
@@ -139,11 +139,11 @@ class TestValueConstraints:
         assert "CF524" not in _ids(ctx2)
 
     def test_cf525_invalid_response_code(self):
-        ctx = _lint("http.response.code eq 999", "response_header_rules")
+        ctx = _lint("http.response.code eq 999", "cloudflare.response_header_rules")
         assert "CF525" in _ids(ctx)
 
     def test_cf525_valid_response_code(self):
-        ctx = _lint("http.response.code eq 200", "response_header_rules")
+        ctx = _lint("http.response.code eq 200", "cloudflare.response_header_rules")
         assert "CF525" not in _ids(ctx)
 
     def test_cf527_extension_with_dot(self):
@@ -379,14 +379,14 @@ class TestFunctionConstraints:
 class TestNoExpression:
     def test_no_crash_on_missing_expression(self):
         rule = {"ref": "test"}
-        phase = PHASE_BY_NAME["waf_custom_rules"]
+        phase = PHASE_BY_NAME["cloudflare.waf_custom_rules"]
         ctx = LintContext()
         lint_expressions(rule, phase, ctx)
         assert len(ctx.results) == 0
 
     def test_no_crash_on_non_string_expression(self):
         rule = {"ref": "test", "expression": 42}
-        phase = PHASE_BY_NAME["waf_custom_rules"]
+        phase = PHASE_BY_NAME["cloudflare.waf_custom_rules"]
         ctx = LintContext()
         lint_expressions(rule, phase, ctx)
         assert len(ctx.results) == 0
@@ -705,47 +705,47 @@ class TestE003ReplaceLimits:
     def test_cf302_regex_replace_twice(self):
         ctx = _lint(
             'regex_replace(http.host, "a", "b") eq regex_replace(http.host, "c", "d")',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF302" in _ids(ctx)
 
     def test_cf302_wildcard_replace_twice(self):
         ctx = _lint(
             'wildcard_replace(http.host, "*a*", "b") eq wildcard_replace(http.host, "*c*", "d")',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF302" in _ids(ctx)
 
     def test_cf302_both_present(self):
         ctx = _lint(
             'regex_replace(http.host, "a", "b") eq wildcard_replace(http.host, "*c*", "d")',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF302" in _ids(ctx)
 
     def test_cf302_single_ok(self):
         ctx = _lint(
             'regex_replace(http.host, "a", "b") eq "c"',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF302" not in _ids(ctx)
 
 
 class TestE002PhaseRestrictions:
     def test_cf301_regex_replace_in_waf(self):
-        ctx = _lint('regex_replace(http.host, "a", "b") eq "c"', "waf_custom_rules")
+        ctx = _lint('regex_replace(http.host, "a", "b") eq "c"', "cloudflare.waf_custom_rules")
         assert "CF301" in _ids(ctx)
 
     def test_cf301_regex_replace_in_transform_ok(self):
-        ctx = _lint('regex_replace(http.host, "a", "b") eq "c"', "url_rewrite_rules")
+        ctx = _lint('regex_replace(http.host, "a", "b") eq "c"', "cloudflare.url_rewrite_rules")
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_sha256_in_waf(self):
-        ctx = _lint('sha256(http.host) eq "abc"', "waf_custom_rules")
+        ctx = _lint('sha256(http.host) eq "abc"', "cloudflare.waf_custom_rules")
         assert "CF301" in _ids(ctx)
 
     def test_cf301_uuidv4_in_transform_ok(self):
-        ctx = _lint('uuidv4() eq "abc"', "url_rewrite_rules")
+        ctx = _lint('uuidv4() eq "abc"', "cloudflare.url_rewrite_rules")
         assert "CF301" not in _ids(ctx)
 
 
@@ -778,7 +778,7 @@ class TestG006PerField:
         # cf.threat_score value 50 should NOT trigger CF525
         ctx = _lint(
             "http.response.code eq 200 and cf.threat_score gt 50",
-            "response_header_rules",
+            "cloudflare.response_header_rules",
         )
         g006 = [r for r in ctx.results if r.rule_id == "CF525"]
         assert len(g006) == 0
@@ -810,15 +810,15 @@ class TestO003Parens:
 
 class TestG019ReversedRange:
     def test_cf538_start_gt_end(self):
-        ctx = _lint("http.response.code in {500..200}", "response_header_rules")
+        ctx = _lint("http.response.code in {500..200}", "cloudflare.response_header_rules")
         assert "CF538" in _ids(ctx)
 
     def test_cf538_valid_range_ok(self):
-        ctx = _lint("http.response.code in {200..299}", "response_header_rules")
+        ctx = _lint("http.response.code in {200..299}", "cloudflare.response_header_rules")
         assert "CF538" not in _ids(ctx)
 
     def test_cf538_equal_range_ok(self):
-        ctx = _lint("http.response.code in {200..200}", "response_header_rules")
+        ctx = _lint("http.response.code in {200..200}", "cloudflare.response_header_rules")
         assert "CF538" not in _ids(ctx)
 
 
@@ -843,11 +843,11 @@ class TestH003RegexCount:
 
 class TestE004EncodeBase64Flags:
     def test_cf303_invalid_flag(self):
-        ctx = _lint('encode_base64(http.host, "x") eq "abc"', "url_rewrite_rules")
+        ctx = _lint('encode_base64(http.host, "x") eq "abc"', "cloudflare.url_rewrite_rules")
         assert "CF303" in _ids(ctx)
 
     def test_cf303_valid_flag(self):
-        ctx = _lint('encode_base64(http.host, "u") eq "abc"', "url_rewrite_rules")
+        ctx = _lint('encode_base64(http.host, "u") eq "abc"', "cloudflare.url_rewrite_rules")
         assert "CF303" not in _ids(ctx)
 
 
@@ -865,14 +865,14 @@ class TestE006WildcardReplaceFlags:
     def test_cf305_invalid_flag(self):
         ctx = _lint(
             'wildcard_replace(http.host, "*.example.com", "${1}.cdn.com", "x") eq "a"',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF305" in _ids(ctx)
 
     def test_cf305_valid_flag(self):
         ctx = _lint(
             'wildcard_replace(http.host, "*.example.com", "${1}.cdn.com", "s") eq "a"',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF305" not in _ids(ctx)
 
@@ -913,14 +913,14 @@ class TestG022RemoveQueryArgs:
     def test_cf541_wrong_field(self):
         ctx = _lint(
             'remove_query_args(http.host, "key") eq "abc"',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF541" in _ids(ctx)
 
     def test_cf541_correct_field(self):
         ctx = _lint(
             'remove_query_args(http.request.uri.query, "key") eq "abc"',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF541" not in _ids(ctx)
 
@@ -976,7 +976,7 @@ class TestA001ParseErrors:
             '(http.host eq "dev.example.com" and '
             'not http.request.uri.path contains "." and '
             'not starts_with(http.request.uri.path, "/api"))',
-            "url_rewrite_rules",
+            "cloudflare.url_rewrite_rules",
         )
         assert "CF001" not in _ids(ctx)
 
@@ -1268,30 +1268,41 @@ class TestG026BitSlice:
     """Tests for CF545 — bit_slice offset/size validation."""
 
     def test_cf545_valid_bit_slice(self):
-        ctx = _lint("bit_slice(raw.http.request.body.raw, 0, 16) eq 1234", "network_firewall_rules")
+        ctx = _lint(
+            "bit_slice(raw.http.request.body.raw, 0, 16) eq 1234",
+            "cloudflare.network_firewall_rules",
+        )
         assert "CF545" not in _ids(ctx)
 
     def test_cf545_offset_too_large(self):
         ctx = _lint(
-            "bit_slice(raw.http.request.body.raw, 2048, 16) eq 1234", "network_firewall_rules"
+            "bit_slice(raw.http.request.body.raw, 2048, 16) eq 1234",
+            "cloudflare.network_firewall_rules",
         )
         assert "CF545" in _ids(ctx)
         g026 = [r for r in ctx.results if r.rule_id == "CF545"]
         assert "offset" in g026[0].message
 
     def test_cf545_size_too_large(self):
-        ctx = _lint("bit_slice(raw.http.request.body.raw, 0, 64) eq 1234", "network_firewall_rules")
+        ctx = _lint(
+            "bit_slice(raw.http.request.body.raw, 0, 64) eq 1234",
+            "cloudflare.network_firewall_rules",
+        )
         assert "CF545" in _ids(ctx)
         g026 = [r for r in ctx.results if r.rule_id == "CF545"]
         assert "size" in g026[0].message
 
     def test_cf545_size_zero(self):
-        ctx = _lint("bit_slice(raw.http.request.body.raw, 0, 0) eq 1234", "network_firewall_rules")
+        ctx = _lint(
+            "bit_slice(raw.http.request.body.raw, 0, 0) eq 1234",
+            "cloudflare.network_firewall_rules",
+        )
         assert "CF545" in _ids(ctx)
 
     def test_cf545_max_valid_offset_and_size(self):
         ctx = _lint(
-            "bit_slice(raw.http.request.body.raw, 2040, 32) eq 1234", "network_firewall_rules"
+            "bit_slice(raw.http.request.body.raw, 2040, 32) eq 1234",
+            "cloudflare.network_firewall_rules",
         )
         assert "CF545" not in _ids(ctx)
 
@@ -1362,59 +1373,68 @@ class TestFunctionPhaseRestrictions:
     """Tests for function phase restrictions added in coverage audit."""
 
     def test_cf301_split_in_wrong_phase(self):
-        ctx = _lint('split(http.cookie, ";", 10)[0] eq "session"', "waf_custom_rules")
+        ctx = _lint('split(http.cookie, ";", 10)[0] eq "session"', "cloudflare.waf_custom_rules")
         assert "CF301" in _ids(ctx)
 
     def test_cf301_split_in_correct_phase(self):
-        ctx = _lint('split(http.cookie, ";", 10)[0] eq "session"', "response_header_rules")
+        ctx = _lint(
+            'split(http.cookie, ";", 10)[0] eq "session"', "cloudflare.response_header_rules"
+        )
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_split_in_custom_error_phase(self):
-        ctx = _lint('split(http.cookie, ";", 10)[0] eq "session"', "custom_error_rules")
+        ctx = _lint('split(http.cookie, ";", 10)[0] eq "session"', "cloudflare.custom_error_rules")
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_join_in_wrong_phase(self):
-        ctx = _lint('join(http.request.headers.names, ",") eq "a,b"', "redirect_rules")
+        ctx = _lint('join(http.request.headers.names, ",") eq "a,b"', "cloudflare.redirect_rules")
         assert "CF301" in _ids(ctx)
 
     def test_cf301_join_in_correct_phase(self):
-        ctx = _lint('join(http.request.headers.names, ",") eq "a,b"', "url_rewrite_rules")
+        ctx = _lint(
+            'join(http.request.headers.names, ",") eq "a,b"', "cloudflare.url_rewrite_rules"
+        )
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_cidr_in_wrong_phase(self):
-        ctx = _lint("cidr(ip.src, 24, 0) in {192.168.0.0/24}", "redirect_rules")
+        ctx = _lint("cidr(ip.src, 24, 0) in {192.168.0.0/24}", "cloudflare.redirect_rules")
         assert "CF301" in _ids(ctx)
 
     def test_cf301_cidr_in_correct_phase(self):
-        ctx = _lint("cidr(ip.src, 24, 0) in {192.168.0.0/24}", "waf_custom_rules")
+        ctx = _lint("cidr(ip.src, 24, 0) in {192.168.0.0/24}", "cloudflare.waf_custom_rules")
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_cidr_in_rate_limiting(self):
-        ctx = _lint("cidr(ip.src, 24, 0) in {192.168.0.0/24}", "rate_limiting_rules")
+        ctx = _lint("cidr(ip.src, 24, 0) in {192.168.0.0/24}", "cloudflare.rate_limiting_rules")
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_bit_slice_in_wrong_phase(self):
-        ctx = _lint("bit_slice(raw.http.request.body.raw, 0, 16) eq 1234", "waf_custom_rules")
+        ctx = _lint(
+            "bit_slice(raw.http.request.body.raw, 0, 16) eq 1234", "cloudflare.waf_custom_rules"
+        )
         assert "CF301" in _ids(ctx)
 
     def test_cf301_bit_slice_in_correct_phase(self):
-        ctx = _lint("bit_slice(raw.http.request.body.raw, 0, 16) eq 1234", "network_firewall_rules")
+        ctx = _lint(
+            "bit_slice(raw.http.request.body.raw, 0, 16) eq 1234",
+            "cloudflare.network_firewall_rules",
+        )
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_decode_base64_in_wrong_phase(self):
-        ctx = _lint('decode_base64(http.cookie) eq "test"', "redirect_rules")
+        ctx = _lint('decode_base64(http.cookie) eq "test"', "cloudflare.redirect_rules")
         assert "CF301" in _ids(ctx)
 
     def test_cf301_decode_base64_in_transform_phase(self):
-        ctx = _lint('decode_base64(http.cookie) eq "test"', "request_header_rules")
+        ctx = _lint('decode_base64(http.cookie) eq "test"', "cloudflare.request_header_rules")
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_decode_base64_in_waf_phase(self):
-        ctx = _lint('decode_base64(http.cookie) eq "test"', "waf_custom_rules")
+        ctx = _lint('decode_base64(http.cookie) eq "test"', "cloudflare.waf_custom_rules")
         assert "CF301" not in _ids(ctx)
 
     def test_cf301_decode_base64_in_rate_limiting(self):
-        ctx = _lint('decode_base64(http.cookie) eq "test"', "rate_limiting_rules")
+        ctx = _lint('decode_base64(http.cookie) eq "test"', "cloudflare.rate_limiting_rules")
         assert "CF301" not in _ids(ctx)
 
 
@@ -1424,14 +1444,14 @@ class TestFunctionPlanRestrictions:
     def test_cf021_sha256_requires_enterprise(self):
         ctx = _lint(
             'sha256(http.request.body.raw) eq "abc"',
-            "request_header_rules",
+            "cloudflare.request_header_rules",
         )
         # Default plan_tier is 'enterprise', so should not fire
         assert "CF021" not in [r.rule_id for r in ctx.results if "sha256" in r.message]
 
     def test_cf021_sha256_on_free_plan(self):
         rule = {"ref": "test", "expression": 'sha256(http.request.body.raw) eq "abc"'}
-        phase = PHASE_BY_NAME["request_header_rules"]
+        phase = PHASE_BY_NAME["cloudflare.request_header_rules"]
         ctx = LintContext(plan_tier="free")
         lint_expressions(rule, phase, ctx)
         b003 = [r for r in ctx.results if r.rule_id == "CF021" and "sha256" in r.message]
@@ -1441,7 +1461,7 @@ class TestFunctionPlanRestrictions:
     def test_cf021_is_timed_hmac_requires_pro(self):
         expr = 'is_timed_hmac_valid_v0(http.request.uri.path, "secret", 300, 0)'
         rule = {"ref": "test", "expression": expr}
-        phase = PHASE_BY_NAME["waf_custom_rules"]
+        phase = PHASE_BY_NAME["cloudflare.waf_custom_rules"]
         ctx = LintContext(plan_tier="free")
         lint_expressions(rule, phase, ctx)
         b003 = [
@@ -1453,7 +1473,7 @@ class TestFunctionPlanRestrictions:
     def test_cf021_is_timed_hmac_on_pro_ok(self):
         expr = 'is_timed_hmac_valid_v0(http.request.uri.path, "secret", 300, 0)'
         rule = {"ref": "test", "expression": expr}
-        phase = PHASE_BY_NAME["waf_custom_rules"]
+        phase = PHASE_BY_NAME["cloudflare.waf_custom_rules"]
         ctx = LintContext(plan_tier="pro")
         lint_expressions(rule, phase, ctx)
         b003 = [
@@ -1495,7 +1515,7 @@ class TestLargeExpressionStability:
         assert len(expr) > 10_000, f"Expression too short: {len(expr)} bytes"
 
         rule = {"ref": "big-rule", "expression": expr}
-        phase = PHASE_BY_NAME["waf_custom_rules"]
+        phase = PHASE_BY_NAME["cloudflare.waf_custom_rules"]
         ctx = LintContext()
 
         start = time.monotonic()

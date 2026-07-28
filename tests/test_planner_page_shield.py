@@ -27,9 +27,9 @@ from octorules_cloudflare.page_shield import (
     validate_page_shield_policy,
 )
 
-REDIRECT_PHASE = get_phase("redirect_rules")
-CACHE_PHASE = get_phase("cache_rules")
-WAF_PHASE = get_phase("waf_custom_rules")
+REDIRECT_PHASE = get_phase("cloudflare.redirect_rules")
+CACHE_PHASE = get_phase("cloudflare.cache_rules")
+WAF_PHASE = get_phase("cloudflare.waf_custom_rules")
 
 
 class TestPageShieldPolicyPlan:
@@ -489,10 +489,10 @@ class TestWarnUnknownPhaseKeysPageShield:
     """Test that page_shield_policies doesn't trigger unknown phase warning."""
 
     def test_page_shield_policies_not_warned(self, caplog):
-        rules_data = {"redirect_rules": [], "page_shield_policies": []}
+        rules_data = {"cloudflare.redirect_rules": [], "cloudflare.page_shield_policies": []}
         with caplog.at_level(logging.WARNING, logger="octorules"):
             check_zone_sections(rules_data, "example.com")
-        assert "page_shield_policies" not in caplog.text
+        assert "cloudflare.page_shield_policies" not in caplog.text
 
 
 class TestComputeChecksumWithPageShieldPolicies:
@@ -748,7 +748,7 @@ class TestCacheVaryRoundTrip:
             "action": "set_cache_settings",
             "action_parameters": {"cache": True, "vary": dict(self._VARY)},
         }
-        return prepare_desired_rules([rule], get_phase("cache_rules"))[0]
+        return prepare_desired_rules([rule], get_phase("cloudflare.cache_rules"))[0]
 
     def test_survives_prepare(self):
         assert self._prepared()["action_parameters"]["vary"] == self._VARY
@@ -782,7 +782,7 @@ class TestCacheVaryRoundTrip:
         from octorules.dumper import dump_zone_rules
         from octorules.phases import get_phase
 
-        pid = get_phase("cache_rules").provider_id
+        pid = get_phase("cloudflare.cache_rules").provider_id
         out = dump_zone_rules(
             "example.com", {pid: [self._prepared() | {"enabled": True}]}, tmp_path
         )

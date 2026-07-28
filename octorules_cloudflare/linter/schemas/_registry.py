@@ -20,11 +20,11 @@ _OVERLAY_PATH = _SCHEMAS_DIR / "overlay.toml"
 # expression bridge (scheme selection).
 MAGIC_FIREWALL_PHASES = frozenset(
     {
-        "network_ddos_rules",
-        "network_firewall_rules",
-        "network_firewall_managed",
-        "network_firewall_ratelimit",
-        "network_firewall_ids",
+        "cloudflare.network_ddos_rules",
+        "cloudflare.network_firewall_rules",
+        "cloudflare.network_firewall_managed",
+        "cloudflare.network_firewall_ratelimit",
+        "cloudflare.network_firewall_ids",
     }
 )
 

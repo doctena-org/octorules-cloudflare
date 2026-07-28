@@ -24,19 +24,19 @@ RULE_IDS = frozenset({"CF019", "CF020", "CF021"})
 # Request-only phases (where response fields are NOT available)
 _REQUEST_ONLY_PHASES = frozenset(
     {
-        "redirect_rules",
-        "url_rewrite_rules",
-        "request_header_rules",
-        "config_rules",
-        "origin_rules",
-        "cache_rules",
-        "waf_custom_rules",
-        "waf_managed_rules",
-        "rate_limiting_rules",
-        "bot_fight_rules",
-        "http_ddos_rules",
-        "bulk_redirect_rules",
-        "url_normalization",
+        "cloudflare.redirect_rules",
+        "cloudflare.url_rewrite_rules",
+        "cloudflare.request_header_rules",
+        "cloudflare.config_rules",
+        "cloudflare.origin_rules",
+        "cloudflare.cache_rules",
+        "cloudflare.waf_custom_rules",
+        "cloudflare.waf_managed_rules",
+        "cloudflare.rate_limiting_rules",
+        "cloudflare.bot_fight_rules",
+        "cloudflare.http_ddos_rules",
+        "cloudflare.bulk_redirect_rules",
+        "cloudflare.url_normalization",
     }
 )
 

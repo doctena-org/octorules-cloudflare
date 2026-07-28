@@ -13,7 +13,7 @@ from octorules_cloudflare.page_shield import (
 def _dump_with_ps(zone_name, rules, tmp_path, policies):
     """Helper: clean policies and pass as extra_sections to dump_zone_rules."""
     cleaned = _clean_page_shield_policies(policies)
-    extra = {"page_shield_policies": cleaned} if cleaned else None
+    extra = {"cloudflare.page_shield_policies": cleaned} if cleaned else None
     return dump_zone_rules(zone_name, rules, tmp_path, extra_sections=extra)
 
 
@@ -42,9 +42,9 @@ class TestDumpPageShieldPolicies:
         result = _dump_with_ps("example.com", {}, tmp_path, policies)
         assert result is not None
         data = _load_flat(result)
-        assert "page_shield_policies" in data
-        assert len(data["page_shield_policies"]) == 1
-        policy = data["page_shield_policies"][0]
+        assert "cloudflare.page_shield_policies" in data
+        assert len(data["cloudflare.page_shield_policies"]) == 1
+        policy = data["cloudflare.page_shield_policies"][0]
         assert policy["description"] == "CSP on all example.com"
         assert policy["action"] == "allow"
         assert policy["expression"] == "true"
@@ -65,7 +65,7 @@ class TestDumpPageShieldPolicies:
         ]
         result = _dump_with_ps("example.com", {}, tmp_path, policies)
         data = _load_flat(result)
-        policy = data["page_shield_policies"][0]
+        policy = data["cloudflare.page_shield_policies"][0]
         assert "id" not in policy
         assert "last_updated" not in policy
         assert policy["description"] == "Test"
@@ -89,18 +89,18 @@ class TestDumpPageShieldPolicies:
         ]
         result = _dump_with_ps("example.com", {}, tmp_path, policies)
         data = _load_flat(result)
-        assert data["page_shield_policies"][0]["description"] == "Alpha"
-        assert data["page_shield_policies"][1]["description"] == "Zebra"
+        assert data["cloudflare.page_shield_policies"][0]["description"] == "Alpha"
+        assert data["cloudflare.page_shield_policies"][1]["description"] == "Zebra"
 
     def test_dump_page_shield_policies_none_no_section(self, tmp_path):
         result = dump_zone_rules("example.com", {}, tmp_path)
         data = _load_flat(result)
-        assert "page_shield_policies" not in (data or {})
+        assert "cloudflare.page_shield_policies" not in (data or {})
 
     def test_dump_page_shield_policies_empty_no_section(self, tmp_path):
         result = dump_zone_rules("example.com", {}, tmp_path, extra_sections={})
         data = _load_flat(result)
-        assert "page_shield_policies" not in (data or {})
+        assert "cloudflare.page_shield_policies" not in (data or {})
 
     def test_dump_with_phase_rules_and_policies(self, tmp_path):
         rules = {
@@ -119,8 +119,8 @@ class TestDumpPageShieldPolicies:
         ]
         result = _dump_with_ps("example.com", rules, tmp_path, policies)
         data = _load_flat(result)
-        assert "waf_custom_rules" in data
-        assert "page_shield_policies" in data
+        assert "cloudflare.waf_custom_rules" in data
+        assert "cloudflare.page_shield_policies" in data
 
     def test_dump_page_shield_multiline_value_block_style(self, tmp_path):
         policies = [
@@ -181,7 +181,7 @@ class TestDumpPageShieldPolicies:
         assert "|" in text
         # Should not be on a single line
         data = normalize_zone_format(yaml.safe_load(text), source="dumped")
-        loaded_value = data["page_shield_policies"][0]["value"]
+        loaded_value = data["cloudflare.page_shield_policies"][0]["value"]
         # Loaded multi-line value should normalize back to original
         from octorules.expression import normalize_expression
 
@@ -202,7 +202,7 @@ class TestDumpPageShieldPolicies:
         ]
         result = _dump_with_ps("example.com", {}, tmp_path, cf_policies)
         data = _load_flat(result)
-        dumped_policies = data["page_shield_policies"]
+        dumped_policies = data["cloudflare.page_shield_policies"]
         plans = diff_page_shield_policies(dumped_policies, cf_policies)
         assert not any(p.has_changes for p in plans)
 
@@ -230,6 +230,6 @@ class TestDumpPageShieldPolicies:
         ]
         result = _dump_with_ps("example.com", {}, tmp_path, cf_policies)
         data = _load_flat(result)
-        dumped_policies = data["page_shield_policies"]
+        dumped_policies = data["cloudflare.page_shield_policies"]
         plans = diff_page_shield_policies(dumped_policies, cf_policies)
         assert not any(p.has_changes for p in plans)

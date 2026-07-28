@@ -138,7 +138,7 @@ def diff_bot_management(current: dict, desired: dict) -> BotManagementPlan:
 # ---------------------------------------------------------------------------
 # Extension hooks
 # ---------------------------------------------------------------------------
-_prefetch_bot_management = make_prefetch_hook("cloudflare_bot_management", "get_bot_management")
+_prefetch_bot_management = make_prefetch_hook("cloudflare.bot_management", "get_bot_management")
 
 
 def _finalize_bot_management(zp, all_desired, scope, provider, ctx):
@@ -149,9 +149,9 @@ def _finalize_bot_management(zp, all_desired, scope, provider, ctx):
     current, desired = ctx
     plan = diff_bot_management(current, desired)
     if plan.unsupported:
-        warn_unsupported("cloudflare_bot_management", scope, plan.unsupported)
+        warn_unsupported("cloudflare.bot_management", scope, plan.unsupported)
     if plan.has_changes or plan.unsupported:
-        zp.extension_plans.setdefault("cloudflare_bot_management", []).append(plan)
+        zp.extension_plans.setdefault("cloudflare.bot_management", []).append(plan)
 
 
 def _apply_bot_management(zp, plans, scope, provider):
@@ -166,16 +166,16 @@ def _apply_bot_management(zp, plans, scope, provider):
         if desired_values:
             provider.update_bot_management(scope, desired_values)
             verify_settings_applied(
-                provider.get_bot_management, scope, desired_values, "cloudflare_bot_management"
+                provider.get_bot_management, scope, desired_values, "cloudflare.bot_management"
             )
-            synced.append("cloudflare_bot_management")
+            synced.append("cloudflare.bot_management")
 
     return synced, None
 
 
 def _validate_bot_management(desired, zone_name, errors, lines):
     """Validate cloudflare_bot_management offline."""
-    settings = desired.get("cloudflare_bot_management")
+    settings = desired.get("cloudflare.bot_management")
     if not isinstance(settings, dict):
         return
 
@@ -211,7 +211,7 @@ def _validate_bot_management(desired, zone_name, errors, lines):
         )
 
 
-_dump_bot_management = make_dump_hook("cloudflare_bot_management", "get_bot_management")
+_dump_bot_management = make_dump_hook("cloudflare.bot_management", "get_bot_management")
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ class BotManagementFormatter(SettingsFormatter):
 class BotManagementExtension(ProviderExtension):
     """Zone-level bot management settings."""
 
-    section = "cloudflare_bot_management"
+    section = "cloudflare.bot_management"
     formatter = BotManagementFormatter()
 
     def prefetch(self, desired, scope, provider):
@@ -271,6 +271,6 @@ def register_bot_management() -> None:
     )
 
     register_plan_zone_hook(_prefetch_bot_management, _finalize_bot_management)
-    register_apply_extension("cloudflare_bot_management", _apply_bot_management)
-    register_format_extension("cloudflare_bot_management", BotManagementFormatter())
+    register_apply_extension("cloudflare.bot_management", _apply_bot_management)
+    register_format_extension("cloudflare.bot_management", BotManagementFormatter())
     register_validate_extension(_validate_bot_management)

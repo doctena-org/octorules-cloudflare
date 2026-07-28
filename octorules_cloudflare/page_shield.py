@@ -165,7 +165,7 @@ def _make_page_shield_phase(description: str) -> Phase:
     return make_synthetic_phase(
         "page_shield",
         description,
-        "page_shield_policies",
+        "cloudflare.page_shield_policies",
         zone_level=True,
         account_level=False,
     )
@@ -340,7 +340,7 @@ def _prefetch_page_shield(
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    ps_desired = all_desired.get("page_shield_policies")
+    ps_desired = all_desired.get("cloudflare.page_shield_policies")
     if ps_desired is None:
         return None
     if not provider_supports(provider, SUPPORTS_PAGE_SHIELD):
@@ -383,7 +383,7 @@ def _finalize_page_shield(
         try:
             current_policies = future.result(timeout=_PREFETCH_TIMEOUT)
         except ProviderAuthError:
-            if "page_shield_policies" in all_desired:
+            if "cloudflare.page_shield_policies" in all_desired:
                 raise  # User explicitly declared this section -- permission is needed
             log.debug("Skipping page_shield_policies (no permission and not in desired config)")
             return
@@ -517,7 +517,7 @@ def _validate_page_shield(
     lines: list[str],
 ) -> None:
     """Validate page_shield_policies entries offline."""
-    ps_entries = desired.get("page_shield_policies")
+    ps_entries = desired.get("cloudflare.page_shield_policies")
     if not isinstance(ps_entries, list):
         return
     for i, entry in enumerate(ps_entries):
@@ -528,7 +528,7 @@ def _validate_page_shield(
             log.info("%s", msg)
             lines.append(msg)
         except RuleValidationError as e:
-            msg = f"  {zone_name}/page_shield_policies: {e}"
+            msg = f"  {zone_name}/cloudflare.page_shield_policies: {e}"
             errors.append(msg)
 
 
@@ -578,7 +578,7 @@ def _dump_page_shield(
         return None
     cleaned = _clean_page_shield_policies(policies)
     if cleaned:
-        return {"page_shield_policies": cleaned}
+        return {"cloudflare.page_shield_policies": cleaned}
     return None
 
 
@@ -696,7 +696,7 @@ class PageShieldExtension(ProviderExtension):
     ``page_shield_policies`` while plans bucket under ``page_shield``.
     """
 
-    section = "page_shield_policies"
+    section = "cloudflare.page_shield_policies"
     name = "page_shield"
     formatter = PageShieldFormatter()
 

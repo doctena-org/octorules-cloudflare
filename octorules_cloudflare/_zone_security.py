@@ -109,7 +109,7 @@ def diff_zone_security(current: dict, desired: dict) -> ZoneSecurityPlan:
 # Extension hooks
 # ---------------------------------------------------------------------------
 _prefetch_zone_security = make_prefetch_hook(
-    "cloudflare_zone_security", "get_zone_security_settings"
+    "cloudflare.zone_security", "get_zone_security_settings"
 )
 
 
@@ -121,9 +121,9 @@ def _finalize_zone_security(zp, all_desired, scope, provider, ctx):
     current, desired = ctx
     plan = diff_zone_security(current, desired)
     if plan.unsupported:
-        warn_unsupported("cloudflare_zone_security", scope, plan.unsupported)
+        warn_unsupported("cloudflare.zone_security", scope, plan.unsupported)
     if plan.has_changes or plan.unsupported:
-        zp.extension_plans.setdefault("cloudflare_zone_security", []).append(plan)
+        zp.extension_plans.setdefault("cloudflare.zone_security", []).append(plan)
 
 
 def _apply_zone_security(zp, plans, scope, provider):
@@ -141,16 +141,16 @@ def _apply_zone_security(zp, plans, scope, provider):
                 provider.get_zone_security_settings,
                 scope,
                 desired_values,
-                "cloudflare_zone_security",
+                "cloudflare.zone_security",
             )
-            synced.append("cloudflare_zone_security")
+            synced.append("cloudflare.zone_security")
 
     return synced, None
 
 
 def _validate_zone_security(desired, zone_name, errors, lines):
     """Validate cloudflare_zone_security offline."""
-    settings = desired.get("cloudflare_zone_security")
+    settings = desired.get("cloudflare.zone_security")
     if not isinstance(settings, dict):
         return
 
@@ -183,7 +183,7 @@ def _validate_zone_security(desired, zone_name, errors, lines):
         )
 
 
-_dump_zone_security = make_dump_hook("cloudflare_zone_security", "get_zone_security_settings")
+_dump_zone_security = make_dump_hook("cloudflare.zone_security", "get_zone_security_settings")
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ class ZoneSecurityFormatter(SettingsFormatter):
 class ZoneSecurityExtension(ProviderExtension):
     """Zone security defaults."""
 
-    section = "cloudflare_zone_security"
+    section = "cloudflare.zone_security"
     formatter = ZoneSecurityFormatter()
 
     def prefetch(self, desired, scope, provider):
@@ -238,6 +238,6 @@ def register_zone_security() -> None:
     )
 
     register_plan_zone_hook(_prefetch_zone_security, _finalize_zone_security)
-    register_apply_extension("cloudflare_zone_security", _apply_zone_security)
-    register_format_extension("cloudflare_zone_security", ZoneSecurityFormatter())
+    register_apply_extension("cloudflare.zone_security", _apply_zone_security)
+    register_format_extension("cloudflare.zone_security", ZoneSecurityFormatter())
     register_validate_extension(_validate_zone_security)

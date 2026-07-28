@@ -174,7 +174,7 @@ class TestPrefetchHook:
             "scope": "incoming",
             "type": "cloudflare",
         }
-        all_desired = {"cloudflare_url_normalization": {"scope": "both"}}
+        all_desired = {"cloudflare.url_normalization_settings": {"scope": "both"}}
         result = _prefetch_url_normalization(all_desired, _scope(), provider)
         assert result is not None
         current, desired = result
@@ -186,7 +186,7 @@ class TestPrefetchHook:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderError("API down")
-        all_desired = {"cloudflare_url_normalization": {"scope": "both"}}
+        all_desired = {"cloudflare.url_normalization_settings": {"scope": "both"}}
         result = _prefetch_url_normalization(all_desired, _scope(), provider)
         current, _desired = result
         assert current == {}
@@ -197,7 +197,7 @@ class TestPrefetchHook:
 
         provider = MagicMock(spec=CloudflareProvider)
         provider.get_url_normalization.side_effect = ProviderAuthError("forbidden")
-        all_desired = {"cloudflare_url_normalization": {"scope": "both"}}
+        all_desired = {"cloudflare.url_normalization_settings": {"scope": "both"}}
         with pytest.raises(ProviderAuthError):
             _prefetch_url_normalization(all_desired, _scope(), provider)
 
@@ -215,8 +215,8 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_url_normalization(zp, {}, _scope(), MagicMock(), ctx)
-        assert "cloudflare_url_normalization" in zp.extension_plans
-        plan = zp.extension_plans["cloudflare_url_normalization"][0]
+        assert "cloudflare.url_normalization_settings" in zp.extension_plans
+        plan = zp.extension_plans["cloudflare.url_normalization_settings"][0]
         assert plan.has_changes
 
     def test_no_plan_when_no_changes(self):
@@ -228,7 +228,7 @@ class TestFinalizeHook:
         ctx = (current, desired)
 
         _finalize_url_normalization(zp, {}, _scope(), MagicMock(), ctx)
-        assert "cloudflare_url_normalization" not in zp.extension_plans
+        assert "cloudflare.url_normalization_settings" not in zp.extension_plans
 
     def test_none_ctx_is_noop(self):
         zp = MagicMock()
@@ -252,7 +252,7 @@ class TestApplyHook:
         )
         synced, error = _apply_url_normalization(zp, [plan], _scope(), provider)
         assert error is None
-        assert "cloudflare_url_normalization" in synced
+        assert "cloudflare.url_normalization_settings" in synced
         provider.update_url_normalization.assert_called_once()
         call_args = provider.update_url_normalization.call_args
         payload = call_args[0][1]
@@ -282,7 +282,7 @@ class TestApplyHook:
 class TestValidateExtension:
     def test_valid_settings(self):
         desired = {
-            "cloudflare_url_normalization": {
+            "cloudflare.url_normalization_settings": {
                 "scope": "incoming",
                 "type": "cloudflare",
             }
@@ -292,7 +292,7 @@ class TestValidateExtension:
         assert errors == []
 
     def test_invalid_scope(self):
-        desired = {"cloudflare_url_normalization": {"scope": "outgoing"}}
+        desired = {"cloudflare.url_normalization_settings": {"scope": "outgoing"}}
         errors: list[str] = []
         _validate_url_normalization(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -300,7 +300,7 @@ class TestValidateExtension:
         assert "outgoing" in errors[0]
 
     def test_invalid_type(self):
-        desired = {"cloudflare_url_normalization": {"type": "custom"}}
+        desired = {"cloudflare.url_normalization_settings": {"type": "custom"}}
         errors: list[str] = []
         _validate_url_normalization(desired, "zone", errors, [])
         assert len(errors) == 1
@@ -309,7 +309,7 @@ class TestValidateExtension:
 
     def test_multiple_errors(self):
         desired = {
-            "cloudflare_url_normalization": {
+            "cloudflare.url_normalization_settings": {
                 "scope": "outgoing",
                 "type": "custom",
             }
@@ -326,7 +326,7 @@ class TestValidateExtension:
     def test_non_dict_config_is_ok(self):
         errors: list[str] = []
         _validate_url_normalization(
-            {"cloudflare_url_normalization": "not-a-dict"}, "zone", errors, []
+            {"cloudflare.url_normalization_settings": "not-a-dict"}, "zone", errors, []
         )
         assert errors == []
 
@@ -342,8 +342,8 @@ class TestDumpExtension:
             "type": "cloudflare",
         }
         result = _dump_url_normalization(_scope(), provider)
-        assert "cloudflare_url_normalization" in result
-        assert result["cloudflare_url_normalization"]["scope"] == "incoming"
+        assert "cloudflare.url_normalization_settings" in result
+        assert result["cloudflare.url_normalization_settings"]["scope"] == "incoming"
 
     def test_dump_api_failure(self):
         from octorules.provider.exceptions import ProviderError
@@ -566,7 +566,7 @@ class TestReadBackVerification:
         with caplog.at_level(logging.WARNING, logger="octorules_cloudflare._settings_common"):
             synced, error = _apply_url_normalization(MagicMock(), [plan], _scope(), provider)
         assert error is None
-        assert synced == ["cloudflare_url_normalization"]
+        assert synced == ["cloudflare.url_normalization_settings"]
         provider.get_url_normalization.assert_called_once()
         assert "type" in caplog.text
         assert "reads back" in caplog.text
