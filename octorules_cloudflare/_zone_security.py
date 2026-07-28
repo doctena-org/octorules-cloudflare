@@ -17,6 +17,7 @@ apply_extension, format_extension, validate_extension, and dump_extension.
 import logging
 
 from octorules.extensions import (
+    ProviderExtension,
     SettingsChange,
     SettingsFormatter,
     SettingsPlan,
@@ -196,6 +197,31 @@ class ZoneSecurityFormatter(SettingsFormatter):
             plan_type=ZoneSecurityPlan,
             prefix="zone_security",
         )
+
+
+# ---------------------------------------------------------------------------
+# Extension
+# ---------------------------------------------------------------------------
+class ZoneSecurityExtension(ProviderExtension):
+    """Zone security defaults."""
+
+    section = "cloudflare_zone_security"
+    formatter = ZoneSecurityFormatter()
+
+    def prefetch(self, desired, scope, provider):
+        return _prefetch_zone_security(desired, scope, provider)
+
+    def finalize(self, zp, desired, scope, provider, ctx):
+        return _finalize_zone_security(zp, desired, scope, provider, ctx)
+
+    def apply(self, zp, plans, scope, provider):
+        return _apply_zone_security(zp, plans, scope, provider)
+
+    def dump(self, scope, provider):
+        return _dump_zone_security(scope, provider)
+
+    def validate(self, desired, zone_name, errors, lines):
+        return _validate_zone_security(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

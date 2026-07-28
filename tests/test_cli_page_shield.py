@@ -47,6 +47,8 @@ def _make_dump_mock(**overrides):
     # implementation and let it aggregate against these mocked getters.  Other
     # providers' getters no longer need stubbing: their dump code is reachable
     # only through their own provider class.
+    mock_prov._extensions = None  # let the real property build the list
+    mock_prov.extensions = CloudflareProvider.extensions.fget(mock_prov)
     mock_prov.dump_extra_sections = lambda scope: CloudflareProvider.dump_extra_sections(
         mock_prov, scope
     )

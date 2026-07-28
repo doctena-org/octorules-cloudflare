@@ -20,6 +20,7 @@ validate_extension, and dump_extension.
 import logging
 
 from octorules.extensions import (
+    ProviderExtension,
     SettingsChange,
     SettingsFormatter,
     SettingsPlan,
@@ -196,6 +197,31 @@ class ContentScanningFormatter(SettingsFormatter):
             plan_type=ContentScanningPlan,
             prefix="content_scanning",
         )
+
+
+# ---------------------------------------------------------------------------
+# Extension
+# ---------------------------------------------------------------------------
+class ContentScanningExtension(ProviderExtension):
+    """Content scanning / anti-malware settings."""
+
+    section = "cloudflare_content_scanning"
+    formatter = ContentScanningFormatter()
+
+    def prefetch(self, desired, scope, provider):
+        return _prefetch_content_scanning(desired, scope, provider)
+
+    def finalize(self, zp, desired, scope, provider, ctx):
+        return _finalize_content_scanning(zp, desired, scope, provider, ctx)
+
+    def apply(self, zp, plans, scope, provider):
+        return _apply_content_scanning(zp, plans, scope, provider)
+
+    def dump(self, scope, provider):
+        return _dump_content_scanning(scope, provider)
+
+    def validate(self, desired, zone_name, errors, lines):
+        return _validate_content_scanning(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

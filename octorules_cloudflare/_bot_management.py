@@ -12,6 +12,7 @@ settings in ``octorules_azure/_policy_settings.py``.
 import logging
 
 from octorules.extensions import (
+    ProviderExtension,
     SettingsChange,
     SettingsFormatter,
     SettingsPlan,
@@ -227,11 +228,41 @@ class BotManagementFormatter(SettingsFormatter):
 
 
 # ---------------------------------------------------------------------------
+# Extension
+# ---------------------------------------------------------------------------
+class BotManagementExtension(ProviderExtension):
+    """Zone-level bot management settings."""
+
+    section = "cloudflare_bot_management"
+    formatter = BotManagementFormatter()
+
+    def prefetch(self, desired, scope, provider):
+        return _prefetch_bot_management(desired, scope, provider)
+
+    def finalize(self, zp, desired, scope, provider, ctx):
+        return _finalize_bot_management(zp, desired, scope, provider, ctx)
+
+    def apply(self, zp, plans, scope, provider):
+        return _apply_bot_management(zp, plans, scope, provider)
+
+    def dump(self, scope, provider):
+        return _dump_bot_management(scope, provider)
+
+    def validate(self, desired, zone_name, errors, lines):
+        return _validate_bot_management(desired, zone_name, errors, lines)
+
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 @idempotent_registration
 def register_bot_management() -> None:
-    """Register all bot management hooks with the core extension system."""
+    """Register the hooks core still keeps in registries.
+
+    plan/apply/dump are reached through
+    ``CloudflareProvider.extensions``; format and validate are still
+    registry-based, so they register here until those move too.
+    """
     from octorules.extensions import (
         register_apply_extension,
         register_format_extension,

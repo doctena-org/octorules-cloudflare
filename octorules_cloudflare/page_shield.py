@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from octorules.expression import normalize_expression
 from octorules.extensions import (
+    ProviderExtension,
     make_synthetic_phase,
     register_apply_extension,
     register_format_extension,
@@ -683,6 +684,36 @@ class PageShieldFormatter:
             total_modifies += psp_modifies
 
         return total_creates, total_removes, total_modifies, 0
+
+
+# ---------------------------------------------------------------------------
+# Extension
+# ---------------------------------------------------------------------------
+class PageShieldExtension(ProviderExtension):
+    """Page Shield CSP policies.
+
+    ``section`` and ``name`` differ here: the zone-file key is
+    ``page_shield_policies`` while plans bucket under ``page_shield``.
+    """
+
+    section = "page_shield_policies"
+    name = "page_shield"
+    formatter = PageShieldFormatter()
+
+    def prefetch(self, desired, scope, provider):
+        return _prefetch_page_shield(desired, scope, provider)
+
+    def finalize(self, zp, desired, scope, provider, ctx):
+        return _finalize_page_shield(zp, desired, scope, provider, ctx)
+
+    def apply(self, zp, plans, scope, provider):
+        return _apply_page_shield(zp, plans, scope, provider)
+
+    def dump(self, scope, provider):
+        return _dump_page_shield(scope, provider)
+
+    def validate(self, desired, zone_name, errors, lines):
+        return _validate_page_shield(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

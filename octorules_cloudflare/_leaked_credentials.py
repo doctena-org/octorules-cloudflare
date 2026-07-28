@@ -21,6 +21,7 @@ validate_extension, and dump_extension.
 import logging
 
 from octorules.extensions import (
+    ProviderExtension,
     SettingsChange,
     SettingsFormatter,
     SettingsPlan,
@@ -201,6 +202,31 @@ class LeakedCredentialFormatter(SettingsFormatter):
             plan_type=LeakedCredentialPlan,
             prefix="leaked_credential_check",
         )
+
+
+# ---------------------------------------------------------------------------
+# Extension
+# ---------------------------------------------------------------------------
+class LeakedCredentialsExtension(ProviderExtension):
+    """Leaked-credential detection settings."""
+
+    section = "cloudflare_leaked_credential_check"
+    formatter = LeakedCredentialFormatter()
+
+    def prefetch(self, desired, scope, provider):
+        return _prefetch_leaked_credentials(desired, scope, provider)
+
+    def finalize(self, zp, desired, scope, provider, ctx):
+        return _finalize_leaked_credentials(zp, desired, scope, provider, ctx)
+
+    def apply(self, zp, plans, scope, provider):
+        return _apply_leaked_credentials(zp, plans, scope, provider)
+
+    def dump(self, scope, provider):
+        return _dump_leaked_credentials(scope, provider)
+
+    def validate(self, desired, zone_name, errors, lines):
+        return _validate_leaked_credentials(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------
