@@ -1,10 +1,23 @@
 """Tests that extension registration wires up correctly."""
 
 from octorules.dumper import _clean_rule
-from octorules.extensions import _apply_extensions, _format_extensions
+from octorules.extensions import _format_extensions
 from octorules.phases import get_api_fields
 
 import octorules_cloudflare  # noqa: F401 — triggers __init__.py registration
+
+
+def _plan_keys() -> set[str]:
+    """Plan keys the provider exposes.
+
+    Apply is reached through ``provider.extensions`` rather than a registry,
+    so this asserts on what core actually walks.
+    """
+    from octorules_cloudflare.provider import CloudflareProvider
+
+    inst = object.__new__(CloudflareProvider)
+    return {e.plan_key() for e in CloudflareProvider.extensions.fget(inst)}
+
 
 # --- API field strip set ---
 
@@ -60,7 +73,7 @@ def test_bot_management_format_registered():
 
 
 def test_bot_management_apply_registered():
-    assert "cloudflare.bot_management" in _apply_extensions
+    assert "cloudflare.bot_management" in _plan_keys()
 
 
 # --- URL normalization ---
@@ -71,7 +84,7 @@ def test_url_normalization_format_registered():
 
 
 def test_url_normalization_apply_registered():
-    assert "cloudflare.url_normalization_settings" in _apply_extensions
+    assert "cloudflare.url_normalization_settings" in _plan_keys()
 
 
 # --- zone security ---
@@ -82,7 +95,7 @@ def test_zone_security_format_registered():
 
 
 def test_zone_security_apply_registered():
-    assert "cloudflare.zone_security" in _apply_extensions
+    assert "cloudflare.zone_security" in _plan_keys()
 
 
 # --- leaked credential check ---
@@ -93,7 +106,7 @@ def test_leaked_credentials_format_registered():
 
 
 def test_leaked_credentials_apply_registered():
-    assert "cloudflare.leaked_credential_check" in _apply_extensions
+    assert "cloudflare.leaked_credential_check" in _plan_keys()
 
 
 # --- content scanning ---
@@ -104,4 +117,4 @@ def test_content_scanning_format_registered():
 
 
 def test_content_scanning_apply_registered():
-    assert "cloudflare.content_scanning" in _apply_extensions
+    assert "cloudflare.content_scanning" in _plan_keys()

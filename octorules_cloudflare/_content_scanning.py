@@ -231,13 +231,9 @@ class ContentScanningExtension(ProviderExtension):
 def register_content_scanning() -> None:
     """Register all content scanning hooks with the core extension system."""
     from octorules.extensions import (
-        register_apply_extension,
         register_format_extension,
-        register_plan_zone_hook,
         register_validate_extension,
     )
 
-    register_plan_zone_hook(_prefetch_content_scanning, _finalize_content_scanning)
-    register_apply_extension("cloudflare.content_scanning", _apply_content_scanning)
     register_format_extension("cloudflare.content_scanning", ContentScanningFormatter())
     register_validate_extension(_validate_content_scanning)

@@ -13,9 +13,7 @@ from octorules.expression import normalize_expression
 from octorules.extensions import (
     ProviderExtension,
     make_synthetic_phase,
-    register_apply_extension,
     register_format_extension,
-    register_plan_zone_hook,
     register_validate_extension,
 )
 from octorules.phases import Phase, get_api_fields
@@ -723,7 +721,5 @@ class PageShieldExtension(ProviderExtension):
 @idempotent_registration
 def register_page_shield() -> None:
     """Register all Page Shield hooks with the core extension system."""
-    register_plan_zone_hook(_prefetch_page_shield, _finalize_page_shield)
-    register_apply_extension("page_shield", _apply_page_shield)
     register_format_extension("page_shield", PageShieldFormatter())
     register_validate_extension(_validate_page_shield)

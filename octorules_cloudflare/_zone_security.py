@@ -231,13 +231,9 @@ class ZoneSecurityExtension(ProviderExtension):
 def register_zone_security() -> None:
     """Register all zone security hooks with the core extension system."""
     from octorules.extensions import (
-        register_apply_extension,
         register_format_extension,
-        register_plan_zone_hook,
         register_validate_extension,
     )
 
-    register_plan_zone_hook(_prefetch_zone_security, _finalize_zone_security)
-    register_apply_extension("cloudflare.zone_security", _apply_zone_security)
     register_format_extension("cloudflare.zone_security", ZoneSecurityFormatter())
     register_validate_extension(_validate_zone_security)

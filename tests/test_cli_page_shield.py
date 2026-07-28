@@ -97,6 +97,9 @@ class TestPageShieldPoliciesCLI:
         # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
         # the fail-closed capability check sees a real set.
         mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
+        # plan and apply walk provider.extensions, so bind the real list.
+        mock_prov._extensions = None
+        mock_prov.extensions = CloudflareProvider.extensions.fget(mock_prov)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
         mock_init_provs.return_value = {"cloudflare": mock_prov}
@@ -117,6 +120,9 @@ class TestPageShieldPoliciesCLI:
         # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
         # the fail-closed capability check sees a real set.
         mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
+        # plan and apply walk provider.extensions, so bind the real list.
+        mock_prov._extensions = None
+        mock_prov.extensions = CloudflareProvider.extensions.fget(mock_prov)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_init_provs.return_value = {"cloudflare": mock_prov}
 
@@ -246,6 +252,9 @@ class TestPageShieldPoliciesCLI:
         # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
         # the fail-closed capability check sees a real set.
         mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
+        # plan and apply walk provider.extensions, so bind the real list.
+        mock_prov._extensions = None
+        mock_prov.extensions = CloudflareProvider.extensions.fget(mock_prov)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = []
         mock_prov.create_page_shield_policy.return_value = {"id": "new-policy-id"}
@@ -266,6 +275,9 @@ class TestPageShieldPoliciesCLI:
         # spec makes SUPPORTS a Mock, not the real frozenset; declare it so
         # the fail-closed capability check sees a real set.
         mock_prov.SUPPORTS = frozenset({"page_shield", "lists", "custom_rulesets"})
+        # plan and apply walk provider.extensions, so bind the real list.
+        mock_prov._extensions = None
+        mock_prov.extensions = CloudflareProvider.extensions.fget(mock_prov)
         mock_prov.get_all_phase_rules.return_value = {}
         mock_prov.get_all_page_shield_policies.return_value = [
             {

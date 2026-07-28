@@ -220,13 +220,9 @@ class UrlNormalizationExtension(ProviderExtension):
 def register_url_normalization() -> None:
     """Register all URL normalization hooks with the core extension system."""
     from octorules.extensions import (
-        register_apply_extension,
         register_format_extension,
-        register_plan_zone_hook,
         register_validate_extension,
     )
 
-    register_plan_zone_hook(_prefetch_url_normalization, _finalize_url_normalization)
-    register_apply_extension("cloudflare.url_normalization_settings", _apply_url_normalization)
     register_format_extension("cloudflare.url_normalization_settings", UrlNormalizationFormatter())
     register_validate_extension(_validate_url_normalization)

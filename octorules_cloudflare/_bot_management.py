@@ -264,13 +264,9 @@ def register_bot_management() -> None:
     registry-based, so they register here until those move too.
     """
     from octorules.extensions import (
-        register_apply_extension,
         register_format_extension,
-        register_plan_zone_hook,
         register_validate_extension,
     )
 
-    register_plan_zone_hook(_prefetch_bot_management, _finalize_bot_management)
-    register_apply_extension("cloudflare.bot_management", _apply_bot_management)
     register_format_extension("cloudflare.bot_management", BotManagementFormatter())
     register_validate_extension(_validate_bot_management)

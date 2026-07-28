@@ -95,6 +95,9 @@ class CloudflareProvider:
     NAMESPACE = "cloudflare"
     SUPPORTS = frozenset({"custom_rulesets", "lists", "page_shield", "zone_discovery"})
 
+    # Built lazily by the `extensions` property.
+    _extensions: list | None = None
+
     def __init__(
         self,
         *,
@@ -110,9 +113,6 @@ class CloudflareProvider:
                 "Cloudflare provider requires a 'token'"
                 " (set 'token' in provider config or CLOUDFLARE_API_TOKEN env var)"
             )
-        # Built lazily by the `extensions` property; instantiated once per
-        # provider so an extension can hold per-zone state if it needs to.
-        self._extensions: list | None = None
         if client is not None:
             self._client = client
         else:

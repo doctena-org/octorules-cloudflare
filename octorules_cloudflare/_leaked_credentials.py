@@ -236,13 +236,9 @@ class LeakedCredentialsExtension(ProviderExtension):
 def register_leaked_credentials() -> None:
     """Register all leaked credential check hooks with the core extension system."""
     from octorules.extensions import (
-        register_apply_extension,
         register_format_extension,
-        register_plan_zone_hook,
         register_validate_extension,
     )
 
-    register_plan_zone_hook(_prefetch_leaked_credentials, _finalize_leaked_credentials)
-    register_apply_extension("cloudflare.leaked_credential_check", _apply_leaked_credentials)
     register_format_extension("cloudflare.leaked_credential_check", LeakedCredentialFormatter())
     register_validate_extension(_validate_leaked_credentials)
