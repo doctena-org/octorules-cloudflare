@@ -234,7 +234,6 @@ class BotManagementExtension(ProviderExtension):
     """Zone-level bot management settings."""
 
     section = "cloudflare.bot_management"
-    formatter = BotManagementFormatter()
 
     def prefetch(self, desired, scope, provider):
         return _prefetch_bot_management(desired, scope, provider)
@@ -247,9 +246,6 @@ class BotManagementExtension(ProviderExtension):
 
     def dump(self, scope, provider):
         return _dump_bot_management(scope, provider)
-
-    def validate(self, desired, zone_name, errors, lines):
-        return _validate_bot_management(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

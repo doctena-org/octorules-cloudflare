@@ -195,7 +195,6 @@ class UrlNormalizationExtension(ProviderExtension):
     """Zone URL-normalization settings."""
 
     section = "cloudflare.url_normalization_settings"
-    formatter = UrlNormalizationFormatter()
 
     def prefetch(self, desired, scope, provider):
         return _prefetch_url_normalization(desired, scope, provider)
@@ -208,9 +207,6 @@ class UrlNormalizationExtension(ProviderExtension):
 
     def dump(self, scope, provider):
         return _dump_url_normalization(scope, provider)
-
-    def validate(self, desired, zone_name, errors, lines):
-        return _validate_url_normalization(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

@@ -211,7 +211,6 @@ class LeakedCredentialsExtension(ProviderExtension):
     """Leaked-credential detection settings."""
 
     section = "cloudflare.leaked_credential_check"
-    formatter = LeakedCredentialFormatter()
 
     def prefetch(self, desired, scope, provider):
         return _prefetch_leaked_credentials(desired, scope, provider)
@@ -224,9 +223,6 @@ class LeakedCredentialsExtension(ProviderExtension):
 
     def dump(self, scope, provider):
         return _dump_leaked_credentials(scope, provider)
-
-    def validate(self, desired, zone_name, errors, lines):
-        return _validate_leaked_credentials(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

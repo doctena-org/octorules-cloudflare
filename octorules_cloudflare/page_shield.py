@@ -695,7 +695,6 @@ class PageShieldExtension(ProviderExtension):
 
     section = "cloudflare.page_shield_policies"
     name = "page_shield"
-    formatter = PageShieldFormatter()
 
     def prefetch(self, desired, scope, provider):
         return _prefetch_page_shield(desired, scope, provider)
@@ -708,9 +707,6 @@ class PageShieldExtension(ProviderExtension):
 
     def dump(self, scope, provider):
         return _dump_page_shield(scope, provider)
-
-    def validate(self, desired, zone_name, errors, lines):
-        return _validate_page_shield(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------

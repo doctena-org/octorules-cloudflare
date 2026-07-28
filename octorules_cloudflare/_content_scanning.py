@@ -206,7 +206,6 @@ class ContentScanningExtension(ProviderExtension):
     """Content scanning / anti-malware settings."""
 
     section = "cloudflare.content_scanning"
-    formatter = ContentScanningFormatter()
 
     def prefetch(self, desired, scope, provider):
         return _prefetch_content_scanning(desired, scope, provider)
@@ -219,9 +218,6 @@ class ContentScanningExtension(ProviderExtension):
 
     def dump(self, scope, provider):
         return _dump_content_scanning(scope, provider)
-
-    def validate(self, desired, zone_name, errors, lines):
-        return _validate_content_scanning(desired, zone_name, errors, lines)
 
 
 # ---------------------------------------------------------------------------
