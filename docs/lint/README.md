@@ -85,7 +85,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF200–CF225 | Action validation | 26 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
-| CF400–CF409 | Rate limiting | 10 |
+| CF400–CF409 | Rate limiting | 9 |
 | CF410–CF415 | Cache rules | 6 |
 | CF420–CF424 | Config rules | 5 |
 | CF430–CF432 | Redirect rules | 3 |
