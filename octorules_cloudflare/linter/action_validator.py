@@ -79,7 +79,6 @@ RULE_IDS = frozenset(
         "CF400",
         "CF401",
         "CF402",
-        "CF403",
         "CF404",
         "CF405",
         "CF406",
@@ -971,23 +970,7 @@ def _lint_rate_limit_params(
                 )
             )
 
-    # CF403: mitigation_timeout > period
     mitigation_timeout = params.get("mitigation_timeout")
-    if (
-        isinstance(mitigation_timeout, int)
-        and isinstance(period, int)
-        and mitigation_timeout > period
-    ):
-        ctx.add(
-            LintResult(
-                rule_id="CF403",
-                severity=Severity.WARNING,
-                message=(f"mitigation_timeout ({mitigation_timeout}s) exceeds period ({period}s)"),
-                phase=phase_name,
-                ref=ref,
-                field="ratelimit.mitigation_timeout",
-            )
-        )
 
     # CF409: Free/Pro/Business plans cannot select a duration with a challenge
     # action — mitigation_timeout must be 0 when the action is managed_challenge,

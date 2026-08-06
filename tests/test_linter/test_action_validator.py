@@ -997,22 +997,26 @@ class TestRateLimitParams:
         )
         assert "CF402" not in _ids(ctx)
 
-    def test_cf403_timeout_exceeds_period(self):
+    def test_timeout_longer_than_period_is_not_flagged(self):
+        """CF403 warned whenever mitigation_timeout > period, but that is
+        Cloudflare's ordinary shape: the documented mitigation_timeout values
+        include 86400, which exceeds every valid period ("count for 10
+        minutes, block for a day").  The rule was retired."""
         ctx = _lint_rule(
             {
                 "ref": "t",
                 "expression": "true",
                 "action": "block",
                 "ratelimit": {
-                    "period": 60,
+                    "period": 600,
                     "requests_per_period": 100,
-                    "mitigation_timeout": 120,
+                    "mitigation_timeout": 86400,
                     "characteristics": ["ip.src"],
                 },
             },
             "cloudflare.rate_limiting_rules",
         )
-        assert "CF403" in _ids(ctx)
+        assert "CF403" not in _ids(ctx)
 
     def test_cf404_invalid_counting_expression(self):
         ctx = _lint_rule(

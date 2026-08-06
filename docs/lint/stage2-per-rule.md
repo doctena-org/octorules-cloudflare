@@ -532,15 +532,6 @@ Triggers when neither `requests_per_period` nor `score_per_period` is specified.
 
 Fix: Add `requests_per_period` or `score_per_period`.
 
-### CF403 — Mitigation timeout exceeds period
-
-| Severity | Category |
-|----------|----------|
-| WARNING | rate_limit |
-
-Triggers when `mitigation_timeout` is greater than `period`.
-
-Fix: Set `mitigation_timeout` to be less than or equal to `period`.
 
 ### CF404 — Invalid counting_expression
 

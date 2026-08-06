@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **161 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **160 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -264,7 +264,6 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |
-| [CF403](stage2-per-rule.md#cf403--mitigation-timeout-exceeds-period) | Mitigation timeout exceeds period | WARNING |
 | [CF404](stage2-per-rule.md#cf404--invalid-counting_expression) | Invalid counting_expression | ERROR |
 | [CF405](stage2-per-rule.md#cf405--invalid-counting_expression-content) | Invalid counting_expression content | WARNING |
 | [CF406](stage2-per-rule.md#cf406--too-many-rate-limit-characteristics-for-plan-tier) | Too many rate limit characteristics for plan tier | ERROR |
