@@ -82,11 +82,11 @@ a single `cloudflare:` block.
 | Zone discovery (`list_zones`) | Supported |
 | Account-level scopes | Supported |
 | Audit IP extraction (`octorules audit`) | Supported |
-| Bot Management settings (`cloudflare_bot_management`) | Supported |
-| URL normalization settings (`cloudflare_url_normalization`) | Supported |
-| Zone security defaults (`cloudflare_zone_security`) | Supported |
-| Leaked Credential Check (`cloudflare_leaked_credential_check`) | Supported |
-| Content Scanning / anti-malware (`cloudflare_content_scanning`) | Supported |
+| Bot Management settings (`bot_management`) | Supported |
+| URL normalization settings (`url_normalization_settings`) | Supported |
+| Zone security defaults (`zone_security`) | Supported |
+| Leaked Credential Check (`leaked_credential_check`) | Supported |
+| Content Scanning / anti-malware (`content_scanning`) | Supported |
 
 ## Supported phases
 

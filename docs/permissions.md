@@ -64,8 +64,8 @@ specific dashboard permission.
 | Extension | API Endpoint | Permission |
 |---|---|---|
 | `page_shield_policies` | `/zones/{id}/page_shield/policies` | Account > Page Shield |
-| `cloudflare_bot_management` | `/zones/{id}/bot_management` | Zone > Bot Management |
-| `cloudflare_zone_security` | `/zones/{id}/settings/{setting}` | Zone > Zone Settings |
-| `cloudflare_url_normalization` | `/zones/{id}/url_normalization` | Zone > Sanitize |
-| `cloudflare_leaked_credential_check` | `/zones/{id}/leaked-credential-checks` | Zone > Zone WAF |
-| `cloudflare_content_scanning` | `/zones/{id}/content-upload-scan/*` | Zone > Zone WAF |
+| `bot_management` | `/zones/{id}/bot_management` | Zone > Bot Management |
+| `zone_security` | `/zones/{id}/settings/{setting}` | Zone > Zone Settings |
+| `url_normalization_settings` | `/zones/{id}/url_normalization` | Zone > Sanitize |
+| `leaked_credential_check` | `/zones/{id}/leaked-credential-checks` | Zone > Zone WAF |
+| `content_scanning` | `/zones/{id}/content-upload-scan/*` | Zone > Zone WAF |
