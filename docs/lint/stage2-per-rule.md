@@ -35,7 +35,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (27 rules)
+## Category C — Action Validation (28 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -526,6 +526,35 @@ cloudflare:
 | `phases`/`products` in `waf_managed_rules` | WARNING | Absent from [create an exception](https://developers.cloudflare.com/ruleset-engine/managed-rulesets/create-exception/), but never observed being rejected — the parameter may simply be ignored |
 
 Suppress a finding with `# octorules:disable=CF226`. If you observe Cloudflare accepting or rejecting one of the WARNING cases, move it into `REJECTED_SKIP_PARAMS_BY_PHASE` (or into the phase's allowed set) and promote the severity accordingly.
+
+### CF227 — Stored list referenced from an account-scoped waf_custom_rules rule
+
+**Severity:** ERROR
+
+The account-level entry point (`kind: root`) parses a restricted grammar and rejects a stored-list reference outright:
+
+```
+rule in account-level 'http_request_firewall_custom' ruleset phase includes invalid
+sub-expression in the rule filter: could not parse filter expression
+  ... (not (ip.src in $my_list and cf.zone.name in {...})
+                      ^^^^ unrecognised input
+```
+
+Lists work normally one level down, inside a custom ruleset the entry point executes — which is where every working reference lives. This is the same root-kind restriction [CF223](#cf223--skip-action-invalid-in-account-scoped-waf_custom_rules) covers from the action side.
+
+```yaml
+cloudflare:
+  waf_custom_rules:
+  - ref: run-blocking-ruleset
+    action: execute
+    action_parameters:
+      id: <ruleset id>
+    expression: ((not ip.src in $trusted_ips)) and (cf.zone.plan eq "ENT")
+```
+
+**Fix:** Move the condition into a rule *inside* the custom ruleset this entry point executes, where list references are accepted.
+
+Like CF223, account scope is detected by the `cf.zone.plan eq "ENT"` suffix Cloudflare requires on account-level rules. Rules nested in `custom_rulesets` are linted under the same phase name but carry no such suffix, which is what separates the two — a nested rule that included the marker anyway would false-positive. Suppress with `# octorules:disable=CF227`.
 
 ---
 

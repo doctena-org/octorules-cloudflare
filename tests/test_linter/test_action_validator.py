@@ -423,6 +423,79 @@ class TestCF226SkipParamPhaseApplicability:
         assert "CF226" not in _ids(ctx)
 
 
+class TestCF227AccountScopeListRef:
+    """The account-level entry point (kind=root) parses a restricted grammar and
+    rejects a stored-list reference as unrecognised input. Lists work one level
+    down, inside a custom ruleset the entry point executes, which is where every
+    working reference lives."""
+
+    _ENT = '(cf.zone.plan eq "ENT")'
+
+    def test_fires_on_list_ref_in_account_scoped_rule(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": f"((not ip.src in $pentest_ips)) and {self._ENT}",
+                "action": "execute",
+                "action_parameters": {"id": "a" * 32},
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        results = assert_lint(ctx, "CF227", count=1, severity=Severity.ERROR, ref="t")
+        assert "pentest_ips" in results[0].message
+        assert results[0].field == "expression"
+
+    def test_reports_each_distinct_list_once(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": (f"((ip.src in $a or ip.src in $b or ip.src in $a)) and {self._ENT}"),
+                "action": "block",
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert _ids(ctx).count("CF227") == 2
+
+    def test_does_not_fire_without_the_account_marker(self):
+        # A nested custom-ruleset rule is linted under the same phase name but
+        # carries no ENT suffix — that is the only signal separating the two.
+        ctx = _lint_rule(
+            {"ref": "t", "expression": "ip.src in $blocked", "action": "block"},
+            "cloudflare.waf_custom_rules",
+        )
+        assert "CF227" not in _ids(ctx)
+
+    def test_does_not_fire_on_account_rule_without_a_list(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": f'((not http.host contains "example.com")) and {self._ENT}',
+                "action": "execute",
+                "action_parameters": {"id": "a" * 32},
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert "CF227" not in _ids(ctx)
+
+    def test_does_not_fire_in_other_phases(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": f"((ip.src in $blocked)) and {self._ENT}",
+                "action": "block",
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        assert "CF227" not in _ids(ctx)
+
+    def test_does_not_crash_on_non_string_expression(self):
+        ctx = _lint_rule(
+            {"ref": "t", "expression": 123, "action": "block"},
+            "cloudflare.waf_custom_rules",
+        )
+        assert "CF227" not in _ids(ctx)
+
+
 class TestCF224ExpressionLengthCap:
     """Cloudflare's Rulesets API rejects expressions longer than 4096 chars
     (error 20127). CF measures the canonical normalized form, so CF224 does

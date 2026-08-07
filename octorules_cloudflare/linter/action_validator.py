@@ -122,6 +122,7 @@ RULE_IDS = frozenset(
         "CF224",
         "CF225",
         "CF226",
+        "CF227",
         "CF409",
     }
 )
@@ -140,6 +141,52 @@ _VALID_HEADER_OPERATIONS = frozenset({"set", "remove", "add"})
 # rule is intended for account scope (kind=root), where CF rejects skip with
 # API error 20016.
 _ACCOUNT_SCOPE_MARKER = re.compile(r'cf\.zone\.plan\s+eq\s+"ENT"')
+
+# CF227: stored-list reference. Same pattern the cross-rule linter uses (CF102).
+_LIST_REF_RE = re.compile(r"\$([a-zA-Z_][a-zA-Z0-9_.]*)")
+
+
+def _check_account_scope_list_ref(
+    rule: dict[str, Any], phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF227: a ``$list`` reference in an account-scoped ``waf_custom_rules`` rule.
+
+    The account-level entry point (kind=root) parses a restricted grammar and
+    rejects a stored-list reference outright::
+
+        rule in account-level 'http_request_firewall_custom' ruleset phase
+        includes invalid sub-expression in the rule filter: could not parse
+        filter expression ... $my_list ... unrecognised input
+
+    Lists work normally one level down, inside a custom ruleset the entry point
+    executes — which is where every working reference lives. Same root-kind
+    restriction CF223 covers from the action side, and the same marker-based
+    scope detection.
+    """
+    if phase_name != "cloudflare.waf_custom_rules":
+        return
+    expression = rule.get("expression")
+    if not isinstance(expression, str) or not _ACCOUNT_SCOPE_MARKER.search(expression):
+        return
+    for list_name in dict.fromkeys(_LIST_REF_RE.findall(expression)):
+        ctx.add(
+            LintResult(
+                rule_id="CF227",
+                severity=Severity.ERROR,
+                message=(
+                    f"Stored list ${list_name} cannot be referenced from an"
+                    " account-scoped waf_custom_rules rule — the account entry"
+                    " point rejects it as an unrecognised sub-expression"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion=(
+                    "Move the condition into a rule inside the custom ruleset"
+                    " this entry point executes, where list references work"
+                ),
+            )
+        )
 
 
 def _check_expression_length(
@@ -176,9 +223,10 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
     action = rule.get("action")
     phase_name = phase.friendly_name
 
-    # CF224: expression exceeds Cloudflare's 4096-char API cap. Checked first
-    # so it fires regardless of any action-validation early-return below.
+    # CF224 / CF227: expression-level checks, run first so they fire regardless
+    # of any action-validation early-return below.
     _check_expression_length(rule, phase_name, ref, ctx)
+    _check_account_scope_list_ref(rule, phase_name, ref, ctx)
 
     # CF201: Missing action in phase without default
     if action is None:

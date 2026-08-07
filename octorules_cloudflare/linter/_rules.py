@@ -97,6 +97,12 @@ CF226 = RuleMeta(
     "Skip action parameter not available in this phase",
     Severity.ERROR,
 )
+CF227 = RuleMeta(
+    "CF227",
+    "action",
+    "Stored list referenced from an account-scoped waf_custom_rules rule",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)

@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **160 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **162 rules** across **19 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -66,7 +66,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
 | 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF027 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF550 | 120 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF550 | 121 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF480 | 11 | [stage2d-lists.md](stage2d-lists.md) |
@@ -82,7 +82,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF105 | Cross-rule | 6 |
-| CF200–CF225 | Action validation | 26 |
+| CF200–CF227 | Action validation | 28 |
 | CF300–CF306 | Function constraints | 7 |
 | CF307–CF309 | Type system | 3 |
 | CF400–CF409 | Rate limiting | 9 |
