@@ -139,3 +139,152 @@ class TestCloudflareAuditExtractor:
         results = _extract_ips(rules_data, "cloudflare.waf_custom_rules")
         assert len(results) == 1
         assert "cf.open_proxies" in results[0].list_refs
+
+
+class TestNegatedMatchesAreNotTargets:
+    """An IP reached only through a negation is one the rule deliberately does
+    NOT act on. Reporting it as a match target makes the cross-rule (ip-overlap)
+    and cross-zone (zone-drift) checks compare exemptions as though they were
+    blocks — nine false overlaps and three false drifts on a single carve-out."""
+
+    @staticmethod
+    def _extract(expression, action="execute"):
+        return _extract_ips(
+            {
+                "cloudflare.waf_custom_rules": [
+                    {"ref": "r", "action": action, "expression": expression}
+                ]
+            },
+            "cloudflare.waf_custom_rules",
+        )
+
+    def test_negated_list_ref_is_dropped(self):
+        # The shape that produced the false findings: a carve-out gating a
+        # ruleset execute on "everyone except the pentest sources".
+        results = self._extract(
+            '(not (ip.src in $pentest_ips and cf.zone.name in {"a.example"}))'
+            ' and (cf.zone.plan eq "ENT")'
+        )
+        assert results == [] or results[0].list_refs == []
+
+    def test_negated_ip_literal_is_dropped(self):
+        results = self._extract("not (ip.src in {203.0.113.4})")
+        assert results == [] or results[0].ip_ranges == []
+
+    def test_negated_clause_after_and(self):
+        # `not` binds to the comparison that follows it, not the whole expression.
+        results = self._extract("ip.src in {198.51.100.0/24} and not ip.src in $trusted")
+        assert "198.51.100.0/24" in results[0].ip_ranges
+        assert results[0].list_refs == []
+
+    def test_positive_match_is_kept(self):
+        results = self._extract("ip.src in $blocked", action="block")
+        assert results[0].list_refs == ["blocked"]
+
+    def test_double_negation_is_positive(self):
+        results = self._extract("not (not (ip.src in $blocked))", action="block")
+        assert results[0].list_refs == ["blocked"]
+
+    def test_or_ends_the_negations_reach(self):
+        results = self._extract("not ip.src in $trusted or ip.src in $blocked")
+        assert results[0].list_refs == ["blocked"]
+
+    def test_value_positive_somewhere_is_kept(self):
+        # Same list used as an exemption in one clause and a target in another:
+        # keep it. Conservative — never blind the audit to a real target.
+        results = self._extract("(not ip.src in $dual) and (ip.src in $dual)")
+        # One entry per occurrence is pre-existing extractor behaviour.
+        assert set(results[0].list_refs) == {"dual"}
+
+    def test_not_inside_a_string_literal_is_not_an_operator(self):
+        results = self._extract('http.user_agent contains "not a robot" and ip.src in $blocked')
+        assert results[0].list_refs == ["blocked"]
+
+    def test_unparenthesised_negation_of_a_set(self):
+        results = self._extract("not ip.src in {203.0.113.0/24}")
+        assert results == [] or results[0].ip_ranges == []
+
+
+class TestDisabledRulesAreNotAudited:
+    """A disabled rule enforces nothing. Auditing its addresses reports
+    overlaps and drift against traffic handling that does not happen — the
+    live/disabled pair being the common shape (an old rule left in place)."""
+
+    @staticmethod
+    def _extract(rule):
+        return _extract_ips({"cloudflare.waf_custom_rules": [rule]}, "cloudflare.waf_custom_rules")
+
+    def test_disabled_rule_is_skipped(self):
+        assert (
+            self._extract(
+                {
+                    "ref": "old",
+                    "action": "block",
+                    "enabled": False,
+                    "expression": "ip.src in {203.0.113.0/24}",
+                }
+            )
+            == []
+        )
+
+    def test_enabled_rule_is_kept(self):
+        results = self._extract(
+            {
+                "ref": "live",
+                "action": "block",
+                "enabled": True,
+                "expression": "ip.src in {203.0.113.0/24}",
+            }
+        )
+        assert results[0].ip_ranges == ["203.0.113.0/24"]
+
+    def test_absent_enabled_defaults_to_enabled(self):
+        results = self._extract(
+            {"ref": "implicit", "action": "block", "expression": "ip.src in {203.0.113.0/24}"}
+        )
+        assert results[0].ip_ranges == ["203.0.113.0/24"]
+
+    def test_only_false_disables_not_other_falsy(self):
+        # `enabled: null` in YAML is a malformed value, not a disable.
+        results = self._extract(
+            {
+                "ref": "null-enabled",
+                "action": "block",
+                "enabled": None,
+                "expression": "ip.src in {203.0.113.0/24}",
+            }
+        )
+        assert results[0].ip_ranges == ["203.0.113.0/24"]
+
+
+class TestNegatedListRefsAreStillReferences:
+    """A list used only to exempt traffic is not a match target, but it IS
+    referenced — reporting it as an unused standalone list would be wrong."""
+
+    def test_negated_ref_recorded_separately(self):
+        results = _extract_ips(
+            {
+                "cloudflare.waf_custom_rules": [
+                    {
+                        "ref": "r",
+                        "action": "execute",
+                        "expression": '(not ip.src in $trusted) and (cf.zone.plan eq "ENT")',
+                    }
+                ]
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert results[0].list_refs == []
+        assert results[0].negated_list_refs == ["trusted"]
+
+    def test_positive_ref_is_not_recorded_as_negated(self):
+        results = _extract_ips(
+            {
+                "cloudflare.waf_custom_rules": [
+                    {"ref": "r", "action": "block", "expression": "ip.src in $bad"}
+                ]
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert results[0].list_refs == ["bad"]
+        assert results[0].negated_list_refs == []

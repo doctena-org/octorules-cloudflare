@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (rejected by the API at sync time, error 20117); WARNING for `phases`/`products`
   in `waf_managed_rules`, undocumented there but not observed rejected.
 
+### Changed
+- Minimum `octorules` dependency: `>=0.33.0` (audit acceptance and negated list
+  references use its public API).
+
+### Fixed
+- `audit` no longer counts a negated match (`not (ip.src in ...)`) as a match
+  target, which made `ip-overlap` and `zone-drift` compare exemptions as blocks.
+
 ## [0.13.0] - 2026-07-26
 
 ### Added
