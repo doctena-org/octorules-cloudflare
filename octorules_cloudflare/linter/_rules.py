@@ -91,6 +91,12 @@ CF225 = RuleMeta(
     "Incompatible rate limit characteristics (ip.src + cf.unique_visitor_id)",
     Severity.ERROR,
 )
+CF226 = RuleMeta(
+    "CF226",
+    "action",
+    "Skip action parameter not available in this phase",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)

@@ -19,6 +19,8 @@ from octorules_cloudflare.linter.schemas.actions import (
     ACTION_SCHEMAS,
     MAX_CHARACTERISTICS,
     PHASE_PARAMETER_OVERRIDES,
+    REJECTED_SKIP_PARAMS_BY_PHASE,
+    SKIP_SCHEMA,
     VALID_ACTIONS_BY_PHASE,
     VALID_BLOCK_RESPONSE_STATUS_CODES,
     VALID_BROWSER_TTL_MODES,
@@ -31,6 +33,7 @@ from octorules_cloudflare.linter.schemas.actions import (
     VALID_REDIRECT_STATUS_CODES,
     VALID_SENSITIVITY_LEVELS,
     VALID_SERVE_ERROR_CONTENT_TYPES,
+    VALID_SKIP_PARAMS_BY_PHASE,
     VALID_SKIP_PHASES,
     VALID_SKIP_PRODUCTS,
     VALID_SKIP_RULESET_VALUES,
@@ -118,6 +121,7 @@ RULE_IDS = frozenset(
         "CF223",
         "CF224",
         "CF225",
+        "CF226",
         "CF409",
     }
 )
@@ -1511,7 +1515,42 @@ def _lint_execute_params(params: dict, phase_name: str, ref: str, ctx: LintConte
 
 
 def _lint_skip_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:
-    """Validate skip action_parameters (CF210, CF211, CF222)."""
+    """Validate skip action_parameters (CF210, CF211, CF222, CF226)."""
+    # CF226: the parameter must exist in this phase's skip vocabulary. Cloudflare
+    # rejects a cross-phase parameter at sync time; plan does not catch it, so an
+    # invalid rule merges and breaks the deploy. Severity follows the evidence:
+    # ERROR where the rejection is observed or documented, WARNING where the
+    # parameter is merely undocumented for the phase (see REJECTED_SKIP_PARAMS_BY_PHASE).
+    allowed = VALID_SKIP_PARAMS_BY_PHASE.get(phase_name)
+    if allowed is not None:
+        rejected = REJECTED_SKIP_PARAMS_BY_PHASE.get(phase_name, frozenset())
+        for key in sorted(k for k in params if k in SKIP_SCHEMA.allowed_parameter_keys):
+            if key in allowed:
+                continue
+            if key in rejected:
+                severity = Severity.ERROR
+                message = (
+                    f"Skip parameter {key!r} cannot be used in phase"
+                    f" {phase_name!r} (Cloudflare API error 20117)"
+                )
+            else:
+                severity = Severity.WARNING
+                message = (
+                    f"Skip parameter {key!r} is not documented for phase"
+                    f" {phase_name!r} and may be silently ignored"
+                )
+            ctx.add(
+                LintResult(
+                    rule_id="CF226",
+                    severity=severity,
+                    message=message,
+                    phase=phase_name,
+                    ref=ref,
+                    field=f"action_parameters.{key}",
+                    suggestion=f"Documented here: {sorted(allowed)}",
+                )
+            )
+
     # CF222: validate ruleset value
     ruleset = params.get("ruleset")
     if isinstance(ruleset, str):

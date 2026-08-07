@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **CF226**: `skip` action parameter that does not exist in its phase. ERROR for
+  `rulesets`/`rules` in `waf_custom_rules` and `phase` in `waf_managed_rules`
+  (rejected by the API at sync time, error 20117); WARNING for `phases`/`products`
+  in `waf_managed_rules`, undocumented there but not observed rejected.
+
 ## [0.13.0] - 2026-07-26
 
 ### Added

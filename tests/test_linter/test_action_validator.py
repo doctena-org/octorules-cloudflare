@@ -279,6 +279,150 @@ class TestCF223SkipInAccountScope:
         assert "CF223" not in _ids(ctx)
 
 
+class TestCF226SkipParamPhaseApplicability:
+    """The skip action's options depend on the phase it is configured in.
+    Custom rules skip later phases and legacy products; WAF exceptions skip
+    managed rulesets and their rules. Cloudflare rejects a cross-phase
+    parameter with API error 20117 at sync time — plan does not catch it,
+    so lint must."""
+
+    def test_fires_on_rulesets_in_custom_phase(self):
+        # The captured failure: a http_request_firewall_custom ruleset shipped
+        # `rulesets` and broke the deploy with "skip action parameter
+        # 'rulesets' cannot be used in the phase http_request_firewall_custom".
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {
+                    "rulesets": ["af3b73085ff04abcb0b89ca197a84188"],
+                    "phases": ["http_request_firewall_managed"],
+                },
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        results = assert_lint(ctx, "CF226", count=1, severity=Severity.ERROR, ref="t")
+        assert "rulesets" in results[0].message
+        assert "20117" in results[0].message
+        assert results[0].field == "action_parameters.rulesets"
+
+    def test_fires_on_rules_in_custom_phase(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {"rules": {"efb7b8c949ac4650a09736fc376e9aee": ["x"]}},
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert_lint(ctx, "CF226", count=1, severity=Severity.ERROR, ref="t")
+
+    def test_fires_on_phase_in_managed_phase(self):
+        # Positively excluded: "only available at the zone level for the
+        # `http_request_firewall_custom` phase".
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {"ruleset": "current", "phase": "current"},
+            },
+            "cloudflare.waf_managed_rules",
+        )
+        assert_lint(ctx, "CF226", count=1, severity=Severity.ERROR, ref="t")
+
+    def test_warns_only_on_undocumented_managed_phase_params(self):
+        # `products`/`phases` are absent from the WAF-exception docs but have
+        # never been observed being rejected. Absence of documentation is not
+        # proof of rejection, so these must not hard-block a deploy.
+        for key, value in (("products", ["waf"]), ("phases", ["http_ratelimit"])):
+            ctx = _lint_rule(
+                {
+                    "ref": "t",
+                    "expression": "(ip.src eq 1.2.3.4)",
+                    "action": "skip",
+                    "action_parameters": {"ruleset": "current", key: value},
+                },
+                "cloudflare.waf_managed_rules",
+            )
+            results = assert_lint(ctx, "CF226", count=1, severity=Severity.WARNING, ref="t")
+            assert key in results[0].message
+            assert "silently ignored" in results[0].message
+
+    def test_reports_each_offending_parameter(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {"rulesets": ["a" * 32], "rules": {"b" * 32: ["x"]}},
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert _ids(ctx).count("CF226") == 2
+
+    # --- shapes that are live at Cloudflare today and must stay clean ---
+
+    def test_does_not_fire_on_custom_phase_skip(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {
+                    "ruleset": "current",
+                    "phases": ["http_ratelimit", "http_request_firewall_managed"],
+                    "products": ["bic", "securityLevel"],
+                },
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert "CF226" not in _ids(ctx)
+
+    def test_does_not_fire_on_managed_phase_exception(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {
+                    "ruleset": "current",
+                    "rules": {"efb7b8c949ac4650a09736fc376e9aee": ["ae20608d93b94e97988db1bbc12"]},
+                },
+            },
+            "cloudflare.waf_managed_rules",
+        )
+        assert "CF226" not in _ids(ctx)
+
+    def test_does_not_fire_on_unmapped_phase(self):
+        # Phases with no skip vocabulary are left to CF200, which reports that
+        # skip is not a valid action there at all.
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "skip",
+                "action_parameters": {"rulesets": ["a" * 32]},
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        assert "CF226" not in _ids(ctx)
+
+    def test_does_not_fire_on_non_skip_action(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "(ip.src eq 1.2.3.4)",
+                "action": "execute",
+                "action_parameters": {"id": "efb7b8c949ac4650a09736fc376e9aee"},
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert "CF226" not in _ids(ctx)
+
+
 class TestCF224ExpressionLengthCap:
     """Cloudflare's Rulesets API rejects expressions longer than 4096 chars
     (error 20127). CF measures the canonical normalized form, so CF224 does

@@ -35,7 +35,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (26 rules)
+## Category C — Action Validation (27 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -489,6 +489,43 @@ rate_limit:
 ```
 
 **Fix:** Keep one of the two. Use `cf.unique_visitor_id` when you need NAT-aware counting, or `ip.src` for plain per-IP counting — not both.
+
+### CF226 — Skip action parameter not available in this phase
+
+**Severity:** ERROR where Cloudflare is known to reject the parameter, WARNING where it is merely undocumented for the phase (see *Grounding* below)
+
+The `skip` action's options depend on the phase the rule is in: *"The available skip options depend on the phase where you configure the rule"* ([skip options](https://developers.cloudflare.com/waf/custom-rules/skip/options/)). Using a parameter outside its phase is rejected at **sync** time with API error 20117 — `plan` does not catch it, so an invalid rule merges cleanly and then breaks the deploy.
+
+| Phase | Available skip parameters |
+|---|---|
+| `waf_custom_rules` (`http_request_firewall_custom`) | `ruleset`, `phase`, `phases`, `products` |
+| `waf_managed_rules` (`http_request_firewall_managed`) | `ruleset`, `rulesets`, `rules` |
+
+Custom rules skip *later phases and non-Ruleset-Engine products*; WAF exceptions skip *managed rulesets and their rules*. `ruleset: current` is the only option common to both.
+
+```yaml
+cloudflare:
+  waf_custom_rules:
+  - ref: skip-trusted-ips
+    expression: (ip.src eq 10.0.0.1)
+    action: skip
+    action_parameters:
+      rulesets:                       # rejected — managed-phase only
+      - af3b73085ff04abcb0b89ca197a84188
+```
+
+**Fix:** Use a parameter available in the rule's phase. There is no skip that crosses from one entry-point `execute` to another inside `http_request_firewall_custom`: `rulesets` is rejected outright, and `phase: current` is *"only available at the zone level"* ([skip options](https://developers.cloudflare.com/waf/custom-rules/skip/options/)). To exempt traffic from a later account-level ruleset, add a carve-out to that ruleset's own rules instead.
+
+**Grounding.** The severity tracks the strength of the evidence, because a lint error blocks a merge and a corpus of live (accepted) configuration can only ever falsify over-permissiveness, never over-restrictiveness.
+
+| Case | Severity | Evidence |
+|---|---|---|
+| `rulesets` in `waf_custom_rules` | ERROR | Observed: `HTTP 400, code 20117` from a real sync |
+| `rules` in `waf_custom_rules` | ERROR | The phase's parameter set is enumerated in full in the [skip API examples](https://developers.cloudflare.com/waf/custom-rules/skip/api-examples/); `rules` is not in it |
+| `phase` in `waf_managed_rules` | ERROR | *"only available at the zone level for the `http_request_firewall_custom` phase"* ([skip options](https://developers.cloudflare.com/waf/custom-rules/skip/options/)) |
+| `phases`/`products` in `waf_managed_rules` | WARNING | Absent from [create an exception](https://developers.cloudflare.com/ruleset-engine/managed-rulesets/create-exception/), but never observed being rejected — the parameter may simply be ignored |
+
+Suppress a finding with `# octorules:disable=CF226`. If you observe Cloudflare accepting or rejecting one of the WARNING cases, move it into `REJECTED_SKIP_PARAMS_BY_PHASE` (or into the phase's allowed set) and promote the severity accordingly.
 
 ---
 

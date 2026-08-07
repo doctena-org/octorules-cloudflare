@@ -404,6 +404,47 @@ VALID_SERVE_ERROR_CONTENT_TYPES = frozenset(
 
 VALID_SKIP_RULESET_VALUES = frozenset({"current"})
 
+# --- Skip action parameters valid per phase ---
+#
+# "The available skip options depend on the phase where you configure the rule"
+# (https://developers.cloudflare.com/waf/custom-rules/skip/options/). A parameter
+# used outside its phase is rejected at sync time with API error 20117, e.g.
+# "skip action parameter 'rulesets' cannot be used in the phase
+# http_request_firewall_custom".
+#
+# Custom rules skip *later phases and non-Ruleset-Engine products*; WAF exceptions
+# skip *managed rulesets and their rules*. `ruleset: current` is the only option
+# common to both.
+#
+# Phases absent from this map are not checked: skip is not a valid action there at
+# all, and CF200 reports that first.
+VALID_SKIP_PARAMS_BY_PHASE: dict[str, frozenset[str]] = {
+    "cloudflare.waf_custom_rules": frozenset({"ruleset", "phase", "phases", "products"}),
+    "cloudflare.waf_managed_rules": frozenset({"ruleset", "rulesets", "rules"}),
+}
+
+# Parameters Cloudflare is *known* to reject in a phase, either observed from a real
+# API response or positively excluded by the docs. CF226 reports these as errors.
+#
+#   custom/rulesets  observed: HTTP 400 code 20117, "skip action parameter 'rulesets'
+#                    cannot be used in the phase http_request_firewall_custom"
+#   custom/rules     the phase's parameter set is enumerated in full at
+#                    https://developers.cloudflare.com/waf/custom-rules/skip/api-examples/
+#                    and `rules` is not in it
+#   managed/phase    "this option is only available at the zone level for the
+#                    `http_request_firewall_custom` phase"
+#                    (https://developers.cloudflare.com/waf/custom-rules/skip/options/)
+#
+# A parameter in neither map (today: `phases` and `products` in the managed phase) is
+# only *absent* from the WAF-exception docs, never observed being rejected. Absence of
+# documentation is not proof of rejection, and a live corpus is accept-only so it cannot
+# falsify the restrictive direction — so CF226 reports those at WARNING instead, and
+# says the parameter may be silently ignored rather than claiming it is invalid.
+REJECTED_SKIP_PARAMS_BY_PHASE: dict[str, frozenset[str]] = {
+    "cloudflare.waf_custom_rules": frozenset({"rulesets", "rules"}),
+    "cloudflare.waf_managed_rules": frozenset({"phase"}),
+}
+
 # --- Block action response status codes (400-499) ---
 
 VALID_BLOCK_RESPONSE_STATUS_CODES = frozenset(range(400, 500))
