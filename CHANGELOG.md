@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Minimum `octorules` dependency: `>=0.33.0` (audit acceptance and negated list
   references use its public API).
+- **CF010** reports a removed phase name at ERROR and recognises the nested
+  spelling.
+- The rule catalog now declares CF210, CF211 and CF213 at their real ERROR
+  severity; the findings themselves already carried it.
+
+### Removed
+- **CF403** (mitigation_timeout exceeds period): Cloudflare documents
+  mitigation timeouts up to a day against periods up to an hour, so the rule
+  warned on the ordinary count-briefly-block-longer shape.
 
 ### Fixed
 - `audit` no longer counts a negated match (`not (ip.src in ...)`) as a match
