@@ -8,26 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **CF226**: `skip` action parameter that does not exist in its phase. ERROR for
-  `rulesets`/`rules` in `waf_custom_rules` and `phase` in `waf_managed_rules`
-  (rejected by the API at sync time, error 20117); WARNING for `phases`/`products`
-  in `waf_managed_rules`, undocumented there but not observed rejected.
+- **CF226**: `skip` action parameter that does not exist in its phase — ERROR
+  where the API rejects it at sync time, WARNING where it may only be silently
+  ignored.
 - **CF227** (ERROR): a stored list (`$name`) referenced from an account-scoped
   `waf_custom_rules` rule. The account entry point rejects it as an unrecognised
   sub-expression; move the condition into the custom ruleset it executes.
 
 ### Changed
-- Minimum `octorules` dependency: `>=0.33.0` (audit acceptance and negated list
-  references use its public API).
+- Minimum `octorules` dependency: `>=0.33.0`.
 - **CF010** reports a removed phase name at ERROR and recognises the nested
   spelling.
-- The rule catalog now declares CF210, CF211 and CF213 at their real ERROR
-  severity; the findings themselves already carried it.
+- The catalog severity of CF210/CF211/CF213 is ERROR, matching what the
+  findings already reported.
 
 ### Removed
-- **CF403** (mitigation_timeout exceeds period): Cloudflare documents
-  mitigation timeouts up to a day against periods up to an hour, so the rule
-  warned on the ordinary count-briefly-block-longer shape.
+- **CF403**: it warned on Cloudflare's ordinary count-briefly-block-longer
+  rate-limit shape.
 
 ### Fixed
 - `audit` no longer counts a negated match (`not (ip.src in ...)`) as a match
