@@ -261,6 +261,8 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF223](stage2-per-rule.md#cf223--skip-action-invalid-in-account-scoped-waf_custom_rules) | Skip action invalid in account-scoped waf_custom_rules | ERROR |
 | [CF224](stage2-per-rule.md#cf224--expression-exceeds-4096-char-cloudflare-api-cap) | Expression exceeds 4096-char Cloudflare API cap | ERROR |
 | [CF225](stage2-per-rule.md#cf225--incompatible-rate-limit-characteristics) | Incompatible rate limit characteristics | ERROR |
+| [CF226](stage2-per-rule.md#cf226--skip-action-parameter-not-available-in-this-phase) | Skip action parameter not available in this phase | ERROR/WARNING |
+| [CF227](stage2-per-rule.md#cf227--stored-list-referenced-from-an-account-scoped-waf_custom_rules-rule) | Stored list referenced from an account-scoped waf_custom_rules rule | ERROR |
 | [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |

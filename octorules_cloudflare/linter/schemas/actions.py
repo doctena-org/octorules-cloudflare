@@ -406,8 +406,9 @@ VALID_SKIP_RULESET_VALUES = frozenset({"current"})
 
 # --- Skip action parameters valid per phase ---
 #
-# "The available skip options depend on the phase where you configure the rule"
-# (https://developers.cloudflare.com/waf/custom-rules/skip/options/). A parameter
+# Which skip options exist depends on where the rule sits (the docs list them
+# per context: https://developers.cloudflare.com/waf/custom-rules/skip/options/).
+# A parameter
 # used outside its phase is rejected at sync time with API error 20117, e.g.
 # "skip action parameter 'rulesets' cannot be used in the phase
 # http_request_firewall_custom".
