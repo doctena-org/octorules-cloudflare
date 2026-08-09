@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.14.0] - 2026-08-08
 
 ### Added
 - **CF226**: `skip` action parameter that does not exist in its phase — ERROR
@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   sub-expression; move the condition into the custom ruleset it executes.
 
 ### Changed
-- Minimum `octorules` dependency: `>=0.33.0`.
+- Minimum `octorules` dependency: `>=0.33.0`; minimum
+  `octorules-wirefilter`: `>=0.5.2`.
 - **CF010** reports a removed phase name at ERROR and recognises the nested
   spelling.
 - The catalog severity of CF210/CF211/CF213 is ERROR, matching what the
