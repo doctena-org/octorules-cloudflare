@@ -288,3 +288,33 @@ class TestNegatedListRefsAreStillReferences:
         )
         assert results[0].list_refs == ["bad"]
         assert results[0].negated_list_refs == []
+
+
+class TestNeOperatorPolarity:
+    """`ip.src ne X` acts on everyone EXCEPT X — the comparison itself is
+    the negation. Composes with `not` spans by parity, so `not (ip.src ne
+    X)` makes X a target again."""
+
+    def _kept(self, expr):
+        from octorules_cloudflare.audit import _positive_occurrences
+
+        return _positive_occurrences(expr, ["203.0.113.7"])
+
+    def test_ne_exempts_the_value(self):
+        assert self._kept("ip.src ne 203.0.113.7") == []
+
+    def test_bang_eq_exempts_too(self):
+        assert self._kept("ip.src != 203.0.113.7") == []
+
+    def test_eq_keeps(self):
+        assert self._kept("ip.src eq 203.0.113.7") == ["203.0.113.7"]
+
+    def test_not_ne_is_a_target_again(self):
+        assert self._kept("not (ip.src ne 203.0.113.7)") == ["203.0.113.7"]
+
+    def test_positive_occurrence_anywhere_wins(self):
+        expr = "ip.src ne 203.0.113.7 or ip.src eq 203.0.113.7"
+        assert self._kept(expr) == ["203.0.113.7"]
+
+    def test_ne_on_another_field_is_irrelevant(self):
+        assert self._kept('http.host ne "x" and ip.src eq 203.0.113.7') == ["203.0.113.7"]

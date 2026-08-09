@@ -61,9 +61,23 @@ def _negated_spans(expr: str) -> list[tuple[int, int]]:
     return spans
 
 
+# A value compared with `ne`/`!=` is exempted by the comparison itself:
+# `ip.src ne 203.0.113.7` acts on everyone EXCEPT that address. Checked on
+# the text immediately before the occurrence, and XORed with the span
+# parity, so `not (ip.src ne X)` correctly makes X a match target again.
+_NE_BEFORE_RE = re.compile(r"(?:\bne\b|!=)\s*$")
+
+
 def _is_negated(expr: str, span: tuple[int, int], negated: list[tuple[int, int]]) -> bool:
-    """True when *span* falls inside a negated span of *expr*."""
-    return any(start <= span[0] and span[1] <= end for start, end in negated)
+    """True when the occurrence at *span* is an exemption, not a target.
+
+    Two independent sources of negation compose by parity: enclosing
+    `not`/`!` spans, and an `ne`/`!=` comparison operator directly before
+    the value.
+    """
+    in_not_span = any(start <= span[0] and span[1] <= end for start, end in negated)
+    ne_compared = bool(_NE_BEFORE_RE.search(expr[: span[0]]))
+    return in_not_span != ne_compared
 
 
 def _positive_occurrences(expr: str, values: list[str], *, prefix: str = "") -> list[str]:
@@ -76,9 +90,9 @@ def _positive_occurrences(expr: str, values: list[str], *, prefix: str = "") -> 
     """
     if not values:
         return []
+    # No early-return on empty spans: `ne`/`!=` is a second negation source
+    # that _is_negated checks per occurrence, spans or not.
     negated = _negated_spans(expr)
-    if not negated:
-        return values
     kept: list[str] = []
     for value in values:
         needle = re.escape(prefix + value)
