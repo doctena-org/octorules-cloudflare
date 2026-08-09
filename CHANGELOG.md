@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **CF401** is now an ERROR: the API requires `ratelimit.characteristics`
+  (the old WARNING claimed a missing list "applies globally" — it is
+  rejected instead).
+- **CF400** also fires when `ratelimit.period` is missing or not an integer
+  (previously only an invalid integer was caught).
+
 ### Fixed
 - `audit` no longer counts a value compared with `ne`/`!=` as a match
   target; the comparison exempts it, like `not (... in ...)`.

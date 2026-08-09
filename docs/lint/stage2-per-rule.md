@@ -560,28 +560,28 @@ Like CF223, account scope is detected by the `cf.zone.plan eq "ENT"` suffix Clou
 
 ## Category D — Rate Limiting (9 rules)
 
-### CF400 — Invalid rate limiting period
+### CF400 — Missing or invalid rate limiting period
 
 | Severity | Category |
 |----------|----------|
 | ERROR | rate_limit |
 
-Triggers when `period` is not one of the valid values: 10, 60, 120, 300, 600, or 3600 seconds.
+Triggers when the `ratelimit:` block's `period` is missing, not an integer, or not one of the valid values: 10, 60, 120, 300, 600, or 3600 seconds. The API requires the field.
 
-Fix: Use a valid period value.
+Fix: Set `ratelimit.period` to a valid value.
 
 ### CF401 — Missing rate limiting characteristics
 
 | Severity | Category |
 |----------|----------|
-| WARNING | rate_limit |
+| ERROR | rate_limit |
 
-Triggers when `characteristics` is not specified. Without it, the rate limit applies globally across all clients.
+Triggers when `characteristics` is not specified. The API requires at least one; a rule without it is rejected.
 
 Fix:
 
 ```yaml
-action_parameters:
+ratelimit:
   characteristics:
     - ip.src
   requests_per_period: 100

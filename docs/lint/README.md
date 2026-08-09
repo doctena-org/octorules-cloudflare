@@ -263,8 +263,8 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF225](stage2-per-rule.md#cf225--incompatible-rate-limit-characteristics) | Incompatible rate limit characteristics | ERROR |
 | [CF226](stage2-per-rule.md#cf226--skip-action-parameter-not-available-in-this-phase) | Skip action parameter not available in this phase | ERROR/WARNING |
 | [CF227](stage2-per-rule.md#cf227--stored-list-referenced-from-an-account-scoped-waf_custom_rules-rule) | Stored list referenced from an account-scoped waf_custom_rules rule | ERROR |
-| [CF400](stage2-per-rule.md#cf400--invalid-rate-limiting-period) | Invalid rate limiting period | ERROR |
-| [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | WARNING |
+| [CF400](stage2-per-rule.md#cf400--missing-or-invalid-rate-limiting-period) | Missing or invalid rate limiting period | ERROR |
+| [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | ERROR |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |
 | [CF404](stage2-per-rule.md#cf404--invalid-counting_expression) | Invalid counting_expression | ERROR |
 | [CF405](stage2-per-rule.md#cf405--invalid-counting_expression-content) | Invalid counting_expression content | WARNING |

@@ -105,8 +105,8 @@ CF227 = RuleMeta(
 )
 
 # Category D — Rate Limiting Specific
-CF400 = RuleMeta("CF400", "rate_limit", "Invalid rate limiting period", Severity.ERROR)
-CF401 = RuleMeta("CF401", "rate_limit", "Missing rate limiting characteristics", Severity.WARNING)
+CF400 = RuleMeta("CF400", "rate_limit", "Missing or invalid rate limiting period", Severity.ERROR)
+CF401 = RuleMeta("CF401", "rate_limit", "Missing rate limiting characteristics", Severity.ERROR)
 CF402 = RuleMeta("CF402", "rate_limit", "Missing requests_per_period threshold", Severity.ERROR)
 CF404 = RuleMeta("CF404", "rate_limit", "Invalid counting_expression", Severity.ERROR)
 CF405 = RuleMeta("CF405", "rate_limit", "Invalid counting_expression content", Severity.WARNING)

@@ -903,6 +903,22 @@ def _lint_rate_limit_params(
             ref=ref,
             ctx=ctx,
         )
+    else:
+        # The API marks period required (Ratelimit.period: Required[int]);
+        # a missing or non-integer value never reached the enum check.
+        detail = (
+            "Missing 'period'" if period is None else f"'period' must be an integer, got {period!r}"
+        )
+        ctx.add(
+            LintResult(
+                rule_id="CF400",
+                severity=Severity.ERROR,
+                message=f"{detail} — the API requires one of {sorted(VALID_RATE_LIMIT_PERIODS)}",
+                phase=phase_name,
+                ref=ref,
+                field="ratelimit.period",
+            )
+        )
 
     # CF402: missing threshold
     if "requests_per_period" not in params and "score_per_period" not in params:
@@ -952,14 +968,16 @@ def _lint_rate_limit_params(
                 )
             )
 
-    # CF401: missing characteristics
+    # CF401: missing characteristics — the API marks the field required
+    # (Ratelimit.characteristics: Required[...]); it does not fall back to
+    # a global counter.
     characteristics = params.get("characteristics")
     if characteristics is None:
         ctx.add(
             LintResult(
                 rule_id="CF401",
-                severity=Severity.WARNING,
-                message=("Missing 'characteristics' — rate limit will apply globally"),
+                severity=Severity.ERROR,
+                message=("Missing 'characteristics' — the API requires at least one"),
                 phase=phase_name,
                 ref=ref,
                 field="ratelimit.characteristics",

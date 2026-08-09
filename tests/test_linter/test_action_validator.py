@@ -1151,6 +1151,60 @@ class TestRateLimitParams:
         )
         assert "CF400" in _ids(ctx)
 
+    def test_cf400_missing_period(self):
+        """period is Required in the SDK's Ratelimit params; a missing one
+        used to slip past the enum check entirely."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {
+                    "requests_per_period": 100,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        assert "CF400" in _ids(ctx)
+        diag = next(r for r in ctx.results if r.rule_id == "CF400")
+        assert "Missing 'period'" in diag.message
+        assert diag.severity is Severity.ERROR
+
+    def test_cf400_non_integer_period(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {
+                    "period": "60",
+                    "requests_per_period": 100,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        assert "CF400" in _ids(ctx)
+        diag = next(r for r in ctx.results if r.rule_id == "CF400")
+        assert "must be an integer" in diag.message
+
+    def test_cf400_valid_period_clean(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 100,
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        assert "CF400" not in _ids(ctx)
+
     def test_cf401_missing_characteristics(self):
         ctx = _lint_rule(
             {
@@ -1162,6 +1216,22 @@ class TestRateLimitParams:
             "cloudflare.rate_limiting_rules",
         )
         assert "CF401" in _ids(ctx)
+
+    def test_cf401_is_an_error_and_does_not_claim_global_fallback(self):
+        """characteristics is Required in the SDK's Ratelimit params — the
+        API rejects the rule rather than falling back to a global counter."""
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {"period": 60, "requests_per_period": 100},
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        diag = next(r for r in ctx.results if r.rule_id == "CF401")
+        assert diag.severity is Severity.ERROR
+        assert "globally" not in diag.message
 
     def test_execute_action_skips_rate_limit_checks(self):
         """Execute action in rate_limiting_rules is a ruleset reference
