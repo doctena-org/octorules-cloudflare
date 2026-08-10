@@ -211,7 +211,7 @@ def _extract_field_string_values(expr: str, field: str) -> list[str]:
 
 # Pattern for extracting integer values compared against a specific field.
 # Matches: field eq 123, field ne 42, field gt 10, field >= 5, etc.
-_FIELD_INT_PATTERN_TEMPLATE = r"{field}\s+(?:eq|ne|==|!=|gt|ge|lt|le)\s+(\d+)"
+_FIELD_INT_PATTERN_TEMPLATE = r"{field}\s+(?:eq|ne|==|!=|gt|ge|lt|le|<=|>=|<|>)\s+(\d+)"
 # Matches: field in {1 2 3 10..20}
 _FIELD_INT_IN_PATTERN_TEMPLATE = r"{field}\s+in\s*\{{([^}}]+)\}}"
 
@@ -964,7 +964,9 @@ def _check_function_arg_constraints(
                     )
 
     # CF536: len() compared to negative value
-    for m_len in re.finditer(r"len\s*\([^)]+\)\s+(?:eq|ne|lt|le|gt|ge|==|!=)\s+(-?\d+)", expr):
+    for m_len in re.finditer(
+        r"len\s*\([^)]+\)\s+(?:eq|ne|lt|le|gt|ge|==|!=|<=|>=|<|>)\s+(-?\d+)", expr
+    ):
         val = int(m_len.group(1))
         if val < 0:
             ctx.add(
@@ -2267,8 +2269,12 @@ def _lint_style(info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContex
         "le": "gt",
         "==": "!=",
         "!=": "==",
+        "<": ">=",
+        ">=": "<",
+        ">": "<=",
+        "<=": ">",
     }
-    for m in re.finditer(r"\bnot\s+(\S+(?:\.\S+)*)\s+(eq|ne|lt|le|gt|ge|==|!=)\s+", expr):
+    for m in re.finditer(r"\bnot\s+(\S+(?:\.\S+)*)\s+(eq|ne|lt|le|gt|ge|==|!=|<=|>=|<|>)\s+", expr):
         op = m.group(2)
         field_name = m.group(1)
         inverse = _INVERSE_OPS.get(op, "")

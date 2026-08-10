@@ -138,6 +138,17 @@ class TestValueConstraints:
         ctx2 = _lint("cf.bot_management.score gt 1")
         assert "CF524" not in _ids(ctx2)
 
+    def test_cf524_symbolic_operators(self):
+        """Symbolic comparison spellings are as valid as word operators."""
+        ctx = _lint("cf.threat_score > 200")
+        assert "CF524" in _ids(ctx)
+        ctx2 = _lint("cf.threat_score >= 50")
+        assert "CF524" not in _ids(ctx2)
+
+    def test_cf525_symbolic_operator(self):
+        ctx = _lint("http.response.code < 42", "cloudflare.response_header_rules")
+        assert "CF525" in _ids(ctx)
+
     def test_cf525_invalid_response_code(self):
         ctx = _lint("http.response.code eq 999", "cloudflare.response_header_rules")
         assert "CF525" in _ids(ctx)
@@ -563,6 +574,18 @@ class TestNegatedComparison:
         assert o004[0].suggestion is not None
         assert "ne" in o004[0].suggestion
 
+    def test_cf513_symbolic_not_lt_to_ge(self):
+        ctx = _lint("not cf.threat_score < 50")
+        assert "CF513" in _ids(ctx)
+        found = [r for r in ctx.results if r.rule_id == "CF513"]
+        assert ">=" in found[0].suggestion
+
+    def test_cf513_symbolic_not_ge_to_lt(self):
+        ctx = _lint("not cf.threat_score >= 50")
+        assert "CF513" in _ids(ctx)
+        found = [r for r in ctx.results if r.rule_id == "CF513"]
+        assert "cf.threat_score <" in found[0].suggestion
+
 
 class TestIllogicalCondition:
     def test_cf514_contradictory_and(self):
@@ -680,6 +703,21 @@ class TestLenNegative:
 
     def test_cf536_positive_ok(self):
         ctx = _lint("len(http.host) gt 10")
+        assert "CF536" not in _ids(ctx)
+
+    def test_cf536_symbolic_operators_trigger(self):
+        """`len(x) < -1` is as impossible as `len(x) lt -1`."""
+        for expr in (
+            "len(http.host) < -1",
+            "len(http.host) <= -1",
+            "len(http.host) > -5",
+            "len(http.host) >= -2",
+        ):
+            ctx = _lint(expr)
+            assert "CF536" in _ids(ctx), expr
+
+    def test_cf536_symbolic_positive_ok(self):
+        ctx = _lint("len(http.host) > 10")
         assert "CF536" not in _ids(ctx)
 
 

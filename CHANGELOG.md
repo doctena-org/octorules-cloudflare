@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - `audit` no longer counts a value compared with `ne`/`!=` as a match
   target; the comparison exempts it, like `not (... in ...)`.
+- CF513, CF524, CF525, CF532, CF533 and CF536 now match the symbolic
+  comparison operators (`<`, `<=`, `>`, `>=`) in expressions, not only the
+  word spellings.
 
 ## [0.14.0] - 2026-08-08
 
