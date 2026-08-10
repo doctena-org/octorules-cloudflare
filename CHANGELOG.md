@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Development status classifier: Beta → Production/Stable.
 - **CF401** is now an ERROR: the API requires `ratelimit.characteristics`
   (the old WARNING claimed a missing list "applies globally" — it is
   rejected instead).
