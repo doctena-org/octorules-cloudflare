@@ -477,6 +477,7 @@ class TestListMethods:
         with pytest.raises(ProviderError, match="unknown error"):
             provider.poll_bulk_operation(scope, "op-123")
 
+    @patch("octorules_cloudflare.provider._BULK_POLL_TIMEOUT", 0.01)
     @patch("octorules_cloudflare.provider.time.sleep")
     def test_poll_bulk_operation_timeout_raises(self, _mock_sleep, mock_cf_client):
         """poll_bulk_operation raises ProviderError when timeout exceeded."""
@@ -486,7 +487,7 @@ class TestListMethods:
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
         with pytest.raises(ProviderError, match="Bulk operation op-123 timed out"):
-            provider.poll_bulk_operation(scope, "op-123", timeout=0.01)
+            provider.poll_bulk_operation(scope, "op-123")
 
     @patch("octorules_cloudflare.provider.time.sleep")
     def test_poll_bulk_operation_completes_after_retries(self, _mock_sleep, mock_cf_client):
@@ -498,7 +499,7 @@ class TestListMethods:
         ]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        result = provider.poll_bulk_operation(scope, "op-123", timeout=10.0)
+        result = provider.poll_bulk_operation(scope, "op-123")
         assert result == "completed"
         assert mock_cf_client.rules.lists.bulk_operations.get.call_count == 3
 
@@ -516,7 +517,7 @@ class TestListMethods:
         ]
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        result = provider.poll_bulk_operation(scope, "op-123", timeout=60.0)
+        result = provider.poll_bulk_operation(scope, "op-123")
         assert result == "completed"
         assert mock_sleep.call_count == 5
         assert mock_sleep.call_args_list == [

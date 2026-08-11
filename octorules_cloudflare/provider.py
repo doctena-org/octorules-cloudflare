@@ -69,6 +69,11 @@ _LIST_PAGE_BACKOFF = (1.0, 2.0, 3.0, 5.0)
 _LIST_MAX_PAGES = 1000
 _BULK_POLL_BACKOFF = (1.0, 2.0, 3.0, 5.0)
 _BULK_POLL_MAX_ATTEMPTS = 30
+# Wall-clock ceiling for a bulk list operation. Deliberately a constant rather
+# than a parameter: no caller has ever needed a different value, and a knob with
+# no caller is surface we would owe forever. If a large-list user reports a
+# timeout, that is the moment this becomes configurable.
+_BULK_POLL_TIMEOUT = 120.0
 
 
 def _normalize_plan_name(raw: str) -> str:
@@ -564,16 +569,15 @@ class CloudflareProvider:
         return d.get("operation_id", "")
 
     @_wrap_provider_errors
-    def poll_bulk_operation(
-        self, scope: Scope, operation_id: str, *, timeout: float = 120.0
-    ) -> str:
+    def poll_bulk_operation(self, scope: Scope, operation_id: str) -> str:
         """Poll a bulk operation until completion.
 
         Uses graduated backoff with jitter: 1s -> 2s -> 3s -> 5s (capped),
         plus up to 0.5s random jitter per interval.
-        Returns "completed". Raises APIError on "failed", ProviderError on
-        timeout or after ``_BULK_POLL_MAX_ATTEMPTS`` polls.
+        Returns "completed". Raises APIError on "failed", ProviderError after
+        ``_BULK_POLL_TIMEOUT`` seconds or ``_BULK_POLL_MAX_ATTEMPTS`` polls.
         """
+        timeout = _BULK_POLL_TIMEOUT
         sl = _fmt_scope(scope)
         log.debug("POLL bulk_operations/%s %s", operation_id, sl)
         start = time.monotonic()

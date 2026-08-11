@@ -1335,6 +1335,7 @@ class TestProviderErrorScenarios:
         # Should have been called 2 times (1 initial + 1 retry)
         assert mock_cf_client.rules.lists.items.with_raw_response.list.call_count == 2
 
+    @patch("octorules_cloudflare.provider._BULK_POLL_TIMEOUT", 0.01)
     @patch("octorules_cloudflare.provider.time.sleep")
     def test_poll_bulk_operation_timeout(self, _mock_sleep, mock_cf_client):
         """poll_bulk_operation should raise ProviderError when status stays 'running'."""
@@ -1344,8 +1345,9 @@ class TestProviderErrorScenarios:
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
         with pytest.raises(ProviderError, match="timed out"):
-            provider.poll_bulk_operation(scope, "op-timeout", timeout=0.01)
+            provider.poll_bulk_operation(scope, "op-timeout")
 
+    @patch("octorules_cloudflare.provider._BULK_POLL_TIMEOUT", 9999.0)
     @patch("octorules_cloudflare.provider.time.sleep")
     def test_poll_bulk_operation_max_attempts(self, _mock_sleep, mock_cf_client):
         """poll_bulk_operation should raise ProviderError when max poll attempts exceeded."""
@@ -1354,9 +1356,9 @@ class TestProviderErrorScenarios:
         )
         provider = CloudflareProvider(token="token", client=mock_cf_client)
         scope = Scope(account_id="acct-123")
-        # Use a very large timeout so only the attempt cap triggers
+        # Raise the wall-clock ceiling so only the attempt cap can trigger
         with pytest.raises(ProviderError, match="after 30 polls"):
-            provider.poll_bulk_operation(scope, "op-max", timeout=9999)
+            provider.poll_bulk_operation(scope, "op-max")
 
 
 class TestGetListItemsRetry:
