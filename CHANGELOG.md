@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Minimum `octorules` dependency: `>=0.35.0` (for `iter_audit_rules`).
+
 ### Fixed
 - Content scanning deleted expressions before creating them, so one failing
   delete left the zone stripped of expressions and with none of the new ones.

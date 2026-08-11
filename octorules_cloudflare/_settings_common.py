@@ -35,8 +35,9 @@ def apply_each(operations: Iterable[tuple[str, Callable[[], object]]], *, sectio
     than collected: every remaining call would fail the same way, and the
     caller needs the auth error itself, not a summary that buries it.
     """
-    from cloudflare import AuthenticationError, PermissionDeniedError
     from octorules.provider.exceptions import ProviderError
+
+    from octorules_cloudflare.exceptions import AuthenticationError, PermissionDeniedError
 
     applied: list[str] = []
     failures: list[tuple[str, Exception]] = []
