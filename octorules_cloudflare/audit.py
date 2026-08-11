@@ -2,9 +2,8 @@
 
 import re
 
-from octorules.audit import RuleIPInfo
+from octorules.audit import RuleIPInfo, iter_audit_rules
 from octorules.extensions import register_audit_extension
-from octorules.phases import PHASE_BY_NAME
 
 from octorules_cloudflare import CF_PHASE_NAMES
 from octorules_cloudflare.linter.expression_bridge import parse_expression
@@ -108,19 +107,9 @@ def _extract_ips(rules_data: dict, phase_name: str) -> list[RuleIPInfo]:
     Rules nested in ``custom_rulesets`` are walked by core, which resolves the
     ruleset's ``phase`` and calls back in with the matching section.
     """
-    if phase_name not in CF_PHASE_NAMES:
-        return []
-    if phase_name not in PHASE_BY_NAME:
-        return []
-
-    rules = rules_data.get(phase_name)
-    if not isinstance(rules, list):
-        return []
 
     results: list[RuleIPInfo] = []
-    for rule in rules:
-        if not isinstance(rule, dict):
-            continue
+    for rule in iter_audit_rules(rules_data, phase_name, CF_PHASE_NAMES):
         # A disabled rule enforces nothing, so its addresses are not match
         # targets: auditing them reports overlaps and drift against traffic
         # handling that does not happen. Absent `enabled` means enabled.
