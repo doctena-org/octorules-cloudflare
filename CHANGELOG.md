@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Content scanning deleted expressions before creating them, so one failing
+  delete left the zone stripped of expressions and with none of the new ones.
+  Creates now run first.
+- `zone_security`, `leaked_credentials` and `content_scanning` stopped at the
+  first failed API call, applying an unreported subset. Every change is now
+  attempted and the error names what applied and what did not.
+
 ## [0.15.0] - 2026-08-10
 
 ### Changed

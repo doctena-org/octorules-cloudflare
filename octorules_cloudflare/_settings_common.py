@@ -11,11 +11,55 @@ to reduce duplication across modules.
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 log = logging.getLogger(__name__)
 
 _MISSING = object()
+
+
+def apply_each(operations: Iterable[tuple[str, Callable[[], object]]], *, section: str, scope):
+    """Attempt every operation, then raise once if any of them failed.
+
+    *operations* is an iterable of ``(label, call)`` pairs that are independent
+    of one another. Each is attempted even if an earlier one raised, and a
+    single :class:`ProviderError` at the end names what landed and what did not.
+
+    These settings APIs are one HTTP request per field or per object with no
+    transaction around them, so a loop that stops at the first failure leaves
+    the zone in a state neither the plan nor the error message describes. The
+    caller cannot fix that by ordering alone; it needs to know which subset
+    applied.
+
+    Authentication and permission failures are re-raised immediately rather
+    than collected: every remaining call would fail the same way, and the
+    caller needs the auth error itself, not a summary that buries it.
+    """
+    from cloudflare import AuthenticationError, PermissionDeniedError
+    from octorules.provider.exceptions import ProviderError
+
+    applied: list[str] = []
+    failures: list[tuple[str, Exception]] = []
+
+    for label, call in operations:
+        try:
+            call()
+        except (AuthenticationError, PermissionDeniedError):
+            raise
+        except Exception as e:
+            failures.append((label, e))
+        else:
+            applied.append(label)
+
+    if not failures:
+        return
+
+    detail = "; ".join(f"{label} ({type(err).__name__}: {err})" for label, err in failures)
+    raise ProviderError(
+        f"{section}: {len(failures)} of {len(applied) + len(failures)} change(s) failed on"
+        f" {scope.label}. Applied: {', '.join(applied) if applied else 'none'}."
+        f" Failed: {detail}"
+    )
 
 
 def partition_unsupported(current: dict, desired: dict) -> tuple[dict, list[str]]:

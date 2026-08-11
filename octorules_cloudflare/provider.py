@@ -883,17 +883,30 @@ class CloudflareProvider:
         Updates each changed setting individually via:
         ``client.zones.settings.edit(setting_id, zone_id=..., value=...)``.
         """
+        from octorules_cloudflare._settings_common import apply_each
         from octorules_cloudflare._zone_security import _SETTING_IDS
 
         sl = _fmt_scope(scope)
         log.debug("PUT zone security settings %s", sl)
+
+        def _edit(setting_id: str, value: object):
+            def _call():
+                log.debug("  setting %s=%r %s", setting_id, value, sl)
+                return self._client.zones.settings.edit(
+                    setting_id, zone_id=scope.zone_id, value=value
+                )
+
+            return _call
+
+        operations = []
         for yaml_key, value in settings.items():
             setting_id = _SETTING_IDS.get(yaml_key)
             if setting_id is None:
                 log.warning("Unknown zone security setting %r, skipping", yaml_key)
                 continue
-            log.debug("  setting %s=%r %s", setting_id, value, sl)
-            self._client.zones.settings.edit(setting_id, zone_id=scope.zone_id, value=value)
+            operations.append((yaml_key, _edit(setting_id, value)))
+
+        apply_each(operations, section="cloudflare.zone_security", scope=scope)
 
     # --- Leaked Credential Check API ---
 
@@ -951,38 +964,61 @@ class CloudflareProvider:
             if username:
                 current_by_username[username] = d
 
-        desired_usernames: set[str] = set()
-        for det in desired:
-            username = det["username"]
-            desired_usernames.add(username)
-            existing = current_by_username.get(username)
-            if existing is None:
-                # Create
-                log.debug("  CREATE detection username=%r %s", username, sl)
-                self._client.leaked_credential_checks.detections.create(
+        from octorules_cloudflare._settings_common import apply_each
+
+        def _create(det: dict):
+            def _call():
+                log.debug("  CREATE detection username=%r %s", det["username"], sl)
+                return self._client.leaked_credential_checks.detections.create(
                     zone_id=scope.zone_id,
                     username=det["username"],
                     password=det["password"],
                 )
-            elif existing.get("password") != det["password"]:
-                # Update
-                det_id = existing.get("id", "")
-                log.debug("  UPDATE detection %s username=%r %s", det_id, username, sl)
-                self._client.leaked_credential_checks.detections.update(
+
+            return _call
+
+        def _update(det_id: str, det: dict):
+            def _call():
+                log.debug("  UPDATE detection %s username=%r %s", det_id, det["username"], sl)
+                return self._client.leaked_credential_checks.detections.update(
                     det_id,
                     zone_id=scope.zone_id,
                     username=det["username"],
                     password=det["password"],
                 )
 
-        # Delete detections not in desired
-        for username, existing in current_by_username.items():
-            if username not in desired_usernames:
-                det_id = existing.get("id", "")
+            return _call
+
+        def _delete(det_id: str, username: str):
+            def _call():
                 log.debug("  DELETE detection %s username=%r %s", det_id, username, sl)
-                self._client.leaked_credential_checks.detections.delete(
+                return self._client.leaked_credential_checks.detections.delete(
                     det_id, zone_id=scope.zone_id
                 )
+
+            return _call
+
+        # Creates and updates come first, deletes last: a failure part-way
+        # through then leaves a superset of the desired state rather than a
+        # zone missing detections it is supposed to have.
+        operations: list[tuple[str, object]] = []
+        desired_usernames: set[str] = set()
+        for det in desired:
+            username = det["username"]
+            desired_usernames.add(username)
+            existing = current_by_username.get(username)
+            if existing is None:
+                operations.append((f"create {username!r}", _create(det)))
+            elif existing.get("password") != det["password"]:
+                operations.append((f"update {username!r}", _update(existing.get("id", ""), det)))
+
+        for username, existing in current_by_username.items():
+            if username not in desired_usernames:
+                operations.append(
+                    (f"delete {username!r}", _delete(existing.get("id", ""), username))
+                )
+
+        apply_each(operations, section="cloudflare.leaked_credentials", scope=scope)
 
     # --- Content Scanning API ---
 
@@ -1036,24 +1072,43 @@ class CloudflareProvider:
             if payload_str:
                 current_by_payload[payload_str] = d
 
+        from octorules_cloudflare._settings_common import apply_each
+
         desired_payloads: set[str] = {e["payload"] for e in desired}
-
-        # Delete expressions not in desired
-        for payload_str, existing in current_by_payload.items():
-            if payload_str not in desired_payloads:
-                expr_id = existing.get("id", "")
-                log.debug("  DELETE expression %s payload=%r %s", expr_id, payload_str, sl)
-                self._client.content_scanning.payloads.delete(expr_id, zone_id=scope.zone_id)
-
-        # Create new expressions (those in desired but not in current)
         current_payloads = set(current_by_payload.keys())
         new_exprs = [e for e in desired if e["payload"] not in current_payloads]
+
+        operations: list[tuple[str, object]] = []
+
+        # Create before delete. The reverse order meant a single failing delete
+        # aborted the method before any create ran, so the zone lost expressions
+        # and gained none -- the worst of the three possible outcomes. Creating
+        # first leaves a superset instead, which the next sync converges.
         if new_exprs:
-            log.debug("  CREATE %d expression(s) %s", len(new_exprs), sl)
-            self._client.content_scanning.payloads.create(
-                zone_id=scope.zone_id,
-                body=[{"payload": e["payload"]} for e in new_exprs],
-            )
+
+            def _create_new():
+                log.debug("  CREATE %d expression(s) %s", len(new_exprs), sl)
+                return self._client.content_scanning.payloads.create(
+                    zone_id=scope.zone_id,
+                    body=[{"payload": e["payload"]} for e in new_exprs],
+                )
+
+            operations.append((f"create {len(new_exprs)} expression(s)", _create_new))
+
+        def _delete(expr_id: str, payload_str: str):
+            def _call():
+                log.debug("  DELETE expression %s payload=%r %s", expr_id, payload_str, sl)
+                return self._client.content_scanning.payloads.delete(expr_id, zone_id=scope.zone_id)
+
+            return _call
+
+        for payload_str, existing in current_by_payload.items():
+            if payload_str not in desired_payloads:
+                operations.append(
+                    (f"delete {payload_str!r}", _delete(existing.get("id", ""), payload_str))
+                )
+
+        apply_each(operations, section="cloudflare.content_scanning", scope=scope)
 
 
 def _to_dict(obj: object) -> dict:
