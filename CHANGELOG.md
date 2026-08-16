@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   rules as an ordered list identified by `description` (the API persists no
   `ref`). Six new lint rules (CF490-CF495) plus full expression analysis and
   request-phase field checks on rule expressions.
+- **`alerting_policies`**, managing the account's notification policies from
+  the account rules file: identity by `name`, `$name` webhook references,
+  zone names in `filters.zones`, and validation against the account's
+  `available_alerts` registry.
 
 ## [0.16.0] - 2026-08-16
 

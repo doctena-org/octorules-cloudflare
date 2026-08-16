@@ -64,3 +64,35 @@ cloudflare:
       description: "Log ICMP traffic"
       expression: 'ip.proto eq "icmp"'
       action: log
+
+  # ---------------------------------------------------------------------------
+  # Alerting (notification policies)
+  # ---------------------------------------------------------------------------
+  # Account-scoped notification policies. Policies are identified by name;
+  # webhook destinations are referenced by name with a $ prefix and resolved
+  # against the account's destinations at plan time; zone names inside
+  # filters.zones are resolved to zone ids the same way. alert_type is
+  # validated against the account's own available_alerts registry.
+  alerting_policies:
+    - name: "Certificate expiring soon"
+      alert_type: dedicated_ssl_certificate_event_type
+      enabled: true
+      mechanisms:
+        email: ["security@account-a.example"]
+        webhooks: ["$Ops Slack"]
+
+    - name: "Cloudflare incident affecting us"
+      alert_type: incident_alert
+      enabled: true
+      filters:
+        incident_impact: [INCIDENT_IMPACT_CRITICAL, INCIDENT_IMPACT_MAJOR]
+      mechanisms:
+        webhooks: ["$Ops Slack"]
+
+    - name: "WAF anomaly detected"
+      alert_type: clickhouse_alert_fw_ent_anomaly
+      enabled: true
+      filters:
+        zones: [account-a.example]
+      mechanisms:
+        webhooks: ["$Ops Slack"]

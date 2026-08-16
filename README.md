@@ -89,6 +89,7 @@ a single `cloudflare:` block.
 | security.txt (`security_txt`) | Supported |
 | Managed Transforms (`managed_transforms`) | Supported |
 | Cloud Connector rules (`cloud_connector_rules`) | Supported |
+| Alerting / notification policies (`alerting_policies`) | Supported |
 | Leaked Credential Check (`leaked_credential_check`) | Supported |
 | Content Scanning / anti-malware (`content_scanning`) | Supported |
 
@@ -295,6 +296,44 @@ Each rule entry:
 - Rule order is part of the desired state — reordering rules in YAML is a planned change.
 - The presence of a `cloud_connector_rules:` key means ALL rules are managed — the list is replaced wholesale on sync, so rules in Cloudflare not in YAML are planned for deletion. If the key is absent, Cloud Connector is ignored entirely.
 - Use `octorules dump` to export existing Cloud Connector rules to YAML.
+
+## Alerting policies (account-level)
+
+Cloudflare [notification policies](https://developers.cloudflare.com/notifications/) decide who gets told when something happens — a certificate about to expire, an L7 DDoS event, a Cloudflare incident. They live on the account, so the section belongs in the account-scoped rules file:
+
+```yaml
+# rules/account-a.yaml
+cloudflare:
+  alerting_policies:
+    - name: "Certificate expiring soon"
+      alert_type: dedicated_ssl_certificate_event_type
+      enabled: true
+      mechanisms:
+        email: ["security@account-a.example"]
+        webhooks: ["$Ops Slack"]
+```
+
+Each policy entry:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Policy name — used as the identity key for matching |
+| `alert_type` | One of the account's available alert types |
+| `enabled` | Boolean |
+| `mechanisms` | Destinations: `email` (addresses), `webhooks` (`$name` references or ids), `pagerduty` (ids) — at least one required |
+| `description` | Optional |
+| `alert_interval` | Optional re-alert interval |
+| `filters` | Optional per-type filters; `zones` entries are zone names |
+
+**How it works:**
+
+- The `name` field is the identity key. Policies are matched between YAML and Cloudflare by name; names must be unique.
+- Webhook destinations are referenced by name with a `$` prefix (`"$Ops Slack"`) and resolved against the account's webhook destinations at plan time. Destinations themselves are not managed — create them once in the dashboard.
+- Zone names inside `filters.zones` are resolved to zone ids on plan and translated back on dump, so the YAML never carries UUIDs.
+- `alert_type` and each type's required filters are validated at plan time against the account's own `available_alerts` registry, not a hardcoded table — an alert type this account cannot use, or a missing required filter, fails the plan before the API rejects it.
+- The presence of an `alerting_policies:` key means ALL policies are managed — policies in Cloudflare not in YAML are planned for deletion. If the key is absent, alerting is ignored entirely.
+- Fields the YAML declares replace the live value; optional fields it omits keep their dashboard-set values.
+- Use `octorules dump` to export existing policies to YAML.
 
 ## Linting
 

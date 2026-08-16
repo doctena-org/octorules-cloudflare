@@ -153,6 +153,7 @@ _CLOUDFLARE_NAMESPACE_MAPPING: tuple[str, ...] = (
     "security_txt",
     "managed_transforms",
     "cloud_connector_rules",
+    "alerting_policies",
     "leaked_credential_check",
     "content_scanning",
     "url_normalization_settings",
@@ -212,6 +213,12 @@ register_non_phase_key("cloudflare.cloud_connector_rules")
 from octorules_cloudflare._cloud_connector import register_cloud_connector  # noqa: E402
 
 register_cloud_connector()
+
+# Register the alerting (notification policies) extension hooks.
+register_non_phase_key("cloudflare.alerting_policies")
+from octorules_cloudflare._alerting import register_alerting  # noqa: E402
+
+register_alerting()
 
 # Register leaked credential check extension hooks.
 register_non_phase_key("cloudflare.leaked_credential_check")

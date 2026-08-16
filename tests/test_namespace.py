@@ -18,7 +18,7 @@ class TestCloudflareNamespace:
         """Cloudflare namespace mapping contains expected keys."""
         ns = PROVIDER_NAMESPACES["cloudflare"]
         assert isinstance(ns, dict)
-        assert len(ns) == 35  # 23 phases + 4 non-phase + 8 settings
+        assert len(ns) == 36  # 23 phases + 5 non-phase + 8 settings
 
         # Expected mapping (nested key -> canonical flat key)
         expected = {
@@ -51,6 +51,7 @@ class TestCloudflareNamespace:
             "lists": "cloudflare.lists",
             "page_shield_policies": "cloudflare.page_shield_policies",
             "cloud_connector_rules": "cloudflare.cloud_connector_rules",
+            "alerting_policies": "cloudflare.alerting_policies",
             # Settings (drop cloudflare_ prefix)
             "bot_management": "cloudflare.bot_management",
             "zone_security": "cloudflare.zone_security",

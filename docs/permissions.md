@@ -58,6 +58,7 @@ specific dashboard permission.
 |---|---|---|
 | Custom rulesets | Account > Account Rulesets | Read/Write |
 | Lists (IP, ASN, hostname, redirect) | Account > Account Rule Lists | Read/Write |
+| Alerting policies (`alerting_policies`) | Account > Notifications | Read/Write |
 
 ## Zone-Level Extensions
 

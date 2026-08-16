@@ -777,6 +777,7 @@ class CloudflareProvider:
         Core walks this instead of a global registry, so an extension is
         only ever handed the provider that owns it.
         """
+        from octorules_cloudflare._alerting import AlertingExtension
         from octorules_cloudflare._bot_management import BotManagementExtension
         from octorules_cloudflare._cloud_connector import CloudConnectorExtension
         from octorules_cloudflare._content_scanning import ContentScanningExtension
@@ -797,6 +798,7 @@ class CloudflareProvider:
                 SecurityTxtExtension(),
                 ManagedTransformsExtension(),
                 CloudConnectorExtension(),
+                AlertingExtension(),
                 LeakedCredentialsExtension(),
                 ContentScanningExtension(),
                 PageShieldExtension(),
@@ -1074,6 +1076,85 @@ class CloudflareProvider:
                 response_count,
             )
         return response_count
+
+    # --- Alerting (notification policies) API ---
+
+    @_wrap_provider_errors
+    def get_alerting_policies(self, scope: Scope) -> list[dict]:
+        """Fetch the account's notification policies as plain dicts."""
+        sl = _fmt_scope(scope)
+        log.debug("GET alerting/v3/policies %s", sl)
+        result = self._client.alerting.policies.list(account_id=scope.account_id)
+        return [_to_dict(p) for p in result]
+
+    @_wrap_provider_errors
+    def create_alerting_policy(self, scope: Scope, **kwargs) -> dict:
+        """Create a notification policy. Returns the response dict (carries ``id``)."""
+        sl = _fmt_scope(scope)
+        log.debug("POST alerting/v3/policies %s name=%r", sl, kwargs.get("name"))
+        result = self._client.alerting.policies.create(account_id=scope.account_id, **kwargs)
+        return _to_dict(result) if result is not None else {}
+
+    @_wrap_provider_errors
+    def update_alerting_policy(self, scope: Scope, policy_id: str, **kwargs) -> None:
+        """Replace a notification policy (whole-object PUT)."""
+        sl = _fmt_scope(scope)
+        log.debug("PUT alerting/v3/policies/%s %s", policy_id, sl)
+        self._client.alerting.policies.update(policy_id, account_id=scope.account_id, **kwargs)
+
+    @_wrap_provider_errors
+    def delete_alerting_policy(self, scope: Scope, policy_id: str) -> None:
+        """Delete a notification policy."""
+        sl = _fmt_scope(scope)
+        log.debug("DELETE alerting/v3/policies/%s %s", policy_id, sl)
+        self._client.alerting.policies.delete(policy_id, account_id=scope.account_id)
+
+    @_wrap_provider_errors
+    def get_alerting_webhooks(self, scope: Scope) -> list[dict]:
+        """Fetch the account's webhook destinations (id, name, type, url)."""
+        sl = _fmt_scope(scope)
+        log.debug("GET alerting/v3/destinations/webhooks %s", sl)
+        result = self._client.alerting.destinations.webhooks.list(account_id=scope.account_id)
+        return [_to_dict(w) for w in result]
+
+    @_wrap_provider_errors
+    def get_available_alerts(self, scope: Scope) -> dict[str, list[dict]]:
+        """Fetch the account's available alert types keyed by type name.
+
+        Returns ``{alert_type: [filter_option, ...]}`` where each filter
+        option is the API's ``{"Key": ..., "ComparisonOperator": ...,
+        "Range": ..., "AvailableValues": ...}`` dict. This is the account's
+        own capability registry -- which alert types exist here, and which
+        filters each accepts -- so validation reads it instead of a
+        hardcoded table.
+        """
+        sl = _fmt_scope(scope)
+        log.debug("GET alerting/v3/available_alerts %s", sl)
+        result = self._client.alerting.available_alerts.list(account_id=scope.account_id)
+        if result is None:
+            return {}
+        # The response is a category -> item-list mapping; the items are SDK
+        # models (or plain dicts, depending on the response envelope).
+        raw = result if isinstance(result, dict) else _to_dict(result)
+        available: dict[str, list[dict]] = {}
+        for items in raw.values():
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                d = _to_dict(item)
+                if d.get("type"):
+                    available[d["type"]] = d.get("filter_options") or []
+        return available
+
+    @_wrap_provider_errors
+    def get_zone_id_map(self, scope: Scope) -> dict[str, str]:
+        """Map every zone name reachable with this token to its zone id.
+
+        Used by the alerting extension to translate zone names in policy
+        filters to the zone ids the API stores, and back again on dump.
+        """
+        log.debug("GET zones (id map) %s", _fmt_scope(scope))
+        return {z.name: z.id for z in self._client.zones.list()}
 
     # --- Leaked Credential Check API ---
 

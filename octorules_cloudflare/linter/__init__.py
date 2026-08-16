@@ -27,3 +27,4 @@ def register_cloudflare_linter() -> None:
     register_api_fields("action_parameters", {"version", "disable_railgun"})
     register_api_fields("list_item", {"id", "created_on", "modified_on"})
     register_api_fields("page_shield_policy", {"id", "last_updated"})
+    register_api_fields("alerting_policy", {"id", "created", "modified"})
