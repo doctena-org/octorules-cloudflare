@@ -348,5 +348,22 @@ CF478 = RuleMeta("CF478", "list", "Overlapping IP/CIDR entries in list", Severit
 CF479 = RuleMeta("CF479", "list", "Redirect source_url contains a query string", Severity.ERROR)
 CF480 = RuleMeta("CF480", "list", "Invalid list name (format or length)", Severity.ERROR)
 
+# Category U — Cloud Connector Rules
+CF490 = RuleMeta(
+    "CF490", "cloud_connector", "Missing required Cloud Connector field", Severity.ERROR
+)
+CF491 = RuleMeta("CF491", "cloud_connector", "Invalid Cloud Connector provider", Severity.ERROR)
+CF492 = RuleMeta("CF492", "cloud_connector", "Invalid Cloud Connector field type", Severity.ERROR)
+CF493 = RuleMeta(
+    "CF493", "cloud_connector", "Duplicate Cloud Connector description", Severity.WARNING
+)
+CF494 = RuleMeta("CF494", "cloud_connector", "Unknown Cloud Connector field", Severity.ERROR)
+CF495 = RuleMeta(
+    "CF495",
+    "cloud_connector",
+    "Duplicate expression across enabled Cloud Connector rules",
+    Severity.WARNING,
+)
+
 # Collect all rule metas for registration
 CF_RULE_METAS: list[RuleMeta] = [obj for obj in globals().values() if isinstance(obj, RuleMeta)]

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`security_txt`**, managing the zone's RFC 9116 `/.well-known/security.txt`
+  file. `contact` and `expires` are required while `enabled` is true; lint
+  warns once `expires` has passed.
+- **`managed_transforms`**, toggling Cloudflare's managed request/response
+  header transforms. The plan fails when the state after apply would enable
+  two transforms the live API declares mutually exclusive.
+- **`cloud_connector_rules`**, managing the zone's Cloud Connector routing
+  rules as an ordered list identified by `description` (the API persists no
+  `ref`). Six new lint rules (CF490-CF495) plus full expression analysis and
+  request-phase field checks on rule expressions.
+
 ## [0.16.0] - 2026-08-16
 
 ### Added

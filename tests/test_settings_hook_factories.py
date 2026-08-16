@@ -134,6 +134,8 @@ WIRING = [
         "cloudflare.leaked_credential_check",
         "get_leaked_credential_check",
     ),
+    ("zone_tls", "cloudflare.zone_tls", "get_zone_tls_settings"),
+    ("security_txt", "cloudflare.security_txt", "get_security_txt"),
 ]
 
 

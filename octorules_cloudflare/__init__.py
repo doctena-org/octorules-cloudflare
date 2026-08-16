@@ -150,6 +150,9 @@ _CLOUDFLARE_NAMESPACE_MAPPING: tuple[str, ...] = (
     "bot_management",
     "zone_security",
     "zone_tls",
+    "security_txt",
+    "managed_transforms",
+    "cloud_connector_rules",
     "leaked_credential_check",
     "content_scanning",
     "url_normalization_settings",
@@ -191,6 +194,24 @@ from octorules_cloudflare._zone_tls import register_zone_tls  # noqa: E402
 
 register_zone_security()
 register_zone_tls()
+
+# Register the security.txt extension hooks.
+register_non_phase_key("cloudflare.security_txt")
+from octorules_cloudflare._security_txt import register_security_txt  # noqa: E402
+
+register_security_txt()
+
+# Register the managed transforms extension hooks.
+register_non_phase_key("cloudflare.managed_transforms")
+from octorules_cloudflare._managed_transforms import register_managed_transforms  # noqa: E402
+
+register_managed_transforms()
+
+# Register the Cloud Connector extension hooks.
+register_non_phase_key("cloudflare.cloud_connector_rules")
+from octorules_cloudflare._cloud_connector import register_cloud_connector  # noqa: E402
+
+register_cloud_connector()
 
 # Register leaked credential check extension hooks.
 register_non_phase_key("cloudflare.leaked_credential_check")

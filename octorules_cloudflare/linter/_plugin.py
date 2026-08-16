@@ -12,6 +12,7 @@ from octorules.phases import PHASE_BY_NAME
 
 from octorules_cloudflare.linter.action_validator import RULE_IDS as _av
 from octorules_cloudflare.linter.ast_linter import RULE_IDS as _al
+from octorules_cloudflare.linter.cloud_connector_linter import RULE_IDS as _ccl
 from octorules_cloudflare.linter.cross_rule_linter import RULE_IDS as _cr
 from octorules_cloudflare.linter.custom_ruleset_linter import RULE_IDS as _crl
 from octorules_cloudflare.linter.list_linter import RULE_IDS as _ll
@@ -20,7 +21,7 @@ from octorules_cloudflare.linter.phase_linter import RULE_IDS as _pl
 from octorules_cloudflare.linter.plan_linter import RULE_IDS as _pll
 from octorules_cloudflare.linter.yaml_validator import RULE_IDS as _yv
 
-CF_RULE_IDS: frozenset[str] = _av | _al | _cr | _crl | _ll | _psl | _pl | _pll | _yv
+CF_RULE_IDS: frozenset[str] = _av | _al | _ccl | _cr | _crl | _ll | _psl | _pl | _pll | _yv
 
 
 def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
@@ -35,6 +36,7 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
     """
     from octorules_cloudflare.linter.action_validator import lint_actions
     from octorules_cloudflare.linter.ast_linter import lint_expressions
+    from octorules_cloudflare.linter.cloud_connector_linter import lint_cloud_connector_rules
     from octorules_cloudflare.linter.cross_rule_linter import lint_cross_rules
     from octorules_cloudflare.linter.custom_ruleset_linter import lint_custom_rulesets
     from octorules_cloudflare.linter.list_linter import lint_lists
@@ -90,6 +92,9 @@ def cloudflare_lint(rules_data: dict[str, Any], ctx: LintContext) -> None:
 
     # Stage 2d: List validation
     lint_lists(rules_data, ctx)
+
+    # Stage 2e: Cloud Connector rule checks
+    lint_cloud_connector_rules(rules_data, ctx)
 
     # Stage 3: Plan-tier checks
     lint_plan_tier(rules_data, ctx)

@@ -67,6 +67,9 @@ specific dashboard permission.
 | `bot_management` | `/zones/{id}/bot_management` | Zone > Bot Management |
 | `zone_security` | `/zones/{id}/settings/{setting}` | Zone > Zone Settings |
 | `zone_tls` | `/zones/{id}/settings/{setting}` | Zone > Zone Settings |
+| `security_txt` | `/zones/{id}/security-center/securitytxt` | Zone > Zone Security Center Insights |
+| `managed_transforms` | `/zones/{id}/managed_headers` | Zone > Managed headers |
+| `cloud_connector_rules` | `/zones/{id}/cloud_connector/rules` | Zone > Cloud Connector |
 | `url_normalization_settings` | `/zones/{id}/url_normalization` | Zone > Sanitize |
 | `leaked_credential_check` | `/zones/{id}/leaked-credential-checks` | Zone > Zone WAF |
 | `content_scanning` | `/zones/{id}/content-upload-scan/*` | Zone > Zone WAF |

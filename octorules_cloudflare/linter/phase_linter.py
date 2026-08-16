@@ -37,6 +37,7 @@ _REQUEST_ONLY_PHASES = frozenset(
         "cloudflare.http_ddos_rules",
         "cloudflare.bulk_redirect_rules",
         "cloudflare.url_normalization",
+        "cloudflare.cloud_connector_rules",
     }
 )
 

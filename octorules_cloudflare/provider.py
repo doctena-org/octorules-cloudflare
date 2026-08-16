@@ -778,8 +778,11 @@ class CloudflareProvider:
         only ever handed the provider that owns it.
         """
         from octorules_cloudflare._bot_management import BotManagementExtension
+        from octorules_cloudflare._cloud_connector import CloudConnectorExtension
         from octorules_cloudflare._content_scanning import ContentScanningExtension
         from octorules_cloudflare._leaked_credentials import LeakedCredentialsExtension
+        from octorules_cloudflare._managed_transforms import ManagedTransformsExtension
+        from octorules_cloudflare._security_txt import SecurityTxtExtension
         from octorules_cloudflare._url_normalization import UrlNormalizationExtension
         from octorules_cloudflare._zone_security import ZoneSecurityExtension
         from octorules_cloudflare._zone_tls import ZoneTlsExtension
@@ -791,6 +794,9 @@ class CloudflareProvider:
                 UrlNormalizationExtension(),
                 ZoneSecurityExtension(),
                 ZoneTlsExtension(),
+                SecurityTxtExtension(),
+                ManagedTransformsExtension(),
+                CloudConnectorExtension(),
                 LeakedCredentialsExtension(),
                 ContentScanningExtension(),
                 PageShieldExtension(),
@@ -964,6 +970,110 @@ class CloudflareProvider:
             operations.append((yaml_key, _edit(setting_id, value)))
 
         apply_each(operations, section="cloudflare.zone_tls", scope=scope)
+
+    # --- security.txt API ---
+
+    @_wrap_provider_errors
+    def get_security_txt(self, scope: Scope) -> dict:
+        """Fetch and normalize the zone's security.txt configuration.
+
+        The endpoint returns ``null`` when the file was never configured;
+        that reads back as an empty dict.
+        """
+        from octorules_cloudflare._security_txt import normalize_security_txt
+
+        sl = _fmt_scope(scope)
+        log.debug("GET security-center/securitytxt %s", sl)
+        try:
+            result = self._client.security_txt.get(zone_id=scope.zone_id)
+        except NotFoundError:
+            return {}
+        if result is None:
+            return {}
+        return normalize_security_txt(_to_dict(result))
+
+    @_wrap_provider_errors
+    def update_security_txt(self, scope: Scope, settings: dict) -> None:
+        """Replace the zone's security.txt configuration (whole-object PUT)."""
+        sl = _fmt_scope(scope)
+        log.debug("PUT security-center/securitytxt %s", sl)
+        self._client.security_txt.update(zone_id=scope.zone_id, **settings)
+
+    # --- Managed Transforms API ---
+
+    @_wrap_provider_errors
+    def get_managed_transforms_raw(self, scope: Scope) -> dict:
+        """Fetch the zone's managed transform list as a plain dict.
+
+        The raw shape (``managed_request_headers`` / ``managed_response_headers``
+        entry lists) carries each transform's ``conflicts_with`` declaration,
+        which the plan-time conflict check needs and the normalized settings
+        deliberately drop.
+        """
+        sl = _fmt_scope(scope)
+        log.debug("GET managed_headers %s", sl)
+        result = self._client.managed_transforms.list(zone_id=scope.zone_id)
+        return _to_dict(result)
+
+    @_wrap_provider_errors
+    def get_managed_transforms(self, scope: Scope) -> dict:
+        """Fetch and normalize the zone's managed transform toggles."""
+        from octorules_cloudflare._managed_transforms import normalize_managed_transforms
+
+        return normalize_managed_transforms(self.get_managed_transforms_raw(scope))
+
+    @_wrap_provider_errors
+    def update_managed_transforms(self, scope: Scope, settings: dict) -> None:
+        """Update managed transform toggles (partial PATCH).
+
+        *settings* is the normalized ``{"request": {id: enabled}, "response":
+        {id: enabled}}`` shape; only the sides and transforms present are sent.
+        """
+        sl = _fmt_scope(scope)
+        log.debug("PATCH managed_headers %s", sl)
+        kwargs: dict = {}
+        api_keys = {"request": "managed_request_headers", "response": "managed_response_headers"}
+        for side, api_key in api_keys.items():
+            side_map = settings.get(side)
+            if side_map:
+                kwargs[api_key] = [
+                    {"id": tid, "enabled": enabled} for tid, enabled in sorted(side_map.items())
+                ]
+        if not kwargs:
+            return
+        self._client.managed_transforms.edit(zone_id=scope.zone_id, **kwargs)
+
+    # --- Cloud Connector API ---
+
+    @_wrap_provider_errors
+    def get_cloud_connector_rules(self, scope: Scope) -> list[dict]:
+        """Fetch the zone's Cloud Connector rules, in evaluation order."""
+        sl = _fmt_scope(scope)
+        log.debug("GET cloud_connector/rules %s", sl)
+        try:
+            result = self._client.cloud_connector.rules.list(zone_id=scope.zone_id)
+        except NotFoundError:
+            return []
+        return [_to_dict(r) for r in result]
+
+    @_wrap_provider_errors
+    def put_cloud_connector_rules(self, scope: Scope, rules: list[dict]) -> int:
+        """Atomically replace all Cloud Connector rules.
+
+        Returns the number of rules in the response (for verification).
+        """
+        sl = _fmt_scope(scope)
+        log.debug("PUT cloud_connector/rules %s rules=%d", sl, len(rules))
+        result = self._client.cloud_connector.rules.update(zone_id=scope.zone_id, rules=rules)
+        response_count = len(list(result))
+        if response_count != len(rules):
+            log.warning(
+                "PUT cloud_connector/rules %s: sent %d rule(s) but response contains %d",
+                sl,
+                len(rules),
+                response_count,
+            )
+        return response_count
 
     # --- Leaked Credential Check API ---
 

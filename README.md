@@ -86,6 +86,9 @@ a single `cloudflare:` block.
 | URL normalization settings (`url_normalization_settings`) | Supported |
 | Zone security defaults (`zone_security`) | Supported |
 | SSL/TLS settings (`zone_tls`) | Supported |
+| security.txt (`security_txt`) | Supported |
+| Managed Transforms (`managed_transforms`) | Supported |
+| Cloud Connector rules (`cloud_connector_rules`) | Supported |
 | Leaked Credential Check (`leaked_credential_check`) | Supported |
 | Content Scanning / anti-malware (`content_scanning`) | Supported |
 
@@ -259,9 +262,43 @@ Each policy entry requires:
 
 **CSP source normalization:** The order of sources within a CSP directive is not significant — `script-src 'self' example.com` and `script-src example.com 'self'` are semantically identical. octorules normalizes source order (sorted alphabetically within each directive) before comparing `value` fields, so reordering sources in your YAML will not trigger an upstream change on Cloudflare. You can freely reorganize sources for readability without causing a sync.
 
+## Cloud Connector rules (zone-level)
+
+Cloudflare [Cloud Connector](https://developers.cloudflare.com/rules/cloud-connector/) routes matching requests directly to an object-storage provider. octorules manages the zone's rule list declaratively.
+
+Add a `cloud_connector_rules` key under the `cloudflare:` block of your zone rules file:
+
+```yaml
+# rules/example.com.yaml
+cloudflare:
+  cloud_connector_rules:
+    - description: "Serve /assets from the R2 bucket"
+      expression: 'starts_with(http.request.uri.path, "/assets/")'
+      provider: cloudflare_r2
+      parameters:
+        host: assets.account-a.r2.cloudflarestorage.com
+```
+
+Each rule entry:
+
+| Field | Description |
+|-------|-------------|
+| `description` | Rule description — used as the identity key for matching |
+| `expression` | Cloudflare filter expression (request-phase fields) |
+| `provider` | `aws_s3`, `cloudflare_r2`, `gcp_storage`, or `azure_storage` |
+| `parameters` | Provider parameters (`host`: the storage endpoint to route to) |
+| `enabled` | Boolean, defaults to `true` |
+
+**How it works:**
+
+- The `description` field is the identity key (like `description` for Page Shield policies): the Cloud Connector API has no `ref` field to persist, so plans match YAML rules to live rules by description. Descriptions must be unique.
+- Rule order is part of the desired state — reordering rules in YAML is a planned change.
+- The presence of a `cloud_connector_rules:` key means ALL rules are managed — the list is replaced wholesale on sync, so rules in Cloudflare not in YAML are planned for deletion. If the key is absent, Cloud Connector is ignored entirely.
+- Use `octorules dump` to export existing Cloud Connector rules to YAML.
+
 ## Linting
 
-162 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
+168 Cloudflare-specific lint rules (CF prefix) across 6 ranges:
 
 | Range | Category | Rules |
 |-------|----------|-------|
@@ -269,7 +306,7 @@ Each policy entry requires:
 | CF100–CF105 | Cross-rule ordering | 6 |
 | CF200–CF227 | Action validation | 28 |
 | CF300–CF309 | Expression, function & type | 10 |
-| CF400–CF480 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list) | 51 |
+| CF400–CF495 | Domain-specific (rate limit, cache, config, redirect, transform, origin, page shield, list, cloud connector) | 56 |
 | CF500–CF550 | Plan limits, style & value constraints | 43 |
 
 See [docs/lint/README.md](docs/lint/README.md) for the full rule reference.

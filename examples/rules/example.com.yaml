@@ -415,3 +415,54 @@ cloudflare:
     enabled: true
     custom_expressions:
       - payload: 'lookup_json_string(http.request.body.raw, "api_key")'
+
+  # ---------------------------------------------------------------------------
+  # Managed Transforms
+  # ---------------------------------------------------------------------------
+  # Cloudflare's catalogue of managed header transforms, grouped the way the
+  # API groups them. Only the transforms listed are managed - anything omitted
+  # keeps its dashboard state. Enabling both sides of a pair Cloudflare
+  # declares mutually exclusive (add_true_client_ip_headers with
+  # remove_visitor_ip_headers) fails the plan.
+  managed_transforms:
+    request:
+      add_true_client_ip_headers: true
+      add_visitor_location_headers: true
+    response:
+      add_security_headers: true
+
+  # ---------------------------------------------------------------------------
+  # security.txt (RFC 9116)
+  # ---------------------------------------------------------------------------
+  # Served by Cloudflare at /.well-known/security.txt. While enabled is true,
+  # contact and expires are required (RFC 9116), and lint warns once expires
+  # has passed - an expired file advertises a disclosure path nobody maintains.
+  security_txt:
+    enabled: true
+    contact:
+      - "mailto:security@example.com"
+      - "https://example.com/security/report"
+    expires: "2033-01-01T00:00:00Z"
+    preferred_languages: "en, fr"
+    policy:
+      - "https://example.com/security/policy"
+
+  # ---------------------------------------------------------------------------
+  # Cloud Connector Rules
+  # ---------------------------------------------------------------------------
+  # An ordered list of expression-matched routes to object storage
+  # (cloudflare_r2, aws_s3, gcp_storage, azure_storage). The list is replaced
+  # wholesale on sync, and rules are identified by description - the Cloud
+  # Connector API has no ref field to persist.
+  cloud_connector_rules:
+    - description: "Serve /assets from the R2 bucket"
+      expression: 'starts_with(http.request.uri.path, "/assets/")'
+      provider: cloudflare_r2
+      parameters:
+        host: assets.account-a.r2.cloudflarestorage.com
+    - description: "Legacy media still lives in S3"
+      expression: 'starts_with(http.request.uri.path, "/media/legacy/")'
+      provider: aws_s3
+      parameters:
+        host: legacy-media.s3.eu-central-1.amazonaws.com
+      enabled: false

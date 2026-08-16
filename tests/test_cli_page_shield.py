@@ -39,6 +39,9 @@ def _make_dump_mock(**overrides):
                 "url_normalization",
                 "zone_security_settings",
                 "zone_tls_settings",
+                "security_txt",
+                "managed_transforms",
+                "cloud_connector_rules",
                 "leaked_credential_check",
                 "content_scanning",
             )

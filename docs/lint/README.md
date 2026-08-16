@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **162 rules** across **19 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **168 rules** across **20 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -70,6 +70,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF480 | 11 | [stage2d-lists.md](stage2d-lists.md) |
+| 2e. Cloud Connector | Rule structure, provider enum, duplicates, catch-all detection + expression analysis and phase restrictions | CF490–CF495 | 6 | [stage2e-cloud-connector.md](stage2e-cloud-connector.md) |
 | 3. Plan-tier limits | Regex availability, rule count limits | CF500–CF502 | 3 | [stage3-plan-tier.md](stage3-plan-tier.md) |
 | 4. Cross-rule analysis | Duplicates, unreachable rules, list references | CF100–CF105 | 6 | [stage4-cross-rule.md](stage4-cross-rule.md) |
 
@@ -93,6 +94,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF450–CF452 | Origin rules | 3 |
 | CF460–CF463 | Page Shield structure | 4 |
 | CF470–CF480 | List validation | 11 |
+| CF490–CF495 | Cloud Connector rules | 6 |
 | CF500–CF502 | Plan/entitlement | 3 |
 | CF510–CF518 | Best practice / style | 9 |
 | CF520–CF550 | Value constraints | 31 |
@@ -375,6 +377,12 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF478](stage2d-lists.md#cf478--overlapping-ipcidr-entries-in-list) | Overlapping IP/CIDR entries in list | WARNING |
 | [CF479](stage2d-lists.md#cf479--redirect-source_url-contains-a-query-string) | Redirect source_url contains a query string | ERROR |
 | [CF480](stage2d-lists.md#cf480--invalid-list-name) | Invalid list name (format or length) | ERROR |
+| [CF490](stage2e-cloud-connector.md#cf490--missing-required-field) | Missing required Cloud Connector field | ERROR |
+| [CF491](stage2e-cloud-connector.md#cf491--invalid-provider) | Invalid Cloud Connector provider | ERROR |
+| [CF492](stage2e-cloud-connector.md#cf492--invalid-field-type) | Invalid Cloud Connector field type | ERROR |
+| [CF493](stage2e-cloud-connector.md#cf493--duplicate-description) | Duplicate Cloud Connector description | WARNING |
+| [CF494](stage2e-cloud-connector.md#cf494--unknown-field) | Unknown Cloud Connector field | ERROR |
+| [CF495](stage2e-cloud-connector.md#cf495--duplicate-expression) | Duplicate expression across enabled Cloud Connector rules | WARNING |
 | [CF022](stage2b-custom-rulesets.md#cf022--missing-required-field) | Missing required custom ruleset field | ERROR |
 | [CF023](stage2b-custom-rulesets.md#cf023--invalid-id-format) | Invalid custom ruleset id format | WARNING |
 | [CF024](stage2b-custom-rulesets.md#cf024--duplicate-ref-within-custom-ruleset) | Duplicate ref within custom ruleset | ERROR |
