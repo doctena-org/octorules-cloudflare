@@ -85,6 +85,7 @@ a single `cloudflare:` block.
 | Bot Management settings (`bot_management`) | Supported |
 | URL normalization settings (`url_normalization_settings`) | Supported |
 | Zone security defaults (`zone_security`) | Supported |
+| SSL/TLS settings (`zone_tls`) | Supported |
 | Leaked Credential Check (`leaked_credential_check`) | Supported |
 | Content Scanning / anti-malware (`content_scanning`) | Supported |
 

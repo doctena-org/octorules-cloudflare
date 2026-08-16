@@ -149,6 +149,7 @@ _CLOUDFLARE_NAMESPACE_MAPPING: tuple[str, ...] = (
     "page_shield_policies",
     "bot_management",
     "zone_security",
+    "zone_tls",
     "leaked_credential_check",
     "content_scanning",
     "url_normalization_settings",
@@ -182,11 +183,14 @@ from octorules_cloudflare._url_normalization import (  # noqa: E402
 
 register_url_normalization()
 
-# Register zone security settings extension hooks.
+# Register the zone security and SSL/TLS settings extension hooks.
 register_non_phase_key("cloudflare.zone_security")
+register_non_phase_key("cloudflare.zone_tls")
 from octorules_cloudflare._zone_security import register_zone_security  # noqa: E402
+from octorules_cloudflare._zone_tls import register_zone_tls  # noqa: E402
 
 register_zone_security()
+register_zone_tls()
 
 # Register leaked credential check extension hooks.
 register_non_phase_key("cloudflare.leaked_credential_check")

@@ -782,6 +782,7 @@ class CloudflareProvider:
         from octorules_cloudflare._leaked_credentials import LeakedCredentialsExtension
         from octorules_cloudflare._url_normalization import UrlNormalizationExtension
         from octorules_cloudflare._zone_security import ZoneSecurityExtension
+        from octorules_cloudflare._zone_tls import ZoneTlsExtension
         from octorules_cloudflare.page_shield import PageShieldExtension
 
         if self._extensions is None:
@@ -789,6 +790,7 @@ class CloudflareProvider:
                 BotManagementExtension(),
                 UrlNormalizationExtension(),
                 ZoneSecurityExtension(),
+                ZoneTlsExtension(),
                 LeakedCredentialsExtension(),
                 ContentScanningExtension(),
                 PageShieldExtension(),
@@ -911,6 +913,57 @@ class CloudflareProvider:
             operations.append((yaml_key, _edit(setting_id, value)))
 
         apply_each(operations, section="cloudflare.zone_security", scope=scope)
+
+    # --- HTTPS Settings API ---
+
+    @_wrap_provider_errors
+    def get_zone_tls_settings(self, scope: Scope) -> dict:
+        """Fetch the HTTPS negotiation and enforcement settings.
+
+        Same per-setting endpoint as zone security; a separate method because
+        the two sections are separate concerns and each dumps on its own.
+        """
+        from octorules_cloudflare._zone_tls import _SETTING_IDS, normalize_zone_tls
+
+        sl = _fmt_scope(scope)
+        log.debug("GET zone TLS settings %s", sl)
+        raw: dict = {}
+        for yaml_key, setting_id in _SETTING_IDS.items():
+            try:
+                result = self._client.zones.settings.get(setting_id, zone_id=scope.zone_id)
+                d = _to_dict(result)
+                raw[yaml_key] = d.get("value")
+            except (NotFoundError, BadRequestError):
+                log.debug("Skipping zone setting %s for %s (not available)", setting_id, sl)
+        return normalize_zone_tls(raw)
+
+    @_wrap_provider_errors
+    def update_zone_tls_settings(self, scope: Scope, settings: dict) -> None:
+        """Update the HTTPS negotiation and enforcement settings."""
+        from octorules_cloudflare._settings_common import apply_each
+        from octorules_cloudflare._zone_tls import _SETTING_IDS
+
+        sl = _fmt_scope(scope)
+        log.debug("PUT zone TLS settings %s", sl)
+
+        def _edit(setting_id: str, value: object):
+            def _call():
+                log.debug("  setting %s=%r %s", setting_id, value, sl)
+                return self._client.zones.settings.edit(
+                    setting_id, zone_id=scope.zone_id, value=value
+                )
+
+            return _call
+
+        operations = []
+        for yaml_key, value in settings.items():
+            setting_id = _SETTING_IDS.get(yaml_key)
+            if setting_id is None:
+                log.warning("Unknown zone TLS setting %r, skipping", yaml_key)
+                continue
+            operations.append((yaml_key, _edit(setting_id, value)))
+
+        apply_each(operations, section="cloudflare.zone_tls", scope=scope)
 
     # --- Leaked Credential Check API ---
 

@@ -38,6 +38,7 @@ def _make_dump_mock(**overrides):
                 "bot_management",
                 "url_normalization",
                 "zone_security_settings",
+                "zone_tls_settings",
                 "leaked_credential_check",
                 "content_scanning",
             )

@@ -18,6 +18,45 @@ log = logging.getLogger(__name__)
 _MISSING = object()
 
 
+def value_matches(desired: object, current: object) -> bool:
+    """Is *current* consistent with *desired*, comparing only what *desired* states?
+
+    Zone settings diff on partial semantics: a zone file names the fields it
+    wants and everything else stays as the dashboard left it. For scalars that
+    is plain equality. For a nested value like ``security_header`` it cannot
+    be — Cloudflare returns the whole structure
+    (``strict_transport_security`` with all five sub-keys), so a zone file
+    asking only for ``enabled: true`` would compare unequal forever and the
+    plan would show the same change on every run.
+
+    Comparing only the keys *desired* mentions, recursively, keeps a partial
+    declaration stable while still detecting a real drift in any field the
+    zone file does name.
+    """
+    if isinstance(desired, dict):
+        if not isinstance(current, dict):
+            return False
+        return all(k in current and value_matches(v, current[k]) for k, v in desired.items())
+    return desired == current
+
+
+def merge_onto(desired: object, current: object) -> object:
+    """Overlay *desired* onto *current*, returning a complete value to send.
+
+    Cloudflare's per-setting ``edit`` takes the whole value, and whether it
+    merges a partial nested object or replaces it outright is not something to
+    assume — a replace would silently reset the sub-keys the zone file did not
+    mention. Sending the current value with the desired fields overlaid makes
+    the request correct under either behaviour.
+    """
+    if isinstance(desired, dict) and isinstance(current, dict):
+        merged = dict(current)
+        for k, v in desired.items():
+            merged[k] = merge_onto(v, current.get(k))
+        return merged
+    return desired
+
+
 def apply_each(operations: Iterable[tuple[str, Callable[[], object]]], *, section: str, scope):
     """Attempt every operation, then raise once if any of them failed.
 
@@ -134,7 +173,7 @@ def verify_settings_applied(fetch, scope, sent: dict, section: str) -> list[str]
     failed: list[str] = []
     for name, value in sorted(sent.items()):
         got = current.get(name, _MISSING)
-        if got != value:
+        if got is _MISSING or not value_matches(value, got):
             failed.append(name)
             log.warning(
                 "%s: Cloudflare accepted the update for %s but %r reads"

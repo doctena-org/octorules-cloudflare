@@ -379,6 +379,25 @@ cloudflare:
     browser_integrity_check: "on"
 
   # ---------------------------------------------------------------------------
+  # SSL/TLS Settings
+  # ---------------------------------------------------------------------------
+  # Mirrors Cloudflare's SSL/TLS tab. Only the fields listed are managed —
+  # anything omitted keeps whatever value the zone already has, so a partial
+  # block never reverts a setting someone changed in the dashboard.
+  zone_tls:
+    ssl: strict
+    min_tls_version: "1.2"
+    always_use_https: "on"
+    automatic_https_rewrites: "on"
+    security_header:
+      strict_transport_security:
+        enabled: true
+        max_age: 31536000
+        include_subdomains: true
+        preload: false
+        nosniff: false
+
+  # ---------------------------------------------------------------------------
   # Leaked Credential Check Settings
   # ---------------------------------------------------------------------------
   # Source: octorules-cloudflare/octorules_cloudflare/_leaked_credentials.py:63-68

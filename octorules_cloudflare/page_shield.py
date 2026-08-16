@@ -522,9 +522,11 @@ def _validate_page_shield(
         try:
             validate_page_shield_policy(entry, i)
             desc = entry.get("description", f"index {i}")
-            msg = f"  {zone_name}/page_shield:{desc}: OK"
-            log.info("%s", msg)
-            lines.append(msg)
+            # Logged only. This used to also append to the hook's fourth
+            # argument, which core discarded, so the append had no effect. That
+            # argument is now the warning channel, and a policy that validated
+            # cleanly is not a warning.
+            log.info("  %s/page_shield:%s: OK", zone_name, desc)
         except RuleValidationError as e:
             msg = f"  {zone_name}/cloudflare.page_shield_policies: {e}"
             errors.append(msg)

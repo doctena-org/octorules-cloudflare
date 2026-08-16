@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`zone_tls`**, a new section mirroring Cloudflare's SSL/TLS tab: `ssl`,
+  `min_tls_version`, `tls_1_3`, `zero_rtt`, `always_use_https`,
+  `automatic_https_rewrites` and `security_header` (HSTS). A block naming only
+  some fields leaves the rest as they are.
+- Lint rejects HSTS settings that cannot work — `preload` without
+  `include_subdomains`, with a `max_age` under a year, or with
+  `always_use_https: "off"` — and warns on `ssl: flexible`/`off` and a
+  `min_tls_version` of `1.0`/`1.1`.
+
 ### Changed
 - Minimum `octorules` dependency: `>=0.35.0` (for `iter_audit_rules`).
 
