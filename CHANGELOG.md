@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the account rules file: identity by `name`, `$name` webhook references,
   zone names in `filters.zones`, and validation against the account's
   `available_alerts` registry.
+- **`ciphers`** in `zone_tls`: the zone's TLS 1.2 cipher allowlist.
+  Order-insensitive; `[]` resets to Cloudflare's default list while an omitted
+  key leaves the zone's list unmanaged. Lint warns on CBC/static-RSA suites
+  and unknown names, and errors on IANA-style names and TLS 1.3-only lists.
 
 ## [0.16.0] - 2026-08-16
 

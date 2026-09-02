@@ -5,6 +5,7 @@ setting here:
 
 - ``ssl`` — how Cloudflare reaches the origin (off / flexible / full / strict)
 - ``min_tls_version``, ``tls_1_3``, ``zero_rtt`` — handshake floor and features
+- ``ciphers`` -- the TLS 1.2 cipher allowlist, the one list value here
 - ``always_use_https`` — redirect every HTTP request to HTTPS
 - ``automatic_https_rewrites`` — rewrite http:// subresources in HTML
 - ``security_header`` — HSTS, the one nested value here
@@ -25,6 +26,8 @@ Fetched and updated through the same per-setting endpoints as ``zone_security``:
 """
 
 import logging
+import re
+from collections import Counter
 
 from octorules.extensions import (
     ProviderExtension,
@@ -56,6 +59,7 @@ _SETTING_IDS: dict[str, str] = {
     "min_tls_version": "min_tls_version",
     "tls_1_3": "tls_1_3",
     "zero_rtt": "0rtt",
+    "ciphers": "ciphers",
     "always_use_https": "always_use_https",
     "automatic_https_rewrites": "automatic_https_rewrites",
     "security_header": "security_header",
@@ -68,6 +72,67 @@ _VALID_MIN_TLS = frozenset({"1.0", "1.1", "1.2", "1.3"})
 # ``zrt`` is listed as a valid value but Cloudflare does not define it, which is
 # why nothing below infers a relationship between tls_1_3 and zero_rtt.
 _VALID_TLS_1_3 = frozenset({"on", "off", "zrt"})
+
+# ``ciphers`` is the one list value here: the zone's TLS 1.2 cipher allowlist,
+# OpenSSL-style names. Two properties shape its handling. Cloudflare does not
+# honour supplied preference order (live handshakes report client preference),
+# so the value is canonicalized to a sorted, deduplicated list on both sides of
+# every comparison. And ``[]`` is a real instruction -- use Cloudflare's default
+# list -- distinct from omitting the key, which per this section's partial
+# semantics leaves the zone's list unmanaged.
+#
+# The name sets come from Cloudflare's supported-cipher-suites reference.
+# ECDHE-ECDSA-AES256-SHA is absent from that page's table but was offered in a
+# live handshake against a default-configured zone, so it is recognised here.
+# Unknown names only warn: Cloudflare can add suites.
+_MODERN_CIPHERS = frozenset(
+    {
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "ECDHE-ECDSA-CHACHA20-POLY1305",
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-RSA-AES256-GCM-SHA384",
+        "ECDHE-RSA-CHACHA20-POLY1305",
+    }
+)
+# CBC mode and/or static-RSA key exchange -- legal, but the configuration the
+# weak-cipher findings are about.
+_WEAK_CIPHERS = frozenset(
+    {
+        "AES128-GCM-SHA256",
+        "AES128-SHA",
+        "AES128-SHA256",
+        "AES256-GCM-SHA384",
+        "AES256-SHA",
+        "AES256-SHA256",
+        "DES-CBC3-SHA",
+        "ECDHE-ECDSA-AES128-SHA",
+        "ECDHE-ECDSA-AES128-SHA256",
+        "ECDHE-ECDSA-AES256-SHA",
+        "ECDHE-ECDSA-AES256-SHA384",
+        "ECDHE-RSA-AES128-SHA",
+        "ECDHE-RSA-AES128-SHA256",
+        "ECDHE-RSA-AES256-SHA",
+        "ECDHE-RSA-AES256-SHA384",
+    }
+)
+# TLS 1.3 suites share the value space but are not restrictable through this
+# setting; recognised so they are never flagged as unknown.
+_TLS13_CIPHERS = frozenset(
+    {
+        "AEAD-AES128-GCM-SHA256",
+        "AEAD-AES256-GCM-SHA384",
+        "AEAD-CHACHA20-POLY1305-SHA256",
+    }
+)
+_TLS12_CIPHERS = _MODERN_CIPHERS | _WEAK_CIPHERS
+_KNOWN_CIPHERS = _TLS12_CIPHERS | _TLS13_CIPHERS
+
+# The IANA spelling (TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) is the one wrong
+# vocabulary worth a hard error: Cloudflare's own reference maps every suite
+# to an OpenSSL-style name, so an IANA-form name can never be right here --
+# unlike a merely unknown name, which may be a suite Cloudflare added.
+_IANA_NAME_RE = re.compile(r"^TLS_[A-Z0-9_]+$")
 
 # ``security_header`` is the only nested value here. Cloudflare wraps HSTS in a
 # ``strict_transport_security`` object, and the YAML mirrors that shape rather
@@ -107,6 +172,19 @@ class ZoneTlsPlan(SettingsPlan):
 # ---------------------------------------------------------------------------
 # Normalization
 # ---------------------------------------------------------------------------
+def canonicalize_ciphers(value: object) -> object:
+    """Return a cipher list as its canonical sorted, deduplicated form.
+
+    Cloudflare does not honour supplied preference order, so order carries no
+    meaning and a naive list comparison would show a spurious diff on every
+    plan. Duplicates are collapsed for the same reason. Non-list values are
+    returned unchanged -- validation reports them; the diff just compares raw.
+    """
+    if isinstance(value, list):
+        return sorted({str(c) for c in value})
+    return value
+
+
 def normalize_zone_tls(raw_settings: dict) -> dict:
     """Convert raw per-setting API responses to YAML-friendly canonical form.
 
@@ -120,6 +198,12 @@ def normalize_zone_tls(raw_settings: dict) -> dict:
         val = raw_settings.get(key)
         if val is not None:
             result[key] = str(val) if not isinstance(val, str) else val
+
+    ciphers = raw_settings.get("ciphers")
+    if isinstance(ciphers, list):
+        # An empty list is kept: it is the zone's real stored state ("use the
+        # Cloudflare default list"), not an absent setting.
+        result["ciphers"] = canonicalize_ciphers(ciphers)
 
     sh = raw_settings.get("security_header")
     if isinstance(sh, dict):
@@ -152,6 +236,10 @@ def diff_zone_tls(current: dict, desired: dict) -> ZoneTlsPlan:
     for key in sorted(desired.keys()):
         cur = current.get(key)
         des = desired.get(key)
+        if key == "ciphers":
+            # Order-insensitive: the current side is canonicalized by
+            # normalize_zone_tls, the desired side here.
+            des = canonicalize_ciphers(des)
         # Subset comparison, not equality: security_header comes back from the
         # API with every sub-key populated, so a zone file naming only
         # ``enabled`` would otherwise diff on every run forever.
@@ -270,7 +358,82 @@ def _validate_zone_tls(desired, zone_name, errors, lines):
         if val is not None and val not in _VALID_ON_OFF:
             errors.append(_enum_error(where, field, val, _VALID_ON_OFF))
 
+    _validate_ciphers(settings, where, errors, lines)
     _validate_security_header(settings, where, errors)
+
+
+def _validate_ciphers(settings: dict, where: str, errors: list[str], lines: list[str]) -> None:
+    """Validate the TLS 1.2 cipher allowlist.
+
+    *errors* are lists that cannot do what they claim -- wrong types,
+    duplicates (which would diff forever against Cloudflare's deduplicated
+    stored value), IANA-style names (Cloudflare's vocabulary is OpenSSL-style,
+    so those can never be right), and lists naming only TLS 1.3 suites (this
+    setting cannot restrict TLS 1.3). *lines* are warnings: unknown names (the
+    enum stays open -- Cloudflare can add suites, so freshness of the name
+    sets must never carry error weight) and CBC/static-RSA suites, which are
+    legal but are the configuration weak-cipher findings are about. An empty
+    list is valid and means "use Cloudflare's default list"; omitting the key
+    leaves the zone's list unmanaged.
+    """
+    ciphers = settings.get("ciphers")
+    if ciphers is None:
+        return
+    if not isinstance(ciphers, list):
+        errors.append(f"{where}: ciphers must be a list, got {type(ciphers).__name__}")
+        return
+
+    names: list[str] = []
+    for item in ciphers:
+        if not isinstance(item, str) or not item:
+            errors.append(f"{where}: ciphers entries must be non-empty strings, got {item!r}")
+        else:
+            names.append(item)
+
+    duplicates = sorted(n for n, count in Counter(names).items() if count > 1)
+    if duplicates:
+        errors.append(
+            f"{where}: ciphers has duplicate entries {duplicates} -- Cloudflare"
+            " stores a deduplicated list, so duplicates would diff on every plan"
+        )
+
+    if not names:
+        return
+
+    iana_form = sorted(n for n in names if _IANA_NAME_RE.match(n))
+    if iana_form:
+        errors.append(
+            f"{where}: ciphers contains IANA-style name(s) {iana_form} --"
+            " Cloudflare expects OpenSSL-style names"
+            " (TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 is spelled"
+            " ECDHE-RSA-AES128-GCM-SHA256)"
+        )
+
+    unknown = sorted(n for n in names if n not in _KNOWN_CIPHERS and not _IANA_NAME_RE.match(n))
+    if unknown:
+        lines.append(
+            f"{where}: ciphers contains name(s) not in Cloudflare's published"
+            f" suite list: {unknown}. Cloudflare adds suites over time, so this"
+            " is only a warning -- but check for typos and IANA-style spellings"
+            " (Cloudflare expects OpenSSL-style names like"
+            " 'ECDHE-RSA-AES128-GCM-SHA256')"
+        )
+
+    if all(n in _TLS13_CIPHERS for n in names):
+        errors.append(
+            f"{where}: ciphers names only TLS 1.3 suites, which this setting"
+            " cannot restrict -- to require TLS 1.3 use min_tls_version '1.3'"
+            " instead"
+        )
+
+    weak = sorted(n for n in names if n in _WEAK_CIPHERS)
+    if weak:
+        lines.append(
+            f"{where}: ciphers keeps CBC and/or static-RSA suite(s) {weak} --"
+            " these lack forward secrecy or use CBC mode, the configuration"
+            " weak-cipher findings flag. Drop them unless a known legacy client"
+            " requires otherwise."
+        )
 
 
 def _validate_security_header(settings: dict, where: str, errors: list[str]) -> None:

@@ -265,3 +265,125 @@ class TestHstsValidation:
             }
         )
         assert (errors, warnings) == ([], [])
+
+
+class TestCiphers:
+    """The one list-valued field: order-insensitive, with [] distinct from absent."""
+
+    MODERN = (
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+    )
+
+    # -- normalization ------------------------------------------------------
+    def test_normalize_sorts_and_dedupes(self):
+        raw = {"ciphers": ["ECDHE-RSA-AES128-GCM-SHA256", "AES128-SHA", "AES128-SHA"]}
+        assert normalize_zone_tls(raw)["ciphers"] == [
+            "AES128-SHA",
+            "ECDHE-RSA-AES128-GCM-SHA256",
+        ]
+
+    def test_normalize_keeps_the_empty_list(self):
+        """[] is the zone's real stored state (use the default list), not absent."""
+        assert normalize_zone_tls({"ciphers": []})["ciphers"] == []
+
+    def test_normalize_drops_non_list_values(self):
+        assert "ciphers" not in normalize_zone_tls({"ciphers": "AES128-SHA"})
+
+    # -- diff ---------------------------------------------------------------
+    def test_order_never_drives_a_diff(self):
+        current = {"ciphers": sorted(self.MODERN)}
+        desired = {"ciphers": list(reversed(sorted(self.MODERN)))}
+        assert not diff_zone_tls(current, desired).has_changes
+
+    def test_duplicates_never_drive_a_diff(self):
+        current = {"ciphers": sorted(self.MODERN)}
+        desired = {"ciphers": [*self.MODERN, self.MODERN[0]]}
+        assert not diff_zone_tls(current, desired).has_changes
+
+    def test_declared_empty_list_diffs_against_a_populated_zone(self):
+        """ciphers: [] is a real instruction -- reset to Cloudflare's default."""
+        plan = diff_zone_tls({"ciphers": sorted(self.MODERN)}, {"ciphers": []})
+        assert [c.field for c in plan.changes] == ["ciphers"]
+        assert plan.changes[0].desired == []
+
+    def test_omitted_key_leaves_the_zone_list_alone(self):
+        plan = diff_zone_tls({"ciphers": sorted(self.MODERN)}, {"ssl": "strict"})
+        assert not any(c.field == "ciphers" for c in plan.changes)
+
+    def test_matching_empty_lists_are_no_change(self):
+        assert not diff_zone_tls({"ciphers": []}, {"ciphers": []}).has_changes
+
+    def test_the_change_carries_the_canonical_list(self):
+        plan = diff_zone_tls({"ciphers": []}, {"ciphers": list(reversed(sorted(self.MODERN)))})
+        assert plan.changes[0].desired == sorted(self.MODERN)
+
+    # -- apply --------------------------------------------------------------
+    def test_apply_sends_the_canonical_list(self):
+        from octorules_cloudflare.provider import CloudflareProvider
+
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_zone_tls_settings.return_value = {}
+        plan = diff_zone_tls({"ciphers": []}, {"ciphers": list(reversed(sorted(self.MODERN)))})
+        _apply_zone_tls(MagicMock(), [plan], _scope(), provider)
+        payload = provider.update_zone_tls_settings.call_args[0][1]
+        assert payload["ciphers"] == sorted(self.MODERN)
+
+    # -- validation ---------------------------------------------------------
+    def test_modern_allowlist_is_clean(self):
+        errors, warnings = _check({"ciphers": list(self.MODERN)})
+        assert errors == []
+        assert warnings == []
+
+    def test_empty_list_is_clean(self):
+        errors, warnings = _check({"ciphers": []})
+        assert errors == []
+        assert warnings == []
+
+    def test_non_list_is_an_error(self):
+        errors, _ = _check({"ciphers": "AES128-SHA"})
+        assert any("must be a list" in e for e in errors)
+
+    def test_non_string_entry_is_an_error(self):
+        errors, _ = _check({"ciphers": [123]})
+        assert any("non-empty strings" in e for e in errors)
+
+    def test_duplicate_entry_is_an_error(self):
+        errors, _ = _check({"ciphers": [*self.MODERN, self.MODERN[0]]})
+        assert any("duplicate" in e for e in errors)
+
+    def test_unknown_name_warns_but_does_not_fail(self):
+        errors, warnings = _check({"ciphers": [*self.MODERN, "FUTURE-SUITE-X"]})
+        assert errors == []
+        assert any("FUTURE-SUITE-X" in w for w in warnings)
+
+    def test_weak_suite_warns_naming_it(self):
+        errors, warnings = _check({"ciphers": [*self.MODERN, "AES128-SHA"]})
+        assert errors == []
+        assert any("AES128-SHA" in w and "forward secrecy" in w for w in warnings)
+
+    def test_handshake_observed_suite_is_recognised_and_weak(self):
+        """ECDHE-ECDSA-AES256-SHA: absent from the docs table, seen live."""
+        _, warnings = _check({"ciphers": [*self.MODERN, "ECDHE-ECDSA-AES256-SHA"]})
+        assert not any("not in Cloudflare's published" in w for w in warnings)
+        assert any("ECDHE-ECDSA-AES256-SHA" in w for w in warnings)
+
+    def test_iana_style_name_is_an_error_not_an_unknown_warning(self):
+        """The IANA vocabulary can never be right; a merely unknown name can."""
+        errors, warnings = _check({"ciphers": ["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"]})
+        assert any("IANA-style" in e for e in errors)
+        assert not any("not in Cloudflare's published" in w for w in warnings)
+
+    def test_all_unknown_but_plausible_names_never_error(self):
+        """Cloudflare adds suites; list freshness must not carry error weight."""
+        errors, warnings = _check({"ciphers": ["FUTURE-SUITE-X", "FUTURE-SUITE-Y"]})
+        assert errors == []
+        assert any("FUTURE-SUITE-X" in w for w in warnings)
+
+    def test_tls13_only_list_is_an_error_with_the_floor_hint(self):
+        errors, _ = _check({"ciphers": ["AEAD-AES128-GCM-SHA256"]})
+        assert any("min_tls_version" in e for e in errors)
+
+    def test_tls13_names_are_not_unknown(self):
+        _, warnings = _check({"ciphers": [*self.MODERN, "AEAD-AES128-GCM-SHA256"]})
+        assert not any("not in Cloudflare's published" in w for w in warnings)

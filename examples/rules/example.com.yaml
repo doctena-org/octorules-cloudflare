@@ -389,6 +389,16 @@ cloudflare:
     min_tls_version: "1.2"
     always_use_https: "on"
     automatic_https_rewrites: "on"
+    # TLS 1.2 cipher allowlist (OpenSSL-style names). Order is not significant.
+    # [] resets to Cloudflare's default list; omitting the key leaves the
+    # zone's list unmanaged.
+    ciphers:
+      - ECDHE-ECDSA-AES128-GCM-SHA256
+      - ECDHE-ECDSA-AES256-GCM-SHA384
+      - ECDHE-ECDSA-CHACHA20-POLY1305
+      - ECDHE-RSA-AES128-GCM-SHA256
+      - ECDHE-RSA-AES256-GCM-SHA384
+      - ECDHE-RSA-CHACHA20-POLY1305
     security_header:
       strict_transport_security:
         enabled: true
