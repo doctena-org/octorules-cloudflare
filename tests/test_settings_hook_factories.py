@@ -160,3 +160,39 @@ class TestPerFeatureWiring:
 
         # ... and a neighbour's section must not be.
         assert hook({"cloudflare.some_other_section": {"probe": 1}}, _scope(), provider) is None
+
+
+class TestDumpHookReadOnlyFields:
+    """A dumped file must be a usable zone file.
+
+    bot_management's live response carries ``using_latest_model``, which
+    validation rejects as read-only. Dumping it produced output that failed
+    its own lint on every zone, so the dump boundary drops read-only fields.
+    """
+
+    def test_read_only_fields_are_dropped(self):
+        hook = make_dump_hook(SECTION, GETTER, read_only_fields=frozenset({"ro"}))
+        provider, _ = _provider(return_value={"ro": True, "kept": "yes"})
+        assert hook(_scope(), provider) == {SECTION: {"kept": "yes"}}
+
+    def test_a_section_of_only_read_only_fields_dumps_nothing(self):
+        hook = make_dump_hook(SECTION, GETTER, read_only_fields=frozenset({"ro"}))
+        provider, _ = _provider(return_value={"ro": True})
+        assert hook(_scope(), provider) is None
+
+    def test_omitting_the_argument_keeps_every_field(self):
+        hook = make_dump_hook(SECTION, GETTER)
+        provider, _ = _provider(return_value={"ro": True, "kept": "yes"})
+        assert hook(_scope(), provider) == {SECTION: {"ro": True, "kept": "yes"}}
+
+    def test_bot_management_is_wired_with_its_read_only_set(self):
+        from octorules_cloudflare._bot_management import _dump_bot_management
+
+        provider = MagicMock(spec=CloudflareProvider)
+        provider.get_bot_management.return_value = {
+            "using_latest_model": True,
+            "fight_mode": False,
+        }
+        assert _dump_bot_management(_scope(), provider) == {
+            "cloudflare.bot_management": {"fight_mode": False}
+        }

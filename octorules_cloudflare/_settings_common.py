@@ -233,13 +233,23 @@ def make_prefetch_hook(section_name: str, getter_attr: str) -> Callable:
     return _prefetch_hook
 
 
-def make_dump_hook(section_name: str, getter_attr: str) -> Callable:
+def make_dump_hook(
+    section_name: str,
+    getter_attr: str,
+    *,
+    read_only_fields: frozenset[str] | None = None,
+) -> Callable:
     """Create a _dump_* hook function for a settings extension.
 
     Args:
         section_name: The YAML section name (e.g. "cloudflare.bot_management")
         getter_attr: The provider method name to fetch current settings
                      (e.g. "get_bot_management")
+        read_only_fields: Fields the API returns but rejects on update.
+                     Dropped from dump output: a dumped file is meant to be
+                     a usable zone file, and declaring a read-only field is
+                     a validation error, so emitting one produces a dump
+                     that cannot be linted or applied as written.
 
     Returns a function matching the _dump_* signature that exports
     current settings to dump output.  Called by
@@ -264,6 +274,9 @@ def make_dump_hook(section_name: str, getter_attr: str) -> Callable:
             else:
                 log.debug("%s: %s", section_name, e)
             return None
+
+        if read_only_fields and isinstance(settings, dict):
+            settings = {k: v for k, v in settings.items() if k not in read_only_fields}
 
         if settings:
             return {section_name: settings}

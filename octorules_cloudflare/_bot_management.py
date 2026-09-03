@@ -211,7 +211,11 @@ def _validate_bot_management(desired, zone_name, errors, lines):
         )
 
 
-_dump_bot_management = make_dump_hook("cloudflare.bot_management", "get_bot_management")
+_dump_bot_management = make_dump_hook(
+    "cloudflare.bot_management",
+    "get_bot_management",
+    read_only_fields=_READ_ONLY_FIELDS,
+)
 
 
 # ---------------------------------------------------------------------------

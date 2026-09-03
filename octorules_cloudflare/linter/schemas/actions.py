@@ -234,6 +234,12 @@ VALID_ACTIONS_BY_PHASE: dict[str, set[str]] = {
         "log",
         "ddos_dynamic",
         "force_connection_close",
+        # Deploying the HTTP DDoS managed ruleset with sensitivity or action
+        # overrides is an `execute` rule in this phase (Cloudflare's own
+        # configure-via-API guide), and live zones carry exactly that. Its
+        # absence here made CF200 error on a working configuration, so a
+        # dumped zone could not be adopted without editing out real state.
+        "execute",
     },
     "cloudflare.bulk_redirect_rules": {"redirect"},
     "cloudflare.log_custom_fields": {"log_custom_field"},

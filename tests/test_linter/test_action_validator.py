@@ -3,7 +3,7 @@
 import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME
-from octorules.testing.lint import assert_lint
+from octorules.testing.lint import assert_lint, assert_no_lint
 
 from octorules_cloudflare.linter.action_validator import lint_actions
 
@@ -3417,3 +3417,33 @@ class TestCF415CacheVary:
     def test_all_three_actions_accepted(self):
         for action in ("bypass", "passthrough", "normalize"):
             assert "CF415" not in _ids(self._rule({"default": {"action": action}})), action
+
+
+class TestDdosExecuteOverrides:
+    """`execute` deploys the DDoS managed ruleset with overrides.
+
+    Cloudflare's configure-via-API guide uses `action: execute` in the
+    `ddos_l7` phase entrypoint to apply sensitivity/action overrides, and
+    live zones store exactly that. CF200 used to error on it, so a dumped
+    zone carrying real DDoS overrides could not be adopted as written.
+    """
+
+    def test_execute_is_valid_in_http_ddos_rules(self):
+        rule = {
+            "ref": "ddos-overrides",
+            "expression": "true",
+            "action": "execute",
+            "action_parameters": {
+                "id": "4d21379b4f9f4bb088e0729962c8b3cf",
+                "overrides": {"rules": [{"id": "ed651449c4a54f4b99c6e3bf863134d5"}]},
+            },
+        }
+        ctx = LintContext()
+        lint_actions(rule, PHASE_BY_NAME["cloudflare.http_ddos_rules"], ctx)
+        assert_no_lint(ctx, "CF200")
+
+    def test_a_genuinely_invalid_ddos_action_still_errors(self):
+        rule = {"ref": "x", "expression": "true", "action": "redirect"}
+        ctx = LintContext()
+        lint_actions(rule, PHASE_BY_NAME["cloudflare.http_ddos_rules"], ctx)
+        assert_lint(ctx, "CF200")
