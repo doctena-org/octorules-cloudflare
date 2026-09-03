@@ -1,4 +1,4 @@
-"""Tests for the Cloud Connector rule linter — Category U rules + expression analysis."""
+"""Tests for the Cloud Connector rule linter - Category U rules + expression analysis."""
 
 from octorules.linter.engine import LintContext
 from octorules.testing.lint import assert_lint, assert_no_lint

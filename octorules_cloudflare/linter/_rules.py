@@ -348,7 +348,7 @@ CF478 = RuleMeta("CF478", "list", "Overlapping IP/CIDR entries in list", Severit
 CF479 = RuleMeta("CF479", "list", "Redirect source_url contains a query string", Severity.ERROR)
 CF480 = RuleMeta("CF480", "list", "Invalid list name (format or length)", Severity.ERROR)
 
-# Category U — Cloud Connector Rules
+# Category U - Cloud Connector Rules
 CF490 = RuleMeta(
     "CF490", "cloud_connector", "Missing required Cloud Connector field", Severity.ERROR
 )

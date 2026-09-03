@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   file. `contact` and `expires` are required while `enabled` is true; lint
   warns once `expires` has passed.
 - **`managed_transforms`**, toggling Cloudflare's managed request/response
-  header transforms. The plan fails when the state after apply would enable
-  two transforms the live API declares mutually exclusive.
+  header transforms. The plan fails when a declared toggle would leave both
+  sides of a conflict the live API declares enabled.
 - **`cloud_connector_rules`**, managing the zone's Cloud Connector routing
   rules as an ordered list identified by `description` (the API persists no
   `ref`). Six new lint rules (CF490-CF495) plus full expression analysis and

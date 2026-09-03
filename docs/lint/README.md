@@ -377,12 +377,12 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF478](stage2d-lists.md#cf478--overlapping-ipcidr-entries-in-list) | Overlapping IP/CIDR entries in list | WARNING |
 | [CF479](stage2d-lists.md#cf479--redirect-source_url-contains-a-query-string) | Redirect source_url contains a query string | ERROR |
 | [CF480](stage2d-lists.md#cf480--invalid-list-name) | Invalid list name (format or length) | ERROR |
-| [CF490](stage2e-cloud-connector.md#cf490--missing-required-field) | Missing required Cloud Connector field | ERROR |
-| [CF491](stage2e-cloud-connector.md#cf491--invalid-provider) | Invalid Cloud Connector provider | ERROR |
-| [CF492](stage2e-cloud-connector.md#cf492--invalid-field-type) | Invalid Cloud Connector field type | ERROR |
-| [CF493](stage2e-cloud-connector.md#cf493--duplicate-description) | Duplicate Cloud Connector description | WARNING |
-| [CF494](stage2e-cloud-connector.md#cf494--unknown-field) | Unknown Cloud Connector field | ERROR |
-| [CF495](stage2e-cloud-connector.md#cf495--duplicate-expression) | Duplicate expression across enabled Cloud Connector rules | WARNING |
+| [CF490](stage2e-cloud-connector.md#cf490---missing-required-field) | Missing required Cloud Connector field | ERROR |
+| [CF491](stage2e-cloud-connector.md#cf491---invalid-provider) | Invalid Cloud Connector provider | ERROR |
+| [CF492](stage2e-cloud-connector.md#cf492---invalid-field-type) | Invalid Cloud Connector field type | ERROR |
+| [CF493](stage2e-cloud-connector.md#cf493---duplicate-description) | Duplicate Cloud Connector description | WARNING |
+| [CF494](stage2e-cloud-connector.md#cf494---unknown-field) | Unknown Cloud Connector field | ERROR |
+| [CF495](stage2e-cloud-connector.md#cf495---duplicate-expression) | Duplicate expression across enabled Cloud Connector rules | WARNING |
 | [CF022](stage2b-custom-rulesets.md#cf022--missing-required-field) | Missing required custom ruleset field | ERROR |
 | [CF023](stage2b-custom-rulesets.md#cf023--invalid-id-format) | Invalid custom ruleset id format | WARNING |
 | [CF024](stage2b-custom-rulesets.md#cf024--duplicate-ref-within-custom-ruleset) | Duplicate ref within custom ruleset | ERROR |

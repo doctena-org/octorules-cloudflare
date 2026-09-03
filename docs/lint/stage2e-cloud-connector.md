@@ -4,9 +4,9 @@ Validates `cloud_connector_rules` entries for structural correctness and express
 
 Also checks CF015/CF016 (always-true/always-false) on rule expressions and delegates full expression analysis (E, F, G, O rules) and request-phase field restrictions (CF019/CF020) to the AST and phase linters.
 
-## Category U — Cloud Connector Rules (6 rules)
+## Category U - Cloud Connector Rules (6 rules)
 
-### CF490 — Missing required field
+### CF490 - Missing required field
 
 | Severity | Category |
 |----------|----------|
@@ -23,7 +23,7 @@ cloudflare:
 
 Fix: Add all required fields.
 
-### CF491 — Invalid provider
+### CF491 - Invalid provider
 
 | Severity | Category |
 |----------|----------|
@@ -41,7 +41,7 @@ cloudflare:
 
 Fix: Use one of the four supported providers.
 
-### CF492 — Invalid field type
+### CF492 - Invalid field type
 
 | Severity | Category |
 |----------|----------|
@@ -55,33 +55,33 @@ Triggers when:
 
 Fix: Use the correct type for each field.
 
-### CF493 — Duplicate description
+### CF493 - Duplicate description
 
 | Severity | Category |
 |----------|----------|
 | WARNING | cloud_connector |
 
-Triggers when two rules share the same `description`. Descriptions are identity keys — duplicates cause ambiguous matching between YAML and Cloudflare.
+Triggers when two rules share the same `description`. Descriptions are identity keys - duplicates cause ambiguous matching between YAML and Cloudflare.
 
 Fix: Give each rule a unique description.
 
-### CF494 — Unknown field
+### CF494 - Unknown field
 
 | Severity | Category |
 |----------|----------|
 | ERROR | cloud_connector |
 
-Triggers when a rule carries a key other than `description`, `enabled`, `expression`, `parameters`, `provider`, or when `parameters` carries a key other than `host`. A `ref` key gets a dedicated hint — Cloud Connector rules are identified by description, not ref.
+Triggers when a rule carries a key other than `description`, `enabled`, `expression`, `parameters`, `provider`, or when `parameters` carries a key other than `host`. A `ref` key gets a dedicated hint - Cloud Connector rules are identified by description, not ref.
 
 Fix: Remove the unknown key.
 
-### CF495 — Duplicate expression
+### CF495 - Duplicate expression
 
 | Severity | Category |
 |----------|----------|
 | WARNING | cloud_connector |
 
-Triggers when two **enabled** rules share the same expression (after whitespace normalization) — a likely copy/paste error. A pair where either rule is disabled does not trigger; keeping a disabled copy around for a staged swap is a legitimate shape.
+Triggers when two **enabled** rules share the same expression (after whitespace normalization) - a likely copy/paste error. A pair where either rule is disabled does not trigger; keeping a disabled copy around for a staged swap is a legitimate shape.
 
 ```yaml
 cloudflare:

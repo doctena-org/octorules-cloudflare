@@ -1,6 +1,6 @@
 # octorules-cloudflare
 
-Cloudflare provider for [octorules](https://github.com/doctena-org/octorules) — manages 23 Cloudflare rule phases, custom rulesets, lists, and Page Shield policies as YAML.
+Cloudflare provider for [octorules](https://github.com/doctena-org/octorules): manages 23 Cloudflare rule phases, custom rulesets, lists, Cloud Connector rules, Page Shield and alerting policies, and the zone settings sections (bot management, security, SSL/TLS, security.txt, managed transforms, and more) as YAML.
 
 ## Installation
 
@@ -256,7 +256,7 @@ Each policy entry requires:
 **How it works:**
 
 - The `description` field is the identity key (like `ref` for rules and `name` for lists). Policies are matched between YAML and Cloudflare by description.
-- The presence of a `page_shield_policies:` key means ALL policies are managed — policies in Cloudflare not in YAML are planned for deletion.
+- The presence of a `page_shield_policies:` key means ALL policies are managed - policies in Cloudflare not in YAML are planned for deletion.
 - If the `page_shield_policies:` key is absent, policies are ignored entirely.
 - During sync, policies are applied **after** lists and **before** custom rulesets and phases.
 - Use `octorules dump` to export existing Page Shield policies to YAML.
@@ -284,7 +284,7 @@ Each rule entry:
 
 | Field | Description |
 |-------|-------------|
-| `description` | Rule description — used as the identity key for matching |
+| `description` | Rule description, used as the identity key for matching |
 | `expression` | Cloudflare filter expression (request-phase fields) |
 | `provider` | `aws_s3`, `cloudflare_r2`, `gcp_storage`, or `azure_storage` |
 | `parameters` | Provider parameters (`host`: the storage endpoint to route to) |
@@ -293,13 +293,13 @@ Each rule entry:
 **How it works:**
 
 - The `description` field is the identity key (like `description` for Page Shield policies): the Cloud Connector API has no `ref` field to persist, so plans match YAML rules to live rules by description. Descriptions must be unique.
-- Rule order is part of the desired state — reordering rules in YAML is a planned change.
-- The presence of a `cloud_connector_rules:` key means ALL rules are managed — the list is replaced wholesale on sync, so rules in Cloudflare not in YAML are planned for deletion. If the key is absent, Cloud Connector is ignored entirely.
+- Rule order is part of the desired state: reordering rules in YAML is a planned change.
+- The presence of a `cloud_connector_rules:` key means ALL rules are managed - the list is replaced wholesale on sync, so rules in Cloudflare not in YAML are planned for deletion. If the key is absent, Cloud Connector is ignored entirely.
 - Use `octorules dump` to export existing Cloud Connector rules to YAML.
 
 ## Alerting policies (account-level)
 
-Cloudflare [notification policies](https://developers.cloudflare.com/notifications/) decide who gets told when something happens — a certificate about to expire, an L7 DDoS event, a Cloudflare incident. They live on the account, so the section belongs in the account-scoped rules file:
+Cloudflare [notification policies](https://developers.cloudflare.com/notifications/) decide who gets told when something happens: a certificate about to expire, an L7 DDoS event, a Cloudflare incident. They live on the account, so the section belongs in the account-scoped rules file:
 
 ```yaml
 # rules/account-a.yaml
@@ -317,10 +317,10 @@ Each policy entry:
 
 | Field | Description |
 |-------|-------------|
-| `name` | Policy name — used as the identity key for matching |
+| `name` | Policy name, used as the identity key for matching |
 | `alert_type` | One of the account's available alert types |
 | `enabled` | Boolean |
-| `mechanisms` | Destinations: `email` (addresses), `webhooks` (`$name` references or ids), `pagerduty` (ids) — at least one required |
+| `mechanisms` | Destinations: `email` (addresses), `webhooks` (`$name` references or ids), `pagerduty` (ids); at least one required |
 | `description` | Optional |
 | `alert_interval` | Optional re-alert interval |
 | `filters` | Optional per-type filters; `zones` entries are zone names |
@@ -328,10 +328,10 @@ Each policy entry:
 **How it works:**
 
 - The `name` field is the identity key. Policies are matched between YAML and Cloudflare by name; names must be unique.
-- Webhook destinations are referenced by name with a `$` prefix (`"$Ops Slack"`) and resolved against the account's webhook destinations at plan time. Destinations themselves are not managed — create them once in the dashboard.
-- Zone names inside `filters.zones` are resolved to zone ids on plan and translated back on dump, so the YAML never carries UUIDs.
-- `alert_type` and each type's required filters are validated at plan time against the account's own `available_alerts` registry, not a hardcoded table — an alert type this account cannot use, or a missing required filter, fails the plan before the API rejects it.
-- The presence of an `alerting_policies:` key means ALL policies are managed — policies in Cloudflare not in YAML are planned for deletion. If the key is absent, alerting is ignored entirely.
+- Webhook destinations are referenced by name with a `$` prefix (`"$Ops Slack"`) and resolved against the account's webhook destinations at plan time. Destinations themselves are not managed; create them once in the dashboard.
+- Zone names inside `filters.zones` are resolved to zone ids on plan and translated back on dump, so the YAML does not need to carry UUIDs.
+- `alert_type` and each type's required filters are validated at plan time against the account's own `available_alerts` registry, not a hardcoded table: an alert type this account cannot use, or a missing required filter, fails the plan before the API rejects it.
+- The presence of an `alerting_policies:` key means ALL policies are managed - policies in Cloudflare not in YAML are planned for deletion. If the key is absent, alerting is ignored entirely.
 - Fields the YAML declares replace the live value; optional fields it omits keep their dashboard-set values.
 - Use `octorules dump` to export existing policies to YAML.
 
