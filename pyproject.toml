@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "octorules-cloudflare"
-version = "0.16.0"
+version = "0.17.0"
 description = "Cloudflare provider for octorules"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -28,7 +28,7 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "octorules>=0.35.0",
+    "octorules>=0.36.0",
     "cloudflare>=5.6,<6.0",
     "octorules-wirefilter>=0.5.2,<1.0",
 ]

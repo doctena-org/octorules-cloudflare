@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.17.0] - 2026-09-03
+
+### Fixed
+- `dump` no longer emits `bot_management.using_latest_model`, a read-only
+  field whose presence made a dumped zone file fail its own lint.
+- **CF200** accepted: `execute` in `http_ddos_rules`, which is how the DDoS
+  managed ruleset is deployed with overrides. It previously errored on a
+  working configuration.
 
 ### Added
 - **`security_txt`**, managing the zone's RFC 9116 `/.well-known/security.txt`
