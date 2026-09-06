@@ -221,7 +221,7 @@ class CloudflareProvider:
                 provider_id,
                 **scope.api_kwargs,
             )
-            rules = ruleset.rules or []
+            rules = _resp_field(ruleset, "rules", [])
             return [_to_dict(r) for r in rules]
         except NotFoundError:
             return []
@@ -259,7 +259,7 @@ class CloudflareProvider:
             **scope.api_kwargs,
             rules=rules,
         )
-        response_rules = result.rules or []
+        response_rules = _resp_field(result, "rules", [])
         response_count = len(response_rules)
         if response_count != len(rules):
             log.warning(
@@ -345,7 +345,7 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("GET rulesets/%s %s", ruleset_id, sl)
         ruleset = self._client.rulesets.get(ruleset_id, **scope.api_kwargs)
-        rules = ruleset.rules or []
+        rules = _resp_field(ruleset, "rules", [])
         return [_to_dict(r) for r in rules]
 
     @_wrap_provider_errors
@@ -354,7 +354,7 @@ class CloudflareProvider:
         sl = _fmt_scope(scope)
         log.debug("PUT rulesets/%s %s rules=%d", ruleset_id, sl, len(rules))
         result = self._client.rulesets.update(ruleset_id, **scope.api_kwargs, rules=rules)
-        response_rules = result.rules or []
+        response_rules = _resp_field(result, "rules", [])
         response_count = len(response_rules)
         if response_count != len(rules):
             log.warning(
@@ -381,7 +381,7 @@ class CloudflareProvider:
             rules=[],
             description=description,
         )
-        return {"id": result.id, "name": result.name}
+        return {"id": _resp_field(result, "id"), "name": _resp_field(result, "name")}
 
     @_wrap_provider_errors
     def delete_custom_ruleset(self, scope: Scope, ruleset_id: str) -> None:
@@ -1357,6 +1357,28 @@ class CloudflareProvider:
                 )
 
         apply_each(operations, section="cloudflare.content_scanning", scope=scope)
+
+
+def _resp_field(obj: object, field: str, default: object = None) -> object:
+    """Read *field* off a Cloudflare SDK response, whichever shape it arrives in.
+
+    The SDK does not guarantee a model. cloudflare 5.7.0 retyped the ruleset
+    *write* responses from a model class to
+    ``TypeAlias = Union[Ruleset, Optional[object]]``; ``object`` matches
+    anything, so the SDK's ``construct_type`` stops selecting ``Ruleset`` and
+    hands back the raw ``dict``. Attribute access then raises
+    ``AttributeError`` *after* the PUT has already landed, which turns a
+    successful write into a failed deploy with the changes applied.
+
+    Read responses were not retyped in 5.7.0, but the same change can reach
+    them, so every ruleset response field is read through here. Handling both
+    shapes keeps the provider working across the whole 5.x line rather than
+    tracking which release types which response.
+    """
+    if obj is None:
+        return default
+    value = obj.get(field, default) if isinstance(obj, dict) else getattr(obj, field, default)
+    return default if value is None else value
 
 
 def _to_dict(obj: object) -> dict:

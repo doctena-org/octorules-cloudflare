@@ -41,6 +41,7 @@ SET_CACHE_SETTINGS_SCHEMA = ActionSchema(
             "origin_error_page_passthru",
             "cache_reserve",
             "origin_cache_control",
+            "origin_range_requests",
             "additional_cacheable_ports",
             "read_timeout",
             "shared_dictionary",

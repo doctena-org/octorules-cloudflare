@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Ruleset writes no longer fail after the change has reached Cloudflare.
+  cloudflare 5.7.0 returns a plain `dict` from ruleset write responses, which
+  raised `AttributeError` once the PUT had landed.
+- `set_cache_settings` accepts `origin_range_requests`, added in cloudflare
+  5.7.0 and previously rejected as an unknown parameter.
+
 ## [0.17.0] - 2026-09-03
 
 ### Fixed

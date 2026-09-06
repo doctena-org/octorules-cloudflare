@@ -7,6 +7,18 @@ from octorules_cloudflare.linter._plugin import CF_RULE_IDS
 from octorules_cloudflare.linter._rules import CF_RULE_METAS
 from octorules_cloudflare.linter.schemas.actions import ACTION_SCHEMAS
 
+# Action-parameter keys that exist in only part of the supported SDK range.
+# The package supports ``cloudflare>=5.6,<6.0`` and the linter schema is the
+# union across that range, so the schema legitimately carries keys the
+# *installed* SDK has not got yet. Only this direction is relaxed: a key the
+# SDK has and the schema does not still fails, which is the direction that
+# means Cloudflare shipped a field octorules would silently reject.
+_VERSION_DEPENDENT_PARAMETER_KEYS = frozenset(
+    {
+        "origin_range_requests",  # set_cache_settings, added in cloudflare 5.7.0
+    }
+)
+
 
 class TestPluginRegistration:
     def test_plugin_is_registered(self):
@@ -132,7 +144,7 @@ class TestPluginRegistration:
 
             linter_keys = schema.allowed_parameter_keys
 
-            in_linter_not_sdk = linter_keys - sdk_keys
+            in_linter_not_sdk = linter_keys - sdk_keys - _VERSION_DEPENDENT_PARAMETER_KEYS
             in_sdk_not_linter = sdk_keys - linter_keys
 
             assert not in_linter_not_sdk, (
