@@ -12,6 +12,7 @@ import logging
 import re
 from dataclasses import dataclass, field, replace
 
+from octorules_wirefilter import UnknownSchemeError
 from octorules_wirefilter import parse_expression as _wf_parse
 
 from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
@@ -264,6 +265,13 @@ def _parse_with_wirefilter(
                 has_regex=bool(regex_literals),
                 depth_exceeded=result.get("depth_exceeded", False),
             )
+    except UnknownSchemeError:
+        # Not a crash: the scheme names a field set this build of
+        # octorules-wirefilter does not have.  Only _scheme_for_phase can get
+        # that wrong, never a user's YAML, and falling back to regex would file
+        # the mistake as a per-rule parse warning against a correct expression
+        # while every rule in the phase silently goes unvalidated.  Let it out.
+        raise
     except (RuntimeError, TypeError, ValueError, OSError) as e:
         # FFI call crashed — fall back to regex extraction.
         log.warning("Wirefilter FFI crashed, falling back to regex: %s", e, exc_info=True)

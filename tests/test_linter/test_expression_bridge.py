@@ -2,6 +2,10 @@
 
 import logging
 
+import pytest
+from octorules.phases import PHASE_BY_NAME
+from octorules_wirefilter import UnknownSchemeError
+
 from octorules_cloudflare.linter.expression_bridge import (
     ExpressionInfo,
     _clear_parse_cache,
@@ -10,6 +14,7 @@ from octorules_cloudflare.linter.expression_bridge import (
     _scheme_for_phase,
     parse_expression,
 )
+from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
 
 
 class TestMagicFirewallScheme:
@@ -48,6 +53,55 @@ class TestMagicFirewallScheme:
         # http.host is not in the L4 scheme.
         info = parse_expression('http.host eq "x"', phase="cloudflare.network_firewall_rules")
         assert info.parse_error
+
+    def test_magic_firewall_phases_cover_every_registered_l4_phase(self):
+        """MAGIC_FIREWALL_PHASES must equal the L4 phases in the phase table.
+
+        The set is maintained beside the phase table, not derived from it, so a
+        sixth Layer-4 phase can be registered without anyone adding it here.
+        Nothing would fail: _scheme_for_phase would return None for it and its
+        packet fields would be validated against the HTTP scheme, where each one
+        reads as an unknown identifier pointing at the user's expression.
+
+        The control is provider_id, the Cloudflare-side name, which is a
+        different source from the octorules phase names the set holds.
+        """
+        registered_l4 = {
+            name
+            for name, phase in PHASE_BY_NAME.items()
+            if name.startswith("cloudflare.")
+            and (phase.provider_id == "ddos_l4" or phase.provider_id.startswith("magic_transit"))
+        }
+        assert registered_l4 == MAGIC_FIREWALL_PHASES
+
+    def test_unknown_scheme_propagates_from_the_ffi_seam(self):
+        """A scheme the binding does not have is not a crash to fall back from.
+
+        The broad except around the FFI exists for a parser that fell over,
+        where regex extraction still leaves the semantic rules something to
+        inspect. A bad scheme is a different fault: the expression is fine and
+        every rule in the phase is about to be checked against the wrong field
+        set, so swallowing it files a per-rule warning against correct YAML and
+        exits 0.
+        """
+        _clear_parse_cache()
+        with pytest.raises(UnknownSchemeError):
+            _parse_with_wirefilter("ip.len > 1400", scheme="magic-firewall")
+
+    def test_scheme_mapping_drift_reaches_the_caller(self, monkeypatch):
+        """End to end: a typo in the phase-to-scheme mapping fails the run.
+
+        This is the drift the mapping is exposed to, one character in a scheme
+        name, seen through the public entry point rather than the seam.
+        """
+        monkeypatch.setattr(
+            "octorules_cloudflare.linter.expression_bridge._scheme_for_phase",
+            lambda phase: "magic-firewall",
+        )
+        _clear_parse_cache()
+        with pytest.raises(UnknownSchemeError):
+            parse_expression("ip.len > 1400", phase="cloudflare.network_firewall_rules")
+        _clear_parse_cache()
 
 
 class TestRegexParser:
