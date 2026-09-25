@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Minimum `octorules-wirefilter` dependency: `>=0.6.0`.
 
+### Fixed
+- Runs no longer fail intermittently with `PydanticUserError` ("BaseModel
+  cannot be instantiated directly"). The provider sets
+  `DEFER_PYDANTIC_BUILD=false` unless already set, so the SDK builds its
+  models at import instead of racing to build them in worker threads.
+
 ## [0.17.1] - 2026-09-06
 
 ### Fixed

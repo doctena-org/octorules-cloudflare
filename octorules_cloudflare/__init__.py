@@ -1,5 +1,11 @@
 """Cloudflare provider for octorules."""
 
+import os
+
+# Must run before the SDK is imported. The SDK defers each model's pydantic
+# build to first use, and that build is not thread-safe under parallel fetches.
+os.environ.setdefault("DEFER_PYDANTIC_BUILD", "false")
+
 from octorules.expression import normalize_expression
 from octorules.phases import Phase, register_non_phase_key, register_phases
 
