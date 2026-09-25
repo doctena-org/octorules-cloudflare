@@ -125,9 +125,11 @@ class TestFixturesParseIntoSDKModels:
             [
                 {
                     "id": "rule-1",
+                    "ref": "rule-1",
                     "version": "1",
                     "last_updated": "2026-08-11T00:00:00Z",
                     "action": "block",
+                    "enabled": True,
                     "expression": "ip.src eq 1.2.3.4",
                     "description": "block one address",
                 }
@@ -152,9 +154,11 @@ class TestFixturesParseIntoSDKModels:
         rule = MockRule(
             {
                 "id": "rule-1",
+                "ref": "rule-1",
                 "version": "1",
                 "last_updated": "2026-08-11T00:00:00Z",
                 "action": "block",
+                "enabled": True,
                 "expression": "true",
             }
         )
