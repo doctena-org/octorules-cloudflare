@@ -16,6 +16,8 @@ from octorules_cloudflare.linter.schemas.actions import ACTION_SCHEMAS
 _VERSION_DEPENDENT_PARAMETER_KEYS = frozenset(
     {
         "origin_range_requests",  # set_cache_settings, added in cloudflare 5.7.0
+        "webmcp_enabled",  # set_config, added in cloudflare 5.8.0
+        "webmcp_packs",  # set_config, added in cloudflare 5.8.0
     }
 )
 

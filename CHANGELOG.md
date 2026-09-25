@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   cannot be instantiated directly"). The provider sets
   `DEFER_PYDANTIC_BUILD=false` unless already set, so the SDK builds its
   models at import instead of racing to build them in worker threads.
+- `set_config` accepts `webmcp_enabled` and `webmcp_packs`, added in
+  cloudflare 5.8.0 and previously flagged as unknown parameters (**CF203**).
 
 ## [0.17.1] - 2026-09-06
 

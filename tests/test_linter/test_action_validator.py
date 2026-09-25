@@ -3287,6 +3287,22 @@ class TestSetConfigStaleKeys:
         assert "CF203" in _ids(ctx)
 
 
+class TestSetConfigWebMCPKeys:
+    """webmcp_enabled and webmcp_packs are valid set_config keys (cloudflare 5.8.0)."""
+
+    def test_webmcp_keys_accepted(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "set_config",
+                "action_parameters": {"webmcp_enabled": True, "webmcp_packs": []},
+            },
+            "cloudflare.config_rules",
+        )
+        assert _ids(ctx) == []
+
+
 class TestExecuteVersionRemoved:
     """'version' is not an action parameter — should trigger CF203."""
 

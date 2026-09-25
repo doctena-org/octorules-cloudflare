@@ -79,6 +79,8 @@ SET_CONFIG_SCHEMA = ActionSchema(
             "redirects_for_ai_training",
             "request_body_buffering",
             "response_body_buffering",
+            "webmcp_enabled",
+            "webmcp_packs",
         }
     ),
 )
