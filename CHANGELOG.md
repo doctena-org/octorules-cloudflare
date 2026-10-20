@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.18.0] - 2026-10-20
 
 ### Added
 - **CF228** (ERROR): an account-level `waf_custom_rules`, `waf_managed_rules` or `rate_limiting_rules` filter that is neither the ENT clause alone nor one parenthesised group followed by `and` and the ENT clause. Cloudflare rejects such a filter, failing the whole phase; `not (A) and (cf.zone.plan eq "ENT")` is one.
