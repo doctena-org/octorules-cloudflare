@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.18.1] - 2026-10-20
+
+### Fixed
+- **CF228** no longer says Cloudflare rejects every other shape; `(A) and cf.zone.plan eq "ENT"` is accepted too.
+
 ## [0.18.0] - 2026-10-20
 
 ### Added
