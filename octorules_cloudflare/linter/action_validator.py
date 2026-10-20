@@ -124,6 +124,7 @@ RULE_IDS = frozenset(
         "CF226",
         "CF227",
         "CF228",
+        "CF229",
         "CF409",
     }
 )
@@ -208,6 +209,55 @@ def _check_account_entry_point_shape(
     )
 
 
+# CF229: the custom and rate-limit account entry points reject the WAF attack-score
+# fields; the managed entry point and custom rulesets accept them (live API, 2026-10-20).
+_ATTACK_SCORE_FIELDS = frozenset(
+    {
+        "cf.waf.score",
+        "cf.waf.score.class",
+        "cf.waf.score.rce",
+        "cf.waf.score.sqli",
+        "cf.waf.score.xss",
+    }
+)
+_ATTACK_SCORE_ROOT_PHASES = frozenset(
+    {"cloudflare.waf_custom_rules", "cloudflare.rate_limiting_rules"}
+)
+
+
+def _check_account_attack_score_fields(
+    rule: dict[str, Any], phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF229: a WAF attack-score field in an account custom or rate-limit entry-point rule."""
+    from octorules_cloudflare.linter.expression_bridge import parse_expression
+
+    if phase_name not in _ATTACK_SCORE_ROOT_PHASES:
+        return
+    expression = rule.get("expression")
+    if not isinstance(expression, str) or not _ACCOUNT_SCOPE_MARKER.search(expression):
+        return
+    for field_name in parse_expression(expression, phase=phase_name).fields_used:
+        if field_name not in _ATTACK_SCORE_FIELDS:
+            continue
+        ctx.add(
+            LintResult(
+                rule_id="CF229",
+                severity=Severity.ERROR,
+                message=(
+                    f"Field {field_name} is not allowed in an account-level rule of this"
+                    " phase; the entry point rejects it with HTTP 400"
+                ),
+                phase=phase_name,
+                ref=ref,
+                field="expression",
+                suggestion=(
+                    "Move the condition out of the account entry point; in"
+                    " waf_custom_rules, into the custom ruleset it executes"
+                ),
+            )
+        )
+
+
 def _check_account_scope_list_ref(
     rule: dict[str, Any], phase_name: str, ref: str, ctx: LintContext
 ) -> None:
@@ -285,11 +335,12 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
     action = rule.get("action")
     phase_name = phase.friendly_name
 
-    # CF224 / CF227 / CF228: expression-level checks, run first so they
+    # CF224 / CF227 / CF228 / CF229: expression-level checks, run first so they
     # fire regardless of any action-validation early-return below.
     _check_expression_length(rule, phase_name, ref, ctx)
     _check_account_scope_list_ref(rule, phase_name, ref, ctx)
     _check_account_entry_point_shape(rule, phase_name, ref, ctx)
+    _check_account_attack_score_fields(rule, phase_name, ref, ctx)
 
     # CF201: Missing action in phase without default
     if action is None:
@@ -1148,6 +1199,7 @@ def _lint_rate_limit_params(
     if isinstance(counting_expr, str) and counting_expr.strip():
         from octorules.expression import normalize_expression
 
+        from octorules_cloudflare.linter.ast_linter import lint_unsupported_operators
         from octorules_cloudflare.linter.expression_bridge import parse_expression
 
         counting_expr = normalize_expression(counting_expr)
@@ -1163,6 +1215,7 @@ def _lint_rate_limit_params(
                     field="ratelimit.counting_expression",
                 )
             )
+        lint_unsupported_operators(ce_info, phase_name, ref, ctx, "ratelimit.counting_expression")
 
 
 def _lint_origin_params(params: dict, phase_name: str, ref: str, ctx: LintContext) -> None:

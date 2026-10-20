@@ -24,6 +24,10 @@ class TestResponseFieldInRequestPhase:
         ctx = _lint("http.response.code eq 200", "cloudflare.waf_custom_rules")
         assert_lint(ctx, "CF019")
 
+    def test_cf019_response_field_on_right_hand_side(self):
+        ctx = _lint('http.host eq http.response.headers["x"][0]', "cloudflare.waf_custom_rules")
+        assert_lint(ctx, "CF019")
+
     def test_cf019_response_field_in_response_phase_ok(self):
         ctx = _lint("http.response.code eq 200", "cloudflare.response_header_rules")
         assert_no_lint(ctx, "CF019")

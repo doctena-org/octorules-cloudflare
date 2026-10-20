@@ -41,8 +41,8 @@ class TestPluginRegistration:
     def test_rule_count(self):
         """Guard against silent rule add/remove (mirrors Azure/Bunny). Bump
         deliberately when intentionally adding or removing a rule."""
-        assert len(CF_RULE_METAS) == 169, (
-            f"Expected 169 CF rule metas, got {len(CF_RULE_METAS)}. "
+        assert len(CF_RULE_METAS) == 171, (
+            f"Expected 171 CF rule metas, got {len(CF_RULE_METAS)}. "
             "If you added or removed a rule, update this count intentionally."
         )
 

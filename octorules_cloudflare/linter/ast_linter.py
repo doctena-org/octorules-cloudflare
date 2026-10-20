@@ -18,6 +18,7 @@ from octorules.reserved_ips import is_reserved
 
 from octorules_cloudflare.linter._constants import PLAN_TIERS as _PLAN_TIERS
 from octorules_cloudflare.linter.expression_bridge import ExpressionInfo, parse_expression
+from octorules_cloudflare.linter.schemas._registry import MAGIC_FIREWALL_PHASES
 from octorules_cloudflare.linter.schemas.fields import FIELDS
 from octorules_cloudflare.linter.schemas.functions import get_function
 
@@ -37,6 +38,7 @@ RULE_IDS = frozenset(
         "CF307",
         "CF308",
         "CF309",
+        "CF310",
         "CF520",
         "CF521",
         "CF522",
@@ -347,6 +349,7 @@ def lint_expressions(
 
     # Category F — Type system / semantic issues
     _lint_type_constraints(info, phase_name, ref, ctx)
+    lint_unsupported_operators(info, phase_name, ref, ctx)
 
     # Category E — Function constraints
     _lint_function_constraints(info, phase_name, ref, ctx)
@@ -1706,6 +1709,32 @@ def _find_int_range_overlaps(content: str) -> list[tuple[str, str]]:
     return overlaps
 
 
+def lint_unsupported_operators(
+    info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext, field: str = "expression"
+) -> None:
+    """CF310: ``bitwise_and`` (``&``), which every HTTP ruleset phase rejects.
+
+    The engine parses it, but the Rulesets API answers "the use of operator
+    BitwiseAnd is not allowed". Network firewall phases are left alone.
+    """
+    if phase_name in MAGIC_FIREWALL_PHASES or "bitwise_and" not in info.operators_used:
+        return
+    ctx.add(
+        LintResult(
+            rule_id="CF310",
+            severity=Severity.ERROR,
+            message=(
+                "Operator bitwise_and is not allowed in Cloudflare HTTP rulesets;"
+                " the API rejects the rule with HTTP 400"
+            ),
+            phase=phase_name,
+            ref=ref,
+            field=field,
+            suggestion="Compare the value with eq, in or an ordering operator instead",
+        )
+    )
+
+
 def _lint_type_constraints(
     info: ExpressionInfo, phase_name: str, ref: str, ctx: LintContext
 ) -> None:
@@ -2071,6 +2100,9 @@ def _lint_function_constraints(
         "starts_with",
         "ends_with",
         "wildcard_replace",
+        "trim",
+        "trim_start",
+        "trim_end",
     )
     for func_name in _SOURCE_MUST_BE_FIELD_FUNCS:
         for call_args in _extract_function_call_args(expr, func_name):

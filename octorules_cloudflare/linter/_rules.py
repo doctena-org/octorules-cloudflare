@@ -109,6 +109,12 @@ CF228 = RuleMeta(
     "Account entry-point filter not in the shape Cloudflare accepts",
     Severity.ERROR,
 )
+CF229 = RuleMeta(
+    "CF229",
+    "action",
+    "WAF attack-score field in an account custom or rate-limit entry-point rule",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Missing or invalid rate limiting period", Severity.ERROR)
@@ -221,6 +227,9 @@ CF307 = RuleMeta("CF307", "type", "Operator-type incompatibility", Severity.ERRO
 CF308 = RuleMeta("CF308", "type", "Unknown field name in expression", Severity.WARNING)
 CF309 = RuleMeta(
     "CF309", "type", "Array [*] unpacking used on multiple distinct arrays", Severity.WARNING
+)
+CF310 = RuleMeta(
+    "CF310", "type", "Operator not supported by Cloudflare HTTP rulesets", Severity.ERROR
 )
 
 # Category G — Value Constraint Warnings

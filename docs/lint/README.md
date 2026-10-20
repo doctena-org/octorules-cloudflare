@@ -1,6 +1,6 @@
 # Lint Rule Reference
 
-`octorules lint` performs offline static analysis of your rules files. **169 rules** across **20 categories**, organized into a 4-stage pipeline.
+`octorules lint` performs offline static analysis of your rules files. **171 rules** across **20 categories**, organized into a 4-stage pipeline.
 
 **Note:** Lint rules fire independently — multiple rules may report on the same input when they catch different concerns, providing richer signal for policy optimization.
 
@@ -66,7 +66,7 @@ Suppressed findings are excluded from the report but counted in the summary line
 | Stage | What it checks | CF Range | Rules | Details |
 |-------|---------------|----------|-------|---------|
 | 1. YAML structure | Required fields, types, duplicates, unknown keys | CF003–CF027 | 16 | [stage1-yaml-structure.md](stage1-yaml-structure.md) |
-| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF550 | 122 | [stage2-per-rule.md](stage2-per-rule.md) |
+| 2. Per-rule checks | Actions, expressions, phase restrictions, values, style | CF001–CF002, CF019–CF021, CF200–CF550 | 124 | [stage2-per-rule.md](stage2-per-rule.md) |
 | 2b. Custom rulesets | Custom ruleset structure, duplicate refs, rule count + full per-rule checks | CF022–CF026 | 5 | [stage2b-custom-rulesets.md](stage2b-custom-rulesets.md) |
 | 2c. Page Shield | Policy structure, catch-all detection + expression analysis and phase restrictions | CF460–CF463 | 4 | [stage2b-page-shield.md](stage2b-page-shield.md) |
 | 2d. List validation | List structure, item validity, duplicates, count | CF470–CF480 | 11 | [stage2d-lists.md](stage2d-lists.md) |
@@ -83,9 +83,9 @@ Suppressed findings are excluded from the report but counted in the summary line
 | CF019–CF021 | Phase restrictions | 3 |
 | CF022–CF026 | Custom ruleset validation | 5 |
 | CF100–CF105 | Cross-rule | 6 |
-| CF200–CF228 | Action validation | 29 |
+| CF200–CF229 | Action validation | 30 |
 | CF300–CF306 | Function constraints | 7 |
-| CF307–CF309 | Type system | 3 |
+| CF307–CF310 | Type system | 4 |
 | CF400–CF409 | Rate limiting | 9 |
 | CF410–CF415 | Cache rules | 6 |
 | CF420–CF424 | Config rules | 5 |
@@ -266,6 +266,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF226](stage2-per-rule.md#cf226--skip-action-parameter-not-available-in-this-phase) | Skip action parameter not available in this phase | ERROR/WARNING |
 | [CF227](stage2-per-rule.md#cf227--stored-list-referenced-from-an-account-scoped-waf_custom_rules-rule) | Stored list referenced from an account-scoped waf_custom_rules rule | ERROR |
 | [CF228](stage2-per-rule.md#cf228---account-entry-point-filter-not-in-the-shape-cloudflare-accepts) | Account entry-point filter not in the shape Cloudflare accepts | ERROR |
+| [CF229](stage2-per-rule.md#cf229---waf-attack-score-field-in-an-account-custom-or-rate-limit-entry-point-rule) | WAF attack-score field in an account custom or rate-limit entry-point rule | ERROR |
 | [CF400](stage2-per-rule.md#cf400--missing-or-invalid-rate-limiting-period) | Missing or invalid rate limiting period | ERROR |
 | [CF401](stage2-per-rule.md#cf401--missing-rate-limiting-characteristics) | Missing rate limiting characteristics | ERROR |
 | [CF402](stage2-per-rule.md#cf402--missing-requests_per_period-threshold) | Missing requests_per_period threshold | ERROR |
@@ -314,6 +315,7 @@ Some functions are restricted to specific phases. The linter checks this via rul
 | [CF307](stage2-per-rule.md#cf307--operator-type-incompatibility) | Operator-type incompatibility | ERROR |
 | [CF308](stage2-per-rule.md#cf308--unknown-field-name-in-expression) | Unknown field name in expression | WARNING |
 | [CF309](stage2-per-rule.md#cf309--array--unpacking-on-multiple-arrays) | Array [*] unpacking on multiple arrays | WARNING |
+| [CF310](stage2-per-rule.md#cf310---operator-not-supported-by-cloudflare-http-rulesets) | Operator not supported by Cloudflare HTTP rulesets | ERROR |
 | [CF520](stage2-per-rule.md#cf520--http-method-should-be-uppercase) | HTTP method should be uppercase | WARNING |
 | [CF521](stage2-per-rule.md#cf521--uri-path-should-start-with-) | URI path should start with / | WARNING |
 | [CF522](stage2-per-rule.md#cf522--regex-anchor-in-literal-value) | Regex anchor in literal value | WARNING |

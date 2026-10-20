@@ -35,7 +35,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (29 rules)
+## Category C — Action Validation (30 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -580,6 +580,16 @@ cloudflare:
 **Fix:** Wrap every other condition in one pair of parentheses: `(<conditions>) and (cf.zone.plan eq "ENT")`.
 
 The check runs on the whitespace-normalized expression sync sends, so a line break before `and` (which the API rejects in a raw request) makes no difference. Account scope is detected as for [CF227](#cf227--stored-list-referenced-from-an-account-scoped-waf_custom_rules-rule), by the `cf.zone.plan eq "ENT"` clause (or its `==` spelling). Suppress with `# octorules:disable=CF228`.
+
+### CF229 - WAF attack-score field in an account custom or rate-limit entry-point rule
+
+**Severity:** ERROR
+
+The account-level entry points of `waf_custom_rules` and `rate_limiting_rules` reject the WAF attack-score fields (`cf.waf.score`, `cf.waf.score.sqli`, `cf.waf.score.xss`, `cf.waf.score.rce`, `cf.waf.score.class`) with HTTP 400: "the use of field cf.waf.score is not allowed". The account `waf_managed_rules` entry point and custom rulesets accept them.
+
+**Fix:** Move the condition out of the entry point. In `waf_custom_rules`, put it in a rule of the custom ruleset the entry point executes.
+
+Account scope is detected as for [CF227](#cf227--stored-list-referenced-from-an-account-scoped-waf_custom_rules-rule). Suppress with `# octorules:disable=CF229`.
 
 ---
 
@@ -1173,7 +1183,7 @@ Fix: Use `s` for case-sensitive matching or omit the flag argument.
 |----------|----------|
 | WARNING | function |
 
-Triggers when certain functions receive a string literal instead of a field reference as their first (source) argument. Affected functions: `decode_base64`, `url_decode`, `starts_with`, `ends_with`, `wildcard_replace`.
+Triggers when certain functions receive a string literal instead of a field reference as their first (source) argument. Affected functions: `decode_base64`, `url_decode`, `starts_with`, `ends_with`, `wildcard_replace`, `trim`, `trim_start`, `trim_end`.
 
 ```yaml
 expression: 'starts_with("example.com", "/api")'
@@ -1187,7 +1197,7 @@ expression: 'starts_with(http.request.uri.path, "/api")'
 
 ---
 
-## Category F — Type System (3 rules)
+## Category F — Type System (4 rules)
 
 ### CF307 — Operator-type incompatibility
 
@@ -1230,6 +1240,9 @@ expression: 'http.hoost eq "example.com"'
 Fix: Correct the field name. Check for typos.
 
 ### CF309 — Array [*] unpacking on multiple arrays
+
+| Severity | Category |
+|### CF310 - Operator not supported by Cloudflare HTTP rulesets
 
 | Severity | Category |
 |----------|----------|

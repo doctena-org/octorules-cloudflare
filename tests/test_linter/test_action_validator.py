@@ -635,6 +635,61 @@ class TestCF228AccountEntryPointShape:
         assert "CF228" not in _ids(self._lint(f'not (http.host eq "a.example") and {self._ENT}'))
 
 
+class TestCF229AccountAttackScoreFields:
+    """The account custom and rate-limit entry points reject the WAF attack-score
+    fields; the managed entry point and custom rulesets accept them (live API,
+    2026-10-20)."""
+
+    _ENT = '(cf.zone.plan eq "ENT")'
+    _FIELDS = (
+        ("cf.waf.score", "lt 20"),
+        ("cf.waf.score.sqli", "lt 20"),
+        ("cf.waf.score.rce", "lt 20"),
+        ("cf.waf.score.xss", "lt 20"),
+        ("cf.waf.score.class", 'eq "attack"'),
+    )
+
+    def _lint(self, expression, phase):
+        return _lint_rule(
+            {
+                "ref": "t",
+                "expression": expression,
+                "action": "execute",
+                "action_parameters": {"id": "a" * 32},
+            },
+            phase,
+        )
+
+    @pytest.mark.parametrize(("field", "cmp"), _FIELDS)
+    @pytest.mark.parametrize(
+        "phase", ["cloudflare.waf_custom_rules", "cloudflare.rate_limiting_rules"]
+    )
+    def test_fires_at_custom_and_rate_limit_roots(self, field, cmp, phase):
+        results = assert_lint(
+            self._lint(f"({field} {cmp}) and {self._ENT}", phase),
+            "CF229",
+            count=1,
+            severity=Severity.ERROR,
+        )
+        assert field in results[0].message
+
+    @pytest.mark.parametrize(("field", "cmp"), _FIELDS)
+    def test_silent_at_managed_root(self, field, cmp):
+        ctx = self._lint(f"({field} {cmp}) and {self._ENT}", "cloudflare.waf_managed_rules")
+        assert "CF229" not in _ids(ctx)
+
+    def test_silent_without_the_account_marker(self):
+        # Rules in custom rulesets carry no ENT clause and may use the fields.
+        ctx = self._lint("cf.waf.score.sqli lt 20", "cloudflare.waf_custom_rules")
+        assert "CF229" not in _ids(ctx)
+
+    def test_silent_for_other_fields(self):
+        ctx = self._lint(
+            f"(cf.edge.server_port eq 443) and {self._ENT}", "cloudflare.waf_custom_rules"
+        )
+        assert "CF229" not in _ids(ctx)
+
+
 class TestCF224ExpressionLengthCap:
     """Cloudflare's Rulesets API rejects expressions longer than 4096 chars
     (error 20127). CF measures the canonical normalized form, so CF224 does
@@ -1513,6 +1568,26 @@ class TestOriginParams:
             "cloudflare.origin_rules",
         )
         assert "CF450" in _ids(ctx)
+
+
+class TestCF310CountingExpression:
+    def test_bitwise_and_in_counting_expression(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": "true",
+                "action": "block",
+                "ratelimit": {
+                    "period": 60,
+                    "requests_per_period": 100,
+                    "counting_expression": "cf.edge.server_port bitwise_and 1",
+                    "characteristics": ["ip.src"],
+                },
+            },
+            "cloudflare.rate_limiting_rules",
+        )
+        results = assert_lint(ctx, "CF310", count=1)
+        assert results[0].field == "ratelimit.counting_expression"
 
 
 class TestD006CountingExpression:

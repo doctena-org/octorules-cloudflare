@@ -1,5 +1,6 @@
 """Tests for AST linter — expression-level rules (Categories A, E, F, G, O)."""
 
+import pytest
 from octorules.linter.engine import LintContext, Severity
 from octorules.phases import PHASE_BY_NAME
 from octorules.testing.lint import assert_lint, assert_no_lint
@@ -737,6 +738,85 @@ class TestF001FullRegistry:
     def test_cf307_string_numeric_ok(self):
         ctx = _lint('http.host eq "example.com"')
         assert "CF307" not in _ids(ctx)
+
+
+class TestCF310BitwiseAnd:
+    """Every HTTP ruleset phase rejects bitwise_and ("the use of operator
+    BitwiseAnd is not allowed"), with a literal or a field on the right."""
+
+    @pytest.mark.parametrize(
+        "expression", ["cf.edge.server_port bitwise_and 1", "cf.edge.server_port & 1"]
+    )
+    @pytest.mark.parametrize(
+        "phase",
+        [
+            "cloudflare.waf_custom_rules",
+            "cloudflare.rate_limiting_rules",
+            "cloudflare.url_rewrite_rules",
+        ],
+    )
+    def test_fires_in_http_phases(self, expression, phase):
+        results = assert_lint(_lint(expression, phase), "CF310", count=1, severity=Severity.ERROR)
+        assert results[0].field == "expression"
+
+    def test_silent_in_network_firewall_phases(self):
+        assert "CF310" not in _ids(
+            _lint("tcp.dstport bitwise_and 1", "cloudflare.network_firewall_managed")
+        )
+
+    def test_silent_without_bitwise_and(self):
+        assert "CF310" not in _ids(_lint("cf.edge.server_port eq 443"))
+
+
+class TestFieldOnRightHandSide:
+    """Equality and ordering comparisons may take a field, indexed value or
+    function result on the right; its fields are linted like the left side's."""
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "http.request.uri.path ne raw.http.request.uri.path",
+            "len(http.request.uri.path) gt len(http.request.uri.query)",
+            'http.request.uri.args["first"][0] eq http.request.uri.args["second"][0]',
+        ],
+    )
+    def test_parses_without_cf001(self, expression):
+        assert "CF001" not in _ids(_lint(expression))
+
+
+class TestDocumentedFunctions:
+    """coalesce, hash_in_range and the trim functions parse and are known."""
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            'http.request.uri.path eq coalesce(http.request.uri.args["expected_path"][0], "/")',
+            "hash_in_range(0, 100, cf.random_seed) lt 10",
+            'trim(http.request.uri.path, "/") eq "blog"',
+            'trim_start(http.request.uri.path, "/") eq "blog"',
+            'trim_end(http.request.uri.path, "/") eq "blog"',
+        ],
+    )
+    def test_no_parse_error_or_unknown_function(self, expression):
+        ids = _ids(_lint(expression))
+        assert "CF001" not in ids
+        assert "CF300" not in ids
+
+    def test_argument_rules_surface_as_cf001(self):
+        ctx = _lint("hash_in_range(5, 5, cf.random_seed) lt 10")
+        assert "CF001" in _ids(ctx)
+
+
+class TestCF306TrimSource:
+    """trim, trim_start and trim_end reject a literal source (live API, 2026-10-20)."""
+
+    @pytest.mark.parametrize("func", ["trim", "trim_start", "trim_end"])
+    def test_literal_source_fires(self, func):
+        assert "CF306" in _ids(_lint(f'{func}(" x ") eq "x"'))
+
+    @pytest.mark.parametrize("func", ["trim", "trim_start", "trim_end"])
+    def test_field_source_ok(self, func):
+        assert "CF306" not in _ids(_lint(f'{func}(http.host, "/") eq "x"'))
 
 
 class TestE003ReplaceLimits:

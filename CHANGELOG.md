@@ -9,10 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **CF228** (ERROR): an account-level `waf_custom_rules`, `waf_managed_rules` or `rate_limiting_rules` filter that is neither the ENT clause alone nor one parenthesised group followed by `and` and the ENT clause. Cloudflare rejects such a filter, failing the whole phase; `not (A) and (cf.zone.plan eq "ENT")` is one.
+- **CF229** (ERROR): a WAF attack-score field (`cf.waf.score`, `cf.waf.score.*`) in an account-level `waf_custom_rules` or `rate_limiting_rules` rule, which the entry point rejects.
+- **CF310** (ERROR): `bitwise_and` (`&`) in an HTTP phase expression or `counting_expression`, which the Rulesets API rejects.
 
 ### Changed
 - Minimum `octorules-wirefilter` dependency: `>=0.7.0`.
+- `coalesce`, `hash_in_range`, `trim`, `trim_start` and `trim_end` are recognised, with Cloudflare's argument rules; **CF306** also covers a literal source in the `trim` functions.
 - **CF223** and **CF227** also recognise `cf.zone.plan == "ENT"` as marking an account-scoped rule.
+- A comparison with a field or function call on its right-hand side (`http.request.uri.path ne raw.http.request.uri.path`) no longer raises **CF001**; fields on either side are linted.
 
 ## [0.17.2] - 2026-09-25
 
