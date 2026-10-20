@@ -197,7 +197,7 @@ def _check_account_entry_point_shape(
             message=(
                 "Account entry-point filter must be the ENT clause alone or one"
                 f" parenthesised group followed by '{_ENT_SUFFIXES[0].lstrip()}'."
-                " Cloudflare rejects any other shape with HTTP 400, failing the whole phase"
+                " Cloudflare rejects this shape with HTTP 400, failing the whole phase"
             ),
             phase=phase_name,
             ref=ref,

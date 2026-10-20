@@ -548,7 +548,7 @@ class TestCF228AccountEntryPointShape:
     @pytest.mark.parametrize(
         "expression",
         [
-            '(cf.zone.plan eq "ENT")',
+            '(cf.zone.plan eq "ENT")',  # live
             'cf.zone.plan eq "ENT"',  # live
             '(not (http.host eq "ent-shape-test.invalid")) and (cf.zone.plan eq "ENT")',  # live
             '(http.host eq "ent-shape-test.invalid") and cf.zone.plan eq "ENT"',  # live
@@ -583,6 +583,14 @@ class TestCF228AccountEntryPointShape:
         )
         assert results[0].field == "expression"
         assert results[0].suggestion
+
+    def test_message_claims_only_the_flagged_shape_is_rejected(self):
+        # The unparenthesised suffix is accepted too, so "any other shape" was wrong.
+        results = assert_lint(
+            self._lint(f'not (http.host eq "a.example") and {self._ENT}'), "CF228"
+        )
+        assert "rejects this shape" in results[0].message
+        assert "any other shape" not in results[0].message
 
     @pytest.mark.parametrize("phase", _PHASES)
     def test_every_account_entry_point_phase(self, phase):
