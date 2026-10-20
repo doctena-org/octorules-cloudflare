@@ -123,6 +123,7 @@ RULE_IDS = frozenset(
         "CF225",
         "CF226",
         "CF227",
+        "CF228",
         "CF409",
     }
 )
@@ -139,11 +140,72 @@ _VALID_HEADER_OPERATIONS = frozenset({"set", "remove", "add"})
 # conditions and end your expression with `and cf.zone.plan eq \"ENT\"`".
 # We treat the presence of that literal as the YAML-visible signal that the
 # rule is intended for account scope (kind=root), where CF rejects skip with
-# API error 20016.
-_ACCOUNT_SCOPE_MARKER = re.compile(r'cf\.zone\.plan\s+eq\s+"ENT"')
+# API error 20016. `==` is the same comparison, so it marks scope too.
+_ACCOUNT_SCOPE_MARKER = re.compile(r'cf\.zone\.plan(?:\s+eq\s+|\s*==\s*)"ENT"')
 
 # CF227: stored-list reference. Same pattern the cross-rule linter uses (CF102).
 _LIST_REF_RE = re.compile(r"\$([a-zA-Z_][a-zA-Z0-9_.]*)")
+
+# CF228: the filter shapes every account entry point accepts, as sync sends them
+# (whitespace-normalized). Probed against the live API on all three phases.
+_ENT_PHASES = frozenset(
+    {
+        "cloudflare.waf_custom_rules",
+        "cloudflare.waf_managed_rules",
+        "cloudflare.rate_limiting_rules",
+    }
+)
+_ENT_BARE = 'cf.zone.plan eq "ENT"'
+_ENT_ALONE = frozenset({_ENT_BARE, f"({_ENT_BARE})"})
+_ENT_SUFFIXES = (f" and ({_ENT_BARE})", f" and {_ENT_BARE}")
+
+
+def _check_account_entry_point_shape(
+    rule: dict[str, Any], phase_name: str, ref: str, ctx: LintContext
+) -> None:
+    """CF228: an account entry-point filter in a shape Cloudflare rejects.
+
+    Accepted: the ENT clause alone, or exactly one parenthesised group followed
+    by ``and (cf.zone.plan eq "ENT")`` or ``and cf.zone.plan eq "ENT"``.
+    ``not (A) and (ENT)`` ends with the suffix but is rejected: its first
+    operand is a ``not``, not a group.
+    """
+    from octorules_cloudflare.linter.expression_bridge import parse_expression
+
+    if phase_name not in _ENT_PHASES:
+        return
+    expression = rule.get("expression")
+    if not isinstance(expression, str) or not _ACCOUNT_SCOPE_MARKER.search(expression):
+        return
+    info = parse_expression(expression, phase=phase_name)
+    if info.parse_error or not info.top_level_items:
+        return  # CF001 reports parse errors; an older wirefilter reports no shape
+    if info.raw in _ENT_ALONE:
+        return
+    if (
+        info.raw.endswith(_ENT_SUFFIXES)
+        and info.top_level_op == "and"
+        and len(info.top_level_items) == 2
+        and info.top_level_items[0] == "parenthesized"
+    ):
+        return
+    ctx.add(
+        LintResult(
+            rule_id="CF228",
+            severity=Severity.ERROR,
+            message=(
+                "Account entry-point filter must be the ENT clause alone or one"
+                f" parenthesised group followed by '{_ENT_SUFFIXES[0].lstrip()}'."
+                " Cloudflare rejects any other shape with HTTP 400, failing the whole phase"
+            ),
+            phase=phase_name,
+            ref=ref,
+            field="expression",
+            suggestion=(
+                f"Wrap the other conditions in one pair of parentheses: (...){_ENT_SUFFIXES[0]}"
+            ),
+        )
+    )
 
 
 def _check_account_scope_list_ref(
@@ -223,10 +285,11 @@ def lint_actions(rule: dict[str, Any], phase: Phase, ctx: LintContext) -> None:
     action = rule.get("action")
     phase_name = phase.friendly_name
 
-    # CF224 / CF227: expression-level checks, run first so they fire regardless
-    # of any action-validation early-return below.
+    # CF224 / CF227 / CF228: expression-level checks, run first so they
+    # fire regardless of any action-validation early-return below.
     _check_expression_length(rule, phase_name, ref, ctx)
     _check_account_scope_list_ref(rule, phase_name, ref, ctx)
+    _check_account_entry_point_shape(rule, phase_name, ref, ctx)
 
     # CF201: Missing action in phase without default
     if action is None:

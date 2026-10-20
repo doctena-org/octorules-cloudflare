@@ -41,6 +41,11 @@ class ExpressionInfo:
     int_literals: list[int] = field(default_factory=list)
     has_regex: bool = False
     depth_exceeded: bool = False
+    top_level_op: str = ""
+    """``and``/``or``/``xor`` when the top level chains operands, else empty."""
+    top_level_items: list[str] = field(default_factory=list)
+    """Kind of each top-level operand (``comparison``, ``parenthesized``,
+    ``unary``, ``quantifier``, ``combining``). Empty on parse error."""
     parse_error: str = ""
     """Empty on success.  On wirefilter parse failure, contains the error
     message (e.g. ``"unknown field `bogus`"``).  On FFI crash, contains
@@ -264,6 +269,8 @@ def _parse_with_wirefilter(
                 int_literals=result.get("int_literals", []),
                 has_regex=bool(regex_literals),
                 depth_exceeded=result.get("depth_exceeded", False),
+                top_level_op=result.get("top_level_op", ""),
+                top_level_items=result.get("top_level_items", []),
             )
     except UnknownSchemeError:
         # Not a crash: the scheme names a field set this build of

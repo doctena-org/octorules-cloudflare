@@ -195,6 +195,18 @@ class TestCF223SkipInAccountScope:
         assert results[0].severity == Severity.ERROR
         assert "20016" in results[0].message
 
+    def test_fires_with_the_symbolic_marker(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": '(ip.src.asnum eq 45566) and (cf.zone.plan == "ENT")',
+                "action": "skip",
+                "action_parameters": {"ruleset": "current"},
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert_lint(ctx, "CF223", count=1)
+
     def test_does_not_fire_on_zone_scoped_skip(self):
         ctx = _lint_rule(
             {
@@ -445,6 +457,17 @@ class TestCF227AccountScopeListRef:
         assert "pentest_ips" in results[0].message
         assert results[0].field == "expression"
 
+    def test_fires_with_the_symbolic_marker(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": '((ip.src in $blocked)) and (cf.zone.plan == "ENT")',
+                "action": "block",
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert_lint(ctx, "CF227", count=1)
+
     def test_reports_each_distinct_list_once(self):
         ctx = _lint_rule(
             {
@@ -494,6 +517,122 @@ class TestCF227AccountScopeListRef:
             "cloudflare.waf_custom_rules",
         )
         assert "CF227" not in _ids(ctx)
+
+
+class TestCF228AccountEntryPointShape:
+    """Every account entry point (custom, managed, rate limit) accepts a filter
+    that is the ENT clause alone, or one parenthesised group followed by
+    ` and (cf.zone.plan eq "ENT")` or ` and cf.zone.plan eq "ENT"`. Anything else
+    fails the whole phase with HTTP 400. `not (A) and (ENT)` ends with the suffix
+    yet is rejected: `not` binds to `(A)` only, so the first operand is a `not`,
+    not a group. Cases marked "live" were probed against the API."""
+
+    _ENT = '(cf.zone.plan eq "ENT")'
+    _PHASES = (
+        "cloudflare.waf_custom_rules",
+        "cloudflare.waf_managed_rules",
+        "cloudflare.rate_limiting_rules",
+    )
+
+    def _lint(self, expression, phase="cloudflare.waf_custom_rules"):
+        return _lint_rule(
+            {
+                "ref": "t",
+                "expression": expression,
+                "action": "execute",
+                "action_parameters": {"id": "a" * 32},
+            },
+            phase,
+        )
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            '(cf.zone.plan eq "ENT")',
+            'cf.zone.plan eq "ENT"',  # live
+            '(not (http.host eq "ent-shape-test.invalid")) and (cf.zone.plan eq "ENT")',  # live
+            '(http.host eq "ent-shape-test.invalid") and cf.zone.plan eq "ENT"',  # live
+            '((not http.host contains "example.com")) and (cf.zone.plan eq "ENT")',
+            '((cf.zone.name in {"a.example" "b.example"})) and (cf.zone.plan eq "ENT")',
+            '((http.host eq "a.example") and (http.host eq "b.example"))'
+            ' and (cf.zone.plan eq "ENT")',
+            # Sync sends the whitespace-normalized expression, so a line break
+            # before the suffix (which the API itself rejects) never reaches it.
+            '((cf.zone.name in {"a.example"}))\nand (cf.zone.plan eq "ENT")',
+        ],
+    )
+    def test_accepted_shapes_are_clean(self, expression):
+        assert "CF228" not in _ids(self._lint(expression))
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            'not (http.host eq "ent-shape-test.invalid") and (cf.zone.plan eq "ENT")',  # live
+            '(http.host eq "ent-shape-test.invalid") and (http.host eq "b.invalid")'
+            ' and (cf.zone.plan eq "ENT")',  # live
+            '(http.host eq "ent-shape-test.invalid") and (cf.zone.plan == "ENT")',  # live
+            '(cf.zone.plan eq "ENT")\nand not (http.host eq "a.example")',
+            '(http.host eq "a.example") or (http.host eq "b.example") and (cf.zone.plan eq "ENT")',
+            '(http.host eq "a.example") && (cf.zone.plan eq "ENT")',
+            'http.host eq "a.example" and (cf.zone.plan eq "ENT")',
+        ],
+    )
+    def test_rejected_shapes_fire(self, expression):
+        results = assert_lint(
+            self._lint(expression), "CF228", count=1, severity=Severity.ERROR, ref="t"
+        )
+        assert results[0].field == "expression"
+        assert results[0].suggestion
+
+    @pytest.mark.parametrize("phase", _PHASES)
+    def test_every_account_entry_point_phase(self, phase):
+        assert_lint(self._lint(f'not (http.host eq "a.example") and {self._ENT}', phase), "CF228")
+        clean = self._lint(f'(not (http.host eq "a.example")) and {self._ENT}', phase)
+        assert "CF228" not in _ids(clean)
+
+    def test_fires_regardless_of_action(self):
+        ctx = _lint_rule(
+            {
+                "ref": "t",
+                "expression": f'not (http.host eq "a.example") and {self._ENT}',
+                "action": "block",
+            },
+            "cloudflare.waf_custom_rules",
+        )
+        assert_lint(ctx, "CF228", count=1)
+
+    def test_does_not_fire_without_the_account_marker(self):
+        ctx = self._lint('not (http.host eq "a.example") and (http.host eq "b")')
+        assert "CF228" not in _ids(ctx)
+
+    def test_does_not_fire_in_other_phases(self):
+        ctx = self._lint(
+            f'not (http.host eq "a.example") and {self._ENT}', "cloudflare.redirect_rules"
+        )
+        assert "CF228" not in _ids(ctx)
+
+    def test_skips_expressions_wirefilter_cannot_parse(self):
+        # CF001 reports the parse error; the shape is unknown.
+        assert "CF228" not in _ids(self._lint(f'not (bogus.field eq "a") and {self._ENT}'))
+
+    def test_does_not_crash_on_non_string_expression(self):
+        assert "CF228" not in _ids(self._lint(123))
+
+    def test_silent_when_wirefilter_reports_no_shape(self, monkeypatch):
+        # A wirefilter build without top_level_items must not flag every rule.
+        from octorules_cloudflare.linter import expression_bridge
+
+        real = expression_bridge._wf_parse
+
+        def without_shape(expr, scheme=None):
+            result = real(expr, scheme=scheme)
+            result.pop("top_level_items", None)
+            result.pop("top_level_op", None)
+            return result
+
+        monkeypatch.setattr(expression_bridge, "_wf_parse", without_shape)
+        expression_bridge._clear_parse_cache()
+        assert "CF228" not in _ids(self._lint(f'not (http.host eq "a.example") and {self._ENT}'))
 
 
 class TestCF224ExpressionLengthCap:

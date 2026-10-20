@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **CF228** (ERROR): an account-level `waf_custom_rules`, `waf_managed_rules` or `rate_limiting_rules` filter that is neither the ENT clause alone nor one parenthesised group followed by `and` and the ENT clause. Cloudflare rejects such a filter, failing the whole phase; `not (A) and (cf.zone.plan eq "ENT")` is one.
+
+### Changed
+- Minimum `octorules-wirefilter` dependency: `>=0.7.0`.
+- **CF223** and **CF227** also recognise `cf.zone.plan == "ENT"` as marking an account-scoped rule.
+
 ## [0.17.2] - 2026-09-25
 
 ### Changed

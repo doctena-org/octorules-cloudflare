@@ -338,6 +338,26 @@ class TestWirefilterBridge:
         assert "starts_with" in info.functions_used
 
 
+class TestTopLevelShape:
+    """The bridge carries wirefilter's top-level grouping into ExpressionInfo."""
+
+    def test_chain_maps_op_and_items(self):
+        info = parse_expression('not (http.host eq "a") and (cf.zone.plan eq "ENT")')
+        assert info.top_level_op == "and"
+        assert info.top_level_items == ["unary", "parenthesized"]
+
+    def test_single_operand_has_no_op(self):
+        info = parse_expression('(cf.zone.plan eq "ENT")')
+        assert info.top_level_op == ""
+        assert info.top_level_items == ["parenthesized"]
+
+    def test_parse_error_has_no_shape(self):
+        info = parse_expression('not (bogus.field eq "a") and (cf.zone.plan eq "ENT")')
+        assert info.parse_error
+        assert info.top_level_op == ""
+        assert info.top_level_items == []
+
+
 class TestWirefilterFFICrashFallback:
     """Tests for FFI crash → regex fallback with logged warning."""
 

@@ -103,6 +103,12 @@ CF227 = RuleMeta(
     "Stored list referenced from an account-scoped waf_custom_rules rule",
     Severity.ERROR,
 )
+CF228 = RuleMeta(
+    "CF228",
+    "action",
+    "Account entry-point filter not in the shape Cloudflare accepts",
+    Severity.ERROR,
+)
 
 # Category D — Rate Limiting Specific
 CF400 = RuleMeta("CF400", "rate_limit", "Missing or invalid rate limiting period", Severity.ERROR)

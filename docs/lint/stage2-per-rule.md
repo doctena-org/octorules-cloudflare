@@ -35,7 +35,7 @@ Fix: Simplify the expression to reduce nesting depth. Break complex logic into m
 
 ---
 
-## Category C — Action Validation (28 rules)
+## Category C — Action Validation (29 rules)
 
 ### CF200 — Invalid action for phase
 
@@ -555,6 +555,31 @@ cloudflare:
 **Fix:** Move the condition into a rule *inside* the custom ruleset this entry point executes, where list references are accepted.
 
 Like CF223, account scope is detected by the `cf.zone.plan eq "ENT"` suffix Cloudflare requires on account-level rules. Rules nested in `custom_rulesets` are linted under the same phase name but carry no such suffix, which is what separates the two — a nested rule that included the marker anyway would false-positive. Suppress with `# octorules:disable=CF227`.
+
+### CF228 - Account entry-point filter not in the shape Cloudflare accepts
+
+**Severity:** ERROR
+
+The account-level entry points of `waf_custom_rules`, `waf_managed_rules` and `rate_limiting_rules` accept a rule filter in one of two shapes and reject anything else with HTTP 400. Sync replaces the whole phase in one call, so one rejected rule fails every change to the phase.
+
+- The ENT clause alone: `cf.zone.plan eq "ENT"` or `(cf.zone.plan eq "ENT")`.
+- One parenthesised group, then ` and (cf.zone.plan eq "ENT")` or ` and cf.zone.plan eq "ENT"`.
+
+Cloudflare strips the ENT suffix, requires the rest to be a single `(...)` group and parses its inside. So `not (A) and (cf.zone.plan eq "ENT")` is rejected although it ends with the suffix, and `(A) and (B) and (cf.zone.plan eq "ENT")` fails to parse as `A) and (B`. The clause must be spelled `eq`; `==` is rejected.
+
+```yaml
+cloudflare:
+  waf_custom_rules:
+  - ref: run-blocking-ruleset
+    action: execute
+    action_parameters:
+      id: <ruleset id>
+    expression: (not (http.host eq "example.net")) and (cf.zone.plan eq "ENT")
+```
+
+**Fix:** Wrap every other condition in one pair of parentheses: `(<conditions>) and (cf.zone.plan eq "ENT")`.
+
+The check runs on the whitespace-normalized expression sync sends, so a line break before `and` (which the API rejects in a raw request) makes no difference. Account scope is detected as for [CF227](#cf227--stored-list-referenced-from-an-account-scoped-waf_custom_rules-rule), by the `cf.zone.plan eq "ENT"` clause (or its `==` spelling). Suppress with `# octorules:disable=CF228`.
 
 ---
 
@@ -1208,6 +1233,13 @@ Fix: Correct the field name. Check for typos.
 
 | Severity | Category |
 |----------|----------|
+| ERROR | type |
+
+Triggers on `bitwise_and` (`&`) in any HTTP phase, in `expression` or a rate limit's `counting_expression`. The engine parses it, but the Rulesets API rejects the rule: "the use of operator BitwiseAnd is not allowed". Network firewall phases are not checked.
+
+Fix: Compare the value with `eq`, `in` or an ordering operator instead.
+
+----------|----------|
 | WARNING | type |
 
 Triggers when `[*]` (array unpacking) is used on more than one distinct array field in the same expression. Cloudflare only allows `[*]` to be applied to a single array within one expression.
