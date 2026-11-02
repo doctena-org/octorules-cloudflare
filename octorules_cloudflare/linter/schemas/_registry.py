@@ -31,10 +31,8 @@ MAGIC_FIREWALL_PHASES = frozenset(
 
 @functools.lru_cache(maxsize=1)
 def _load_overlay() -> dict:
-    try:
-        import tomllib
-    except ModuleNotFoundError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
+
     with open(_OVERLAY_PATH, "rb") as f:
         return tomllib.load(f)
 

@@ -24,7 +24,7 @@ than serving none at all.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from octorules.extensions import (
     ProviderExtension,
@@ -97,8 +97,8 @@ def canonicalize_expires(value: object) -> object:
     else:
         return value
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def normalize_security_txt(raw: dict) -> dict:
@@ -276,8 +276,8 @@ def _validate_expires(settings: dict, where: str, errors: list[str], lines: list
         errors.append(f"{where}: expires must be an ISO-8601 timestamp string, got {expires!r}")
         return
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    if dt < datetime.now(timezone.utc):
+        dt = dt.replace(tzinfo=UTC)
+    if dt < datetime.now(UTC):
         lines.append(
             f"{where}: expires ({canonicalize_expires(expires)}) is in the past -- an"
             " expired security.txt advertises a disclosure path nobody maintains;"

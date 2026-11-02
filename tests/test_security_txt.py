@@ -1,6 +1,6 @@
 """Tests for the security.txt (RFC 9116) settings extension and provider methods."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from octorules.provider.base import Scope
@@ -45,7 +45,7 @@ class TestCanonicalizeExpires:
         assert canonicalize_expires("2033-01-01T02:00:00+02:00") == "2033-01-01T00:00:00Z"
 
     def test_datetime_converts(self):
-        dt = datetime(2033, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2033, 1, 1, tzinfo=UTC)
         assert canonicalize_expires(dt) == "2033-01-01T00:00:00Z"
 
     def test_naive_datetime_is_treated_as_utc(self):
@@ -67,7 +67,7 @@ class TestNormalization:
         assert normalize_security_txt(raw) == {"enabled": True}
 
     def test_expires_datetime_becomes_canonical_string(self):
-        raw = {"expires": datetime(2033, 1, 1, tzinfo=timezone.utc)}
+        raw = {"expires": datetime(2033, 1, 1, tzinfo=UTC)}
         assert normalize_security_txt(raw) == {"expires": "2033-01-01T00:00:00Z"}
 
     def test_list_entries_are_strings(self):
@@ -252,7 +252,7 @@ class TestProviderSecurityTxt:
         mock_cf_client.security_txt.get.return_value = {
             "enabled": True,
             "contact": ["mailto:security@example.com"],
-            "expires": datetime(2033, 1, 1, tzinfo=timezone.utc),
+            "expires": datetime(2033, 1, 1, tzinfo=UTC),
             "hiring": None,
         }
         provider = self._provider(mock_cf_client)
